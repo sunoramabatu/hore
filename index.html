@@ -1,74 +1,81 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Excel to Map</title>
+  <title>OyonID Map</title>
   <meta charset="UTF-8" />
-
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Leaflet CSS -->
-  <link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
 
   <style>
-    body {
+    html, body {
+      height: 100%;
       margin: 0;
       font-family: Arial, sans-serif;
       background: #f3f4f6;
     }
 
     #upload {
-      padding: 12px;
-      font-size: 16px;
       width: 100%;
-    }
-
-    #map {
-      height: 80vh;
+      padding: 14px;
+      font-size: 16px;
+      border: none;
     }
 
     .ui-bar {
       position: sticky;
       top: 0;
-      background: white;
+      background: #fff;
       padding: 12px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
       z-index: 999;
     }
 
     .ui-input {
-      padding: 12px;
-      font-size: 16px;
-      border-radius: 10px;
+      padding: 14px;
+      font-size: 17px;
+      border-radius: 12px;
       border: 1px solid #ccc;
     }
 
     .ui-btn {
-      padding: 12px;
-      font-size: 16px;
-      border-radius: 10px;
+      padding: 14px;
+      font-size: 17px;
+      border-radius: 14px;
       background: #2563eb;
-      color: white;
-      border: none;
+      color: #fff;
       font-weight: bold;
+      border: none;
       cursor: pointer;
-    }
-
-    .ui-btn:hover {
-      background: #1e40af;
     }
 
     .ui-secondary {
       background: #059669;
     }
 
-    .ui-secondary:hover {
-      background: #047857;
+    .ui-btn:hover {
+      opacity: 0.9;
+    }
+
+    #map {
+      height: calc(100vh - 260px);
+      min-height: 400px;
+      width: 100%;
+    }
+
+    @media (max-width:600px) {
+      #map {
+        height: calc(100vh - 300px);
+      }
+      .ui-btn, .ui-input {
+        font-size: 18px;
+        padding: 16px;
+      }
     }
 
     .status {
@@ -84,7 +91,7 @@
 <div class="ui-bar">
   <div id="statusText" class="status"></div>
 
-  <input id="searchInput" class="ui-input" placeholder="Masukkan IDPEL..." />
+  <input id="searchInput" class="ui-input" placeholder="Masukkan 4 digit IDPEL / Meter" />
   <button id="searchBtn" class="ui-btn">CARI</button>
 
   <button id="zoomBtn" class="ui-btn ui-secondary" style="display:none;">Menuju lokasi tagging</button>
@@ -93,25 +100,21 @@
 
 <div id="map"></div>
 
-<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<!-- RoutingMachine -->
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
-const map = L.map('map', { maxZoom: 22 }).setView([-6.2, 106.8], 12);
+const map = L.map('map', { maxZoom: 22 }).setView([-6.2,106.8], 12);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 22
 }).addTo(map);
 
-let allRows = [];
-let markers = [];
-let userMarker = null;
-let userLatLng = null;
-let routingControl = null;
+setTimeout(()=>map.invalidateSize(),500);
+
+let allRows=[], markers=[], searchIndex=[];
+let userLatLng=null, userMarker=null, routingControl=null;
 
 const upload = document.getElementById("upload");
 const statusText = document.getElementById("statusText");
@@ -120,157 +123,110 @@ const searchBtn = document.getElementById("searchBtn");
 const zoomBtn = document.getElementById("zoomBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
-upload.addEventListener("change", function(e) {
-  const file = e.target.files[0];
+upload.onchange = e=>{
   const reader = new FileReader();
-
-  reader.onload = function(evt) {
-    const data = new Uint8Array(evt.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
-    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  reader.onload = evt=>{
+    const wb = XLSX.read(new Uint8Array(evt.target.result), {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
     allRows = XLSX.utils.sheet_to_json(sheet);
-
     renderMarkers();
-
     statusText.innerText = "✅ Peta berhasil dibuat";
-    zoomBtn.style.display = "block";
+    zoomBtn.style.display="block";
   };
+  reader.readAsArrayBuffer(e.target.files[0]);
+};
 
-  reader.readAsArrayBuffer(file);
-});
-
-function getColor(hari) {
-  if (!hari) return "gray";
-  const val = hari.toUpperCase();
-  const colors = {
-    A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",
-    F:"#911eb4",G:"#46f0f0",H:"#f032e6",I:"#bcf60c",J:"#fabebe",
-    K:"#008080",L:"#ffd700",M:"#aaffc3",N:"#808000",O:"#ffd8b1",
-    P:"#000075",Q:"#ff7f00",R:"#800000",S:"#a9a9a9",T:"#00ced1",
-    U:"#9400d3",V:"#228b22",W:"#ff1493",X:"#8a2be2",Y:"#7fff00",Z:"#dc143c"
-  };
-  return colors[val] || "gray";
+function getColor(v){
+  const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
+  G:"#46f0f0",H:"#f032e6",I:"#bcf60c",J:"#fabebe",K:"#008080",L:"#ffd700",M:"#aaffc3",
+  N:"#808000",O:"#ffd8b1",P:"#000075",Q:"#ff7f00",R:"#800000",S:"#a9a9a9",T:"#00ced1",
+  U:"#9400d3",V:"#228b22",W:"#ff1493",X:"#8a2be2",Y:"#7fff00",Z:"#dc143c"};
+  return c[(v||"").toUpperCase()] || "gray";
 }
 
-function goToCustomer(lat, lng) {
-  if (!userLatLng) {
-    alert("Lokasi Anda belum terdeteksi");
-    return;
-  }
+function renderMarkers(){
+  markers.forEach(m=>map.removeLayer(m.marker));
+  markers=[]; searchIndex=[];
 
-  // hapus rute lama kalau ada
-  if (routingControl) {
-    map.removeControl(routingControl);
-  }
+  allRows.forEach(row=>{
+    const lat=parseFloat(row.LAT), lng=parseFloat(row.LON);
+    if(isNaN(lat)||isNaN(lng)) return;
 
-  routingControl = L.Routing.control({
-    waypoints: [
-      L.latLng(userLatLng[0], userLatLng[1]),
-      L.latLng(lat, lng)
-    ],
-    routeWhileDragging: false,
-    show: false,
-    addWaypoints: false,
-    draggableWaypoints: false,
-    fitSelectedRoutes: true
-  }).addTo(map);
-}
+    const color=getColor(row["HARI BACA ACMT"]);
 
-function renderMarkers() {
-  markers.forEach(m => map.removeLayer(m.marker));
-  markers = [];
-
-  allRows.forEach((row, index) => {
-    const lat = parseFloat(row.LAT);
-    const lng = parseFloat(row.LON);
-    if (isNaN(lat) || isNaN(lng)) return;
-
-    const color = getColor(row["HARI BACA ACMT"]);
-
-    const marker = L.circleMarker([lat, lng], {
-      radius: 8,
-      color,
-      fillColor: color,
-      fillOpacity: 0.9
+    const marker=L.circleMarker([lat,lng],{
+      radius:8,color,fillColor:color,fillOpacity:.9
     }).addTo(map);
 
     marker.bindPopup(`
-      <b>${row.NAMA}</b><br>
+      <b>${row.NAMA||""}</b><br>
       NO: ${row.NO}<br>
       IDPEL: ${row.IDPEL}<br>
       DAYA: ${row.DAYA}<br>
       MERK: ${row["MERK METER"]}<br>
       NOMOR: ${row["NOMOR METER"]}<br><br>
-      <button onclick="markDone(${index})">SUDAH DIBACA</button>
-      <button onclick="goToCustomer(${lat}, ${lng})">DATANGI</button>
+      <button onclick="markDone('${row.IDPEL}')">SUDAH DIBACA</button>
+      <button onclick="goToCustomer(${lat},${lng})">DATANGI</button>
     `);
 
-    markers.push({ marker, row });
+    markers.push({marker,row});
+    searchIndex.push({
+      idpel:String(row.IDPEL||""),
+      meter:String(row["NOMOR METER"]||""),
+      marker
+    });
   });
 }
 
-function markDone(index) {
-  allRows.splice(index, 1);
+function markDone(idpel){
+  allRows = allRows.filter(r=>String(r.IDPEL)!==String(idpel));
   renderMarkers();
 }
 
-searchBtn.onclick = function() {
-  const keyword = searchInput.value.trim();
-
-  if (keyword.length < 4) {
-    alert("Masukkan minimal 4 digit terakhir");
-    return;
-  }
-
-  const found = markers.find(obj => {
-    const idpel = String(obj.row.IDPEL || "");
-    const meter = String(obj.row["NOMOR METER"] || "");
-
-    return idpel.endsWith(keyword) || meter.endsWith(keyword);
-  });
-
-  if (found) {
-    map.setView(found.marker.getLatLng(), 19);
+searchBtn.onclick=()=>{
+  const key=searchInput.value.trim();
+  if(key.length<4) return alert("Minimal 4 digit");
+  const found=searchIndex.find(o=>o.idpel.endsWith(key)||o.meter.endsWith(key));
+  if(found){
+    map.setView(found.marker.getLatLng(),19);
     found.marker.openPopup();
-  } else {
-    alert("Data tidak ditemukan");
-  }
+  } else alert("Tidak ditemukan");
 };
 
-zoomBtn.onclick = function() {
-  if (!markers.length) return;
-  const group = L.featureGroup(markers.map(m => m.marker));
-  map.fitBounds(group.getBounds(), { padding: [30, 30] });
+zoomBtn.onclick=()=>{
+  if(!markers.length) return;
+  const group=L.featureGroup(markers.map(m=>m.marker));
+  map.fitBounds(group.getBounds(),{padding:[30,30]});
 };
 
-downloadBtn.onclick = function() {
-  const ws = XLSX.utils.json_to_sheet(allRows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Updated");
-  XLSX.writeFile(wb, "data_update.xlsx");
+downloadBtn.onclick=()=>{
+  const ws=XLSX.utils.json_to_sheet(allRows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Updated");
+  XLSX.writeFile(wb,"data_update.xlsx");
 };
 
-// GPS merah
-if (navigator.geolocation) {
-  navigator.geolocation.watchPosition(pos => {
-    const lat = pos.coords.latitude;
-    const lng = pos.coords.longitude;
-
-    userLatLng = [lat, lng];
-
-    if (!userMarker) {
-      userMarker = L.circleMarker([lat, lng], {
-        radius: 10,
-        color: "red",
-        fillColor: "red",
-        fillOpacity: 1
-      }).addTo(map).bindPopup("📍 Lokasi Anda");
-    } else {
-      userMarker.setLatLng([lat, lng]);
-    }
-  });
+function goToCustomer(lat,lng){
+  if(!userLatLng) return alert("Lokasi belum terdeteksi");
+  if(routingControl) map.removeControl(routingControl);
+  routingControl=L.Routing.control({
+    waypoints:[L.latLng(userLatLng),L.latLng(lat,lng)],
+    addWaypoints:false,
+    draggableWaypoints:false,
+    fitSelectedRoutes:true
+  }).addTo(map);
 }
 
+// GPS Live
+if(navigator.geolocation){
+  navigator.geolocation.watchPosition(pos=>{
+    userLatLng=[pos.coords.latitude,pos.coords.longitude];
+    if(!userMarker){
+      userMarker=L.circleMarker(userLatLng,{radius:10,color:"red",fillColor:"red",fillOpacity:1})
+      .addTo(map).bindPopup("📍 Lokasi Anda");
+    } else userMarker.setLatLng(userLatLng);
+  });
+}
 </script>
 </body>
 </html>
