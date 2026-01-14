@@ -42,25 +42,36 @@
   let markers = [];
   let userMarker = null;
 
-  // UI elements
+  // ===== UI BAR =====
+  const topBar = document.createElement("div");
+  topBar.style.display = "flex";
+  topBar.style.flexDirection = "column";
+  topBar.style.gap = "8px";
+  topBar.style.marginBottom = "10px";
+
   const statusText = document.createElement("div");
-  statusText.style.margin = "10px 0";
   statusText.style.fontWeight = "bold";
 
   const zoomBtn = document.createElement("button");
   zoomBtn.innerText = "Menuju lokasi tagging";
   zoomBtn.style.display = "none";
-  zoomBtn.style.marginBottom = "10px";
 
   const downloadBtn = document.createElement("button");
   downloadBtn.innerText = "Download Excel Update";
-  downloadBtn.style.marginLeft = "10px";
 
-  document.body.insertBefore(statusText, document.getElementById("map"));
-  document.body.insertBefore(zoomBtn, document.getElementById("map"));
-  document.body.insertBefore(downloadBtn, document.getElementById("map"));
+  const searchInput = document.createElement("input");
+  searchInput.placeholder = "Cari IDPEL...";
+  searchInput.style.padding = "8px";
+  searchInput.style.fontSize = "16px";
 
-  // Upload handler
+  topBar.appendChild(statusText);
+  topBar.appendChild(searchInput);
+  topBar.appendChild(zoomBtn);
+  topBar.appendChild(downloadBtn);
+
+  document.body.insertBefore(topBar, document.getElementById("map"));
+
+  // ===== UPLOAD =====
   document.getElementById('upload').addEventListener('change', function(e) {
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -80,6 +91,45 @@
     reader.readAsArrayBuffer(file);
   });
 
+  // ===== WARNA BERDASARKAN HARI BACA =====
+  function getColor(hari) {
+  if (!hari) return "gray";
+
+  const val = hari.toUpperCase();
+
+  const colors = {
+    A: "#e6194b", // merah
+    B: "#3cb44b", // hijau
+    C: "#ffe119", // kuning
+    D: "#4363d8", // biru
+    E: "#f58231", // oranye
+    F: "#911eb4", // ungu
+    G: "#46f0f0", // cyan
+    H: "#f032e6", // pink
+    I: "#bcf60c", // lime
+    J: "#fabebe",
+    K: "#008080",
+    L: "#ffd700", // kuning emas
+    M: "#aaffc3",
+    N: "#808000",
+    O: "#ffd8b1",
+    P: "#000075",
+    Q: "#ff7f00", // oranye kuat
+    R: "#800000",
+    S: "#a9a9a9",
+    T: "#00ced1",
+    U: "#9400d3",
+    V: "#228b22",
+    W: "#ff1493",
+    X: "#8a2be2", // ungu (purple)
+    Y: "#7fff00",
+    Z: "#dc143c"
+  };
+
+  return colors[val] || "gray";
+}
+
+  // ===== RENDER MARKER =====
   function renderMarkers() {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
@@ -89,7 +139,14 @@
       const lng = parseFloat(row.LON);
 
       if (!isNaN(lat) && !isNaN(lng)) {
-        const marker = L.marker([lat, lng]).addTo(map);
+        const color = getColor(row["HARI BACA ACMT"]);
+
+        const marker = L.circleMarker([lat, lng], {
+          radius: 8,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.8
+        }).addTo(map);
 
         marker.bindPopup(`
           <b>${row.NAMA}</b><br>
@@ -97,11 +154,12 @@
           IDPEL: ${row.IDPEL}<br>
           DAYA: ${row.DAYA}<br>
           MERK: ${row["MERK METER"]}<br>
-          NOMOR: ${row["NOMOR METER"]}<br><br>
+          NOMOR: ${row["NOMOR METER"]}<br>
+          HARI BACA: ${row["HARI BACA ACMT"]}<br><br>
           <button onclick="markDone(${index})">SUDAH DIBACA</button>
         `);
 
-        markers.push(marker);
+        markers.push({ marker, row });
       }
     });
   }
@@ -111,15 +169,14 @@
     renderMarkers();
   }
 
-  // Tombol zoom ke semua marker
+  // ===== AUTO ZOOM =====
   zoomBtn.onclick = function() {
     if (markers.length === 0) return;
-
-    const group = L.featureGroup(markers);
+    const group = L.featureGroup(markers.map(m => m.marker));
     map.fitBounds(group.getBounds(), { padding: [30, 30] });
   };
 
-  // Download Excel update
+  // ===== DOWNLOAD EXCEL =====
   downloadBtn.onclick = function() {
     const ws = XLSX.utils.json_to_sheet(allRows);
     const wb = XLSX.utils.book_new();
@@ -127,7 +184,26 @@
     XLSX.writeFile(wb, "data_update.xlsx");
   };
 
-  // GPS lokasi user (live)
+  // ===== SEARCH IDPEL =====
+  searchInput.addEventListener("input", function() {
+    const keyword = this.value.trim();
+
+    if (!keyword) {
+      renderMarkers();
+      return;
+    }
+
+    markers.forEach(obj => map.removeLayer(obj.marker));
+
+    markers.forEach(obj => {
+      if (String(obj.row.IDPEL).includes(keyword)) {
+        obj.marker.addTo(map);
+        obj.marker.openPopup();
+      }
+    });
+  });
+
+  // ===== GPS USER (MERAH) =====
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(pos => {
       const lat = pos.coords.latitude;
@@ -135,8 +211,10 @@
 
       if (!userMarker) {
         userMarker = L.circleMarker([lat, lng], {
-          radius: 8,
-          fillOpacity: 0.8
+          radius: 10,
+          color: "red",
+          fillColor: "red",
+          fillOpacity: 1
         }).addTo(map).bindPopup("📍 Lokasi Anda");
       } else {
         userMarker.setLatLng([lat, lng]);
