@@ -29,21 +29,38 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <script>
-    const map = L.map('map').setView([-6.2, 106.8], 12);
+    const map = L.map('map', {
+    maxZoom: 22
+  }).setView([-6.2, 106.8], 12);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22,
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
   let allRows = [];
   let markers = [];
+  let userMarker = null;
 
-  // Tambahkan tombol download di atas
+  // UI elements
+  const statusText = document.createElement("div");
+  statusText.style.margin = "10px 0";
+  statusText.style.fontWeight = "bold";
+
+  const zoomBtn = document.createElement("button");
+  zoomBtn.innerText = "Menuju lokasi tagging";
+  zoomBtn.style.display = "none";
+  zoomBtn.style.marginBottom = "10px";
+
   const downloadBtn = document.createElement("button");
   downloadBtn.innerText = "Download Excel Update";
-  downloadBtn.style.margin = "10px 0";
+  downloadBtn.style.marginLeft = "10px";
+
+  document.body.insertBefore(statusText, document.getElementById("map"));
+  document.body.insertBefore(zoomBtn, document.getElementById("map"));
   document.body.insertBefore(downloadBtn, document.getElementById("map"));
 
+  // Upload handler
   document.getElementById('upload').addEventListener('change', function(e) {
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -55,6 +72,9 @@
       allRows = XLSX.utils.sheet_to_json(sheet);
 
       renderMarkers();
+
+      statusText.innerText = "✅ Peta berhasil dibuat";
+      zoomBtn.style.display = "inline-block";
     };
 
     reader.readAsArrayBuffer(file);
@@ -91,13 +111,42 @@
     renderMarkers();
   }
 
+  // Tombol zoom ke semua marker
+  zoomBtn.onclick = function() {
+    if (markers.length === 0) return;
+
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds(), { padding: [30, 30] });
+  };
+
+  // Download Excel update
   downloadBtn.onclick = function() {
     const ws = XLSX.utils.json_to_sheet(allRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Updated");
-
     XLSX.writeFile(wb, "data_update.xlsx");
   };
+
+  // GPS lokasi user (live)
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      if (!userMarker) {
+        userMarker = L.circleMarker([lat, lng], {
+          radius: 8,
+          fillOpacity: 0.8
+        }).addTo(map).bindPopup("📍 Lokasi Anda");
+      } else {
+        userMarker.setLatLng([lat, lng]);
+      }
+    }, err => {
+      console.warn("GPS error:", err.message);
+    }, {
+      enableHighAccuracy: true
+    });
+  }
   </script>
 </body>
 </html>
