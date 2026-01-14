@@ -35,6 +35,15 @@
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
+  let allRows = [];
+  let markers = [];
+
+  // Tambahkan tombol download di atas
+  const downloadBtn = document.createElement("button");
+  downloadBtn.innerText = "Download Excel Update";
+  downloadBtn.style.margin = "10px 0";
+  document.body.insertBefore(downloadBtn, document.getElementById("map"));
+
   document.getElementById('upload').addEventListener('change', function(e) {
     const file = e.target.files[0];
     const reader = new FileReader();
@@ -43,29 +52,52 @@
       const data = new Uint8Array(evt.target.result);
       const workbook = XLSX.read(data, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet);
+      allRows = XLSX.utils.sheet_to_json(sheet);
 
-      rows.forEach(row => {
-        const lat = parseFloat(row.LAT);
-        const lng = parseFloat(row.LON);
-
-        if (!isNaN(lat) && !isNaN(lng)) {
-          L.marker([lat, lng])
-            .addTo(map)
-            .bindPopup(`
-              <b>${row.NAMA}</b><br>
-              NO: ${row.NO}<br>
-              IDPEL: ${row.IDPEL}<br>
-              DAYA: ${row.DAYA}<br>
-              MERK METER: ${row["MERK METER"]}<br>
-              NOMOR METER: ${row["NOMOR METER"]}
-            `);
-        }
-      });
+      renderMarkers();
     };
 
     reader.readAsArrayBuffer(file);
   });
+
+  function renderMarkers() {
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    allRows.forEach((row, index) => {
+      const lat = parseFloat(row.LAT);
+      const lng = parseFloat(row.LON);
+
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const marker = L.marker([lat, lng]).addTo(map);
+
+        marker.bindPopup(`
+          <b>${row.NAMA}</b><br>
+          NO: ${row.NO}<br>
+          IDPEL: ${row.IDPEL}<br>
+          DAYA: ${row.DAYA}<br>
+          MERK: ${row["MERK METER"]}<br>
+          NOMOR: ${row["NOMOR METER"]}<br><br>
+          <button onclick="markDone(${index})">SUDAH DIBACA</button>
+        `);
+
+        markers.push(marker);
+      }
+    });
+  }
+
+  function markDone(index) {
+    allRows.splice(index, 1);
+    renderMarkers();
+  }
+
+  downloadBtn.onclick = function() {
+    const ws = XLSX.utils.json_to_sheet(allRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Updated");
+
+    XLSX.writeFile(wb, "data_update.xlsx");
+  };
   </script>
 </body>
 </html>
