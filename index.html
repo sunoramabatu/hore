@@ -7,7 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"
+  />
 
   <style>
     body {
@@ -94,6 +97,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- SheetJS -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<!-- RoutingMachine -->
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
 const map = L.map('map', { maxZoom: 22 }).setView([-6.2, 106.8], 12);
@@ -105,6 +110,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let allRows = [];
 let markers = [];
 let userMarker = null;
+let userLatLng = null;
+let routingControl = null;
 
 const upload = document.getElementById("upload");
 const statusText = document.getElementById("statusText");
@@ -145,6 +152,30 @@ function getColor(hari) {
   return colors[val] || "gray";
 }
 
+function goToCustomer(lat, lng) {
+  if (!userLatLng) {
+    alert("Lokasi Anda belum terdeteksi");
+    return;
+  }
+
+  // hapus rute lama kalau ada
+  if (routingControl) {
+    map.removeControl(routingControl);
+  }
+
+  routingControl = L.Routing.control({
+    waypoints: [
+      L.latLng(userLatLng[0], userLatLng[1]),
+      L.latLng(lat, lng)
+    ],
+    routeWhileDragging: false,
+    show: false,
+    addWaypoints: false,
+    draggableWaypoints: false,
+    fitSelectedRoutes: true
+  }).addTo(map);
+}
+
 function renderMarkers() {
   markers.forEach(m => map.removeLayer(m.marker));
   markers = [];
@@ -171,6 +202,7 @@ function renderMarkers() {
       MERK: ${row["MERK METER"]}<br>
       NOMOR: ${row["NOMOR METER"]}<br><br>
       <button onclick="markDone(${index})">SUDAH DIBACA</button>
+      <button onclick="goToCustomer(${lat}, ${lng})">DATANGI</button>
     `);
 
     markers.push({ marker, row });
@@ -184,14 +216,24 @@ function markDone(index) {
 
 searchBtn.onclick = function() {
   const keyword = searchInput.value.trim();
-  if (!keyword) return alert("Masukkan IDPEL");
 
-  const found = markers.find(m => String(m.row.IDPEL) === keyword);
+  if (keyword.length < 4) {
+    alert("Masukkan minimal 4 digit terakhir");
+    return;
+  }
+
+  const found = markers.find(obj => {
+    const idpel = String(obj.row.IDPEL || "");
+    const meter = String(obj.row["NOMOR METER"] || "");
+
+    return idpel.endsWith(keyword) || meter.endsWith(keyword);
+  });
+
   if (found) {
     map.setView(found.marker.getLatLng(), 19);
     found.marker.openPopup();
   } else {
-    alert("IDPEL tidak ditemukan");
+    alert("Data tidak ditemukan");
   }
 };
 
@@ -214,6 +256,8 @@ if (navigator.geolocation) {
     const lat = pos.coords.latitude;
     const lng = pos.coords.longitude;
 
+    userLatLng = [lat, lng];
+
     if (!userMarker) {
       userMarker = L.circleMarker([lat, lng], {
         radius: 10,
@@ -226,6 +270,7 @@ if (navigator.geolocation) {
     }
   });
 }
+
 </script>
 </body>
 </html>
