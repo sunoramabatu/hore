@@ -4,227 +4,228 @@
   <title>Excel to Map</title>
   <meta charset="UTF-8" />
 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <!-- Leaflet CSS -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    body { font-family: Arial; padding: 10px; }
-    #map { height: 500px; margin-top: 10px; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+    }
+
+    #upload {
+      padding: 12px;
+      font-size: 16px;
+      width: 100%;
+    }
+
+    #map {
+      height: 80vh;
+    }
+
+    .ui-bar {
+      position: sticky;
+      top: 0;
+      background: white;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      z-index: 999;
+    }
+
+    .ui-input {
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+    }
+
+    .ui-btn {
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .ui-btn:hover {
+      background: #1e40af;
+    }
+
+    .ui-secondary {
+      background: #059669;
+    }
+
+    .ui-secondary:hover {
+      background: #047857;
+    }
+
+    .status {
+      font-weight: bold;
+    }
   </style>
 </head>
 
 <body>
-  <h2>Upload Excel → Map Generator</h2>
 
-  <input type="file" id="upload" accept=".xlsx,.xls" />
-  <div id="map"></div>
+<input type="file" id="upload" accept=".xlsx,.xls" />
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<div class="ui-bar">
+  <div id="statusText" class="status"></div>
 
-  <!-- SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <input id="searchInput" class="ui-input" placeholder="Masukkan IDPEL..." />
+  <button id="searchBtn" class="ui-btn">CARI</button>
 
-  <script>
-    const map = L.map('map', {
-    maxZoom: 22
-  }).setView([-6.2, 106.8], 12);
+  <button id="zoomBtn" class="ui-btn ui-secondary" style="display:none;">Menuju lokasi tagging</button>
+  <button id="downloadBtn" class="ui-btn">Download Excel Update</button>
+</div>
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 22,
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
+<div id="map"></div>
 
-  let allRows = [];
-  let markers = [];
-  let userMarker = null;
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- SheetJS -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  // ===== UI BAR =====
-  const topBar = document.createElement("div");
-  topBar.style.display = "flex";
-  topBar.style.flexDirection = "column";
-  topBar.style.gap = "8px";
-  topBar.style.marginBottom = "10px";
+<script>
+const map = L.map('map', { maxZoom: 22 }).setView([-6.2, 106.8], 12);
 
-  const statusText = document.createElement("div");
-  statusText.style.fontWeight = "bold";
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22
+}).addTo(map);
 
-  const zoomBtn = document.createElement("button");
-  zoomBtn.innerText = "Menuju lokasi tagging";
-  zoomBtn.style.display = "none";
+let allRows = [];
+let markers = [];
+let userMarker = null;
 
-  const downloadBtn = document.createElement("button");
-  downloadBtn.innerText = "Download Excel Update";
+const upload = document.getElementById("upload");
+const statusText = document.getElementById("statusText");
+const searchInput = document.getElementById("searchInput");
+const searchBtn = document.getElementById("searchBtn");
+const zoomBtn = document.getElementById("zoomBtn");
+const downloadBtn = document.getElementById("downloadBtn");
 
-  const searchInput = document.createElement("input");
-  searchInput.placeholder = "Cari IDPEL...";
-  searchInput.style.padding = "8px";
-  searchInput.style.fontSize = "16px";
+upload.addEventListener("change", function(e) {
+  const file = e.target.files[0];
+  const reader = new FileReader();
 
-  topBar.appendChild(statusText);
-  topBar.appendChild(searchInput);
-  topBar.appendChild(zoomBtn);
-  topBar.appendChild(downloadBtn);
+  reader.onload = function(evt) {
+    const data = new Uint8Array(evt.target.result);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    allRows = XLSX.utils.sheet_to_json(sheet);
 
-  document.body.insertBefore(topBar, document.getElementById("map"));
+    renderMarkers();
 
-  // ===== UPLOAD =====
-  document.getElementById('upload').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-
-    reader.onload = function(evt) {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      allRows = XLSX.utils.sheet_to_json(sheet);
-
-      renderMarkers();
-
-      statusText.innerText = "✅ Peta berhasil dibuat";
-      zoomBtn.style.display = "inline-block";
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
-
-  // ===== WARNA BERDASARKAN HARI BACA =====
-  function getColor(hari) {
-  if (!hari) return "gray";
-
-  const val = hari.toUpperCase();
-
-  const colors = {
-    A: "#e6194b", // merah
-    B: "#3cb44b", // hijau
-    C: "#ffe119", // kuning
-    D: "#4363d8", // biru
-    E: "#f58231", // oranye
-    F: "#911eb4", // ungu
-    G: "#46f0f0", // cyan
-    H: "#f032e6", // pink
-    I: "#bcf60c", // lime
-    J: "#fabebe",
-    K: "#008080",
-    L: "#ffd700", // kuning emas
-    M: "#aaffc3",
-    N: "#808000",
-    O: "#ffd8b1",
-    P: "#000075",
-    Q: "#ff7f00", // oranye kuat
-    R: "#800000",
-    S: "#a9a9a9",
-    T: "#00ced1",
-    U: "#9400d3",
-    V: "#228b22",
-    W: "#ff1493",
-    X: "#8a2be2", // ungu (purple)
-    Y: "#7fff00",
-    Z: "#dc143c"
+    statusText.innerText = "✅ Peta berhasil dibuat";
+    zoomBtn.style.display = "block";
   };
 
+  reader.readAsArrayBuffer(file);
+});
+
+function getColor(hari) {
+  if (!hari) return "gray";
+  const val = hari.toUpperCase();
+  const colors = {
+    A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",
+    F:"#911eb4",G:"#46f0f0",H:"#f032e6",I:"#bcf60c",J:"#fabebe",
+    K:"#008080",L:"#ffd700",M:"#aaffc3",N:"#808000",O:"#ffd8b1",
+    P:"#000075",Q:"#ff7f00",R:"#800000",S:"#a9a9a9",T:"#00ced1",
+    U:"#9400d3",V:"#228b22",W:"#ff1493",X:"#8a2be2",Y:"#7fff00",Z:"#dc143c"
+  };
   return colors[val] || "gray";
 }
 
-  // ===== RENDER MARKER =====
-  function renderMarkers() {
-    markers.forEach(m => map.removeLayer(m));
-    markers = [];
+function renderMarkers() {
+  markers.forEach(m => map.removeLayer(m.marker));
+  markers = [];
 
-    allRows.forEach((row, index) => {
-      const lat = parseFloat(row.LAT);
-      const lng = parseFloat(row.LON);
+  allRows.forEach((row, index) => {
+    const lat = parseFloat(row.LAT);
+    const lng = parseFloat(row.LON);
+    if (isNaN(lat) || isNaN(lng)) return;
 
-      if (!isNaN(lat) && !isNaN(lng)) {
-        const color = getColor(row["HARI BACA ACMT"]);
+    const color = getColor(row["HARI BACA ACMT"]);
 
-        const marker = L.circleMarker([lat, lng], {
-          radius: 8,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.8
-        }).addTo(map);
+    const marker = L.circleMarker([lat, lng], {
+      radius: 8,
+      color,
+      fillColor: color,
+      fillOpacity: 0.9
+    }).addTo(map);
 
-        marker.bindPopup(`
-          <b>${row.NAMA}</b><br>
-          NO: ${row.NO}<br>
-          IDPEL: ${row.IDPEL}<br>
-          DAYA: ${row.DAYA}<br>
-          MERK: ${row["MERK METER"]}<br>
-          NOMOR: ${row["NOMOR METER"]}<br>
-          HARI BACA: ${row["HARI BACA ACMT"]}<br><br>
-          <button onclick="markDone(${index})">SUDAH DIBACA</button>
-        `);
+    marker.bindPopup(`
+      <b>${row.NAMA}</b><br>
+      NO: ${row.NO}<br>
+      IDPEL: ${row.IDPEL}<br>
+      DAYA: ${row.DAYA}<br>
+      MERK: ${row["MERK METER"]}<br>
+      NOMOR: ${row["NOMOR METER"]}<br><br>
+      <button onclick="markDone(${index})">SUDAH DIBACA</button>
+    `);
 
-        markers.push({ marker, row });
-      }
-    });
-  }
-
-  function markDone(index) {
-    allRows.splice(index, 1);
-    renderMarkers();
-  }
-
-  // ===== AUTO ZOOM =====
-  zoomBtn.onclick = function() {
-    if (markers.length === 0) return;
-    const group = L.featureGroup(markers.map(m => m.marker));
-    map.fitBounds(group.getBounds(), { padding: [30, 30] });
-  };
-
-  // ===== DOWNLOAD EXCEL =====
-  downloadBtn.onclick = function() {
-    const ws = XLSX.utils.json_to_sheet(allRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Updated");
-    XLSX.writeFile(wb, "data_update.xlsx");
-  };
-
-  // ===== SEARCH IDPEL =====
-  searchInput.addEventListener("input", function() {
-    const keyword = this.value.trim();
-
-    if (!keyword) {
-      renderMarkers();
-      return;
-    }
-
-    markers.forEach(obj => map.removeLayer(obj.marker));
-
-    markers.forEach(obj => {
-      if (String(obj.row.IDPEL).includes(keyword)) {
-        obj.marker.addTo(map);
-        obj.marker.openPopup();
-      }
-    });
+    markers.push({ marker, row });
   });
+}
 
-  // ===== GPS USER (MERAH) =====
-  if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(pos => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+function markDone(index) {
+  allRows.splice(index, 1);
+  renderMarkers();
+}
 
-      if (!userMarker) {
-        userMarker = L.circleMarker([lat, lng], {
-          radius: 10,
-          color: "red",
-          fillColor: "red",
-          fillOpacity: 1
-        }).addTo(map).bindPopup("📍 Lokasi Anda");
-      } else {
-        userMarker.setLatLng([lat, lng]);
-      }
-    }, err => {
-      console.warn("GPS error:", err.message);
-    }, {
-      enableHighAccuracy: true
-    });
+searchBtn.onclick = function() {
+  const keyword = searchInput.value.trim();
+  if (!keyword) return alert("Masukkan IDPEL");
+
+  const found = markers.find(m => String(m.row.IDPEL) === keyword);
+  if (found) {
+    map.setView(found.marker.getLatLng(), 19);
+    found.marker.openPopup();
+  } else {
+    alert("IDPEL tidak ditemukan");
   }
-  </script>
+};
+
+zoomBtn.onclick = function() {
+  if (!markers.length) return;
+  const group = L.featureGroup(markers.map(m => m.marker));
+  map.fitBounds(group.getBounds(), { padding: [30, 30] });
+};
+
+downloadBtn.onclick = function() {
+  const ws = XLSX.utils.json_to_sheet(allRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Updated");
+  XLSX.writeFile(wb, "data_update.xlsx");
+};
+
+// GPS merah
+if (navigator.geolocation) {
+  navigator.geolocation.watchPosition(pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+
+    if (!userMarker) {
+      userMarker = L.circleMarker([lat, lng], {
+        radius: 10,
+        color: "red",
+        fillColor: "red",
+        fillOpacity: 1
+      }).addTo(map).bindPopup("📍 Lokasi Anda");
+    } else {
+      userMarker.setLatLng([lat, lng]);
+    }
+  });
+}
+</script>
 </body>
 </html>
