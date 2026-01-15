@@ -95,6 +95,21 @@
       font-size: 16px;
       cursor: pointer;
     }
+        #cancelRouteBtn {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 14px 22px;
+      font-size: 16px;
+      border-radius: 30px;
+      background: #dc2626;
+      color: white;
+      font-weight: bold;
+      border: none;
+      z-index: 9999;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
 
       .ui-bar.minimized {
       height: 48px;
@@ -188,11 +203,11 @@ function renderMarkers(){
 
     marker.bindPopup(`
       <b>${row.NAMA||""}</b><br>
-      NO: ${row.NO}<br>
       IDPEL: ${row.IDPEL}<br>
       DAYA: ${row.DAYA}<br>
       MERK: ${row["MERK METER"]}<br>
-      NOMOR: ${row["NOMOR METER"]}<br><br>
+      NOMET: ${row["NOMOR METER"]}<br>
+      HARI BACA: ${row["HARI BACA ACMT"]}<br><br>
       <button onclick="markDone('${row.IDPEL}'); map.closePopup();">SUDAH DIBACA</button>
       <button onclick="goToCustomer(${lat},${lng}); map.closePopup();">DATANGI</button>
 
@@ -237,19 +252,22 @@ downloadBtn.onclick=()=>{
 
 function goToCustomer(lat,lng){
   if(!userLatLng) return alert("Lokasi belum terdeteksi");
+
   if(routingControl) map.removeControl(routingControl);
 
-  routingControl=L.Routing.control({
+  routingControl = L.Routing.control({
     waypoints:[
       L.latLng(userLatLng),
       L.latLng(lat,lng)
     ],
     addWaypoints:false,
     draggableWaypoints:false,
-    fitSelectedRoutes:true,
-    lineOptions:{styles:[{weight:6}]}
+    fitSelectedRoutes:true
   }).addTo(map);
+
+  document.getElementById("cancelRouteBtn").style.display = "block";
 }
+
 
 // GPS Live
 const officerIcon = L.icon({
@@ -282,7 +300,18 @@ toggleBtn.onclick = () => {
   uiBar.classList.toggle("minimized");
   toggleBtn.innerText = minimized ? "➕" : "➖";
 };
+function cancelRoute(){
+  if(routingControl){
+    map.removeControl(routingControl);
+    routingControl = null;
+  }
+  document.getElementById("cancelRouteBtn").style.display = "none";
+}
 
 </script>
+<button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
+  ❌ BATAL DATANGI
+</button>
+
 </body>
 </html>
