@@ -63,6 +63,7 @@
     }
 
     #map {
+      padding-bottom: 120px;
       height: 100vh;
       width: 100%;
     }
@@ -119,7 +120,7 @@
 
     #historyToggleBtn {
       position: fixed;
-      top: 20px;
+      bottom: 90px;
       right: 20px;
       z-index: 9999;
       padding: 10px 14px;
@@ -236,6 +237,8 @@ function renderMarkers(){
     const marker=L.circleMarker([lat,lng],{
       radius:8,color,fillColor:color,fillOpacity:.9
     }).addTo(map);
+    
+    markers.push({ marker, row });
 
     marker.bindPopup(`
       <b>${row.NAMA||""}</b><br>
