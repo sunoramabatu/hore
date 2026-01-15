@@ -249,12 +249,12 @@ function renderMarkers(){
 
     `);
 
-    markers.push({marker,row});
     searchIndex.push({
-      idpel:String(row.IDPEL||""),
-      meter:String(row["NOMOR METER"]||""),
+      idpel: String(row.IDPEL || "").replace(/\D/g, ""),
+      meter: String(row["NOMOR METER"] || "").replace(/\D/g, ""),
       marker
     });
+
   });
 }
 
