@@ -117,6 +117,34 @@
       padding: 10px;
     }
 
+    #historyToggleBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 9999;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: none;
+      background: #111827;
+      color: white;
+      font-weight: bold;
+    }
+
+      #historyPanel {
+      position: fixed;
+      top: 70px;
+      right: 20px;
+      width: 280px;
+      max-height: 60vh;
+      overflow-y: auto;
+      background: white;
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 10px 25px rgba(0,0,0,.3);
+      z-index: 9998;
+      font-size: 14px;
+    }
+
   </style>
 </head>
 
@@ -141,6 +169,13 @@
   <button id="downloadBtn" class="ui-btn">Download Excel Update</button>
 </div>
 
+<div id="historyPanel" style="display:none;">
+  <div style="font-weight:bold;margin-bottom:6px;">📋 Riwayat Dibaca</div>
+  <div id="historyList"></div>
+</div>
+
+<button id="historyToggleBtn">📋 Riwayat</button>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -157,6 +192,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 setTimeout(()=>map.invalidateSize(),500);
 
 let allRows=[], markers=[], searchIndex=[];
+let historyRows = [];
 let userLatLng=null, userMarker=null, routingControl=null;
 
 const upload = document.getElementById("upload");
@@ -223,9 +259,40 @@ function renderMarkers(){
 }
 
 function markDone(idpel){
+  const found = allRows.find(r => String(r.IDPEL) === String(idpel));
+  if(found){
+    historyRows.push(found);
+  }
+
   allRows = allRows.filter(r=>String(r.IDPEL)!==String(idpel));
   renderMarkers();
+  renderHistory();
 }
+function renderHistory(){
+  const box = document.getElementById("historyList");
+  box.innerHTML = "";
+
+  if(historyRows.length === 0){
+    box.innerHTML = "<i>Belum ada data</i>";
+    return;
+  }
+
+  historyRows.slice().reverse().forEach(r=>{
+    const div = document.createElement("div");
+    div.style.borderBottom = "1px solid #eee";
+    div.style.padding = "6px 0";
+    div.innerHTML = `
+      <b>${r.NAMA}</b><br>
+      IDPEL: ${r.IDPEL}<br>
+      Meter: ${r["NOMOR METER"]}
+    `;
+    box.appendChild(div);
+  });
+}
+document.getElementById("historyToggleBtn").onclick = () => {
+  const panel = document.getElementById("historyPanel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+};
 
 searchBtn.onclick=()=>{
   const key=searchInput.value.trim();
