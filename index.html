@@ -63,9 +63,16 @@
     }
 
     #map {
-      height: calc(100vh - 260px);
-      min-height: 400px;
+      height: 100vh;
       width: 100%;
+    }
+
+    .ui-bar {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 320px;
+      border-radius: 16px;
     }
 
     @media (max-width:600px) {
@@ -85,9 +92,6 @@
 </head>
 
 <body>
-<div style="position:fixed;z-index:99999;top:0;right:0;background:red;color:white;padding:5px;">
-TEST 123
-</div>
 
 <input type="file" id="upload" accept=".xlsx,.xls" />
 
@@ -168,8 +172,9 @@ function renderMarkers(){
       DAYA: ${row.DAYA}<br>
       MERK: ${row["MERK METER"]}<br>
       NOMOR: ${row["NOMOR METER"]}<br><br>
-      <button onclick="markDone('${row.IDPEL}')">SUDAH DIBACA</button>
-      <button onclick="goToCustomer(${lat},${lng})">DATANGI</button>
+      <button onclick="markDone('${row.IDPEL}'); map.closePopup();">SUDAH DIBACA</button>
+      <button onclick="goToCustomer(${lat},${lng}); map.closePopup();">DATANGI</button>
+
     `);
 
     markers.push({marker,row});
@@ -191,7 +196,7 @@ searchBtn.onclick=()=>{
   if(key.length<4) return alert("Minimal 4 digit");
   const found=searchIndex.find(o=>o.idpel.endsWith(key)||o.meter.endsWith(key));
   if(found){
-    map.setView(found.marker.getLatLng(),19);
+    map.setView(found.marker.getLatLng(),22);
     found.marker.openPopup();
   } else alert("Tidak ditemukan");
 };
@@ -217,19 +222,31 @@ function goToCustomer(lat,lng){
     addWaypoints:false,
     draggableWaypoints:false,
     fitSelectedRoutes:true
+    lineOptions:{styles:[{weight:6}]}
   }).addTo(map);
 }
 
 // GPS Live
+const officerIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/9131/9131529.png",
+  iconSize: [40,40],
+  iconAnchor: [20,40],
+  popupAnchor: [0,-35]
+});
+
 if(navigator.geolocation){
   navigator.geolocation.watchPosition(pos=>{
     userLatLng=[pos.coords.latitude,pos.coords.longitude];
     if(!userMarker){
-      userMarker=L.circleMarker(userLatLng,{radius:10,color:"red",fillColor:"red",fillOpacity:1})
-      .addTo(map).bindPopup("📍 Lokasi Anda");
-    } else userMarker.setLatLng(userLatLng);
+      userMarker = L.marker(userLatLng,{icon:officerIcon})
+        .addTo(map)
+        .bindPopup("👮 Lokasi Anda");
+    } else {
+      userMarker.setLatLng(userLatLng);
+    }
   });
 }
+
 </script>
 </body>
 </html>
