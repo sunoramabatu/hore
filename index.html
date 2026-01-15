@@ -217,11 +217,15 @@ downloadBtn.onclick=()=>{
 function goToCustomer(lat,lng){
   if(!userLatLng) return alert("Lokasi belum terdeteksi");
   if(routingControl) map.removeControl(routingControl);
+
   routingControl=L.Routing.control({
-    waypoints:[L.latLng(userLatLng),L.latLng(lat,lng)],
+    waypoints:[
+      L.latLng(userLatLng),
+      L.latLng(lat,lng)
+    ],
     addWaypoints:false,
     draggableWaypoints:false,
-    fitSelectedRoutes:true
+    fitSelectedRoutes:true,
     lineOptions:{styles:[{weight:6}]}
   }).addTo(map);
 }
