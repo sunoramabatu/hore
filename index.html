@@ -235,6 +235,25 @@ function kirimTracking(kode, latlng){
   }).catch(()=>{});
 }
 
+function doPost(e) {
+  const sheet = SpreadsheetApp.openById("KODE PETUGAS")
+    .getSheetByName("Log");
+
+  const data = JSON.parse(e.postData.contents);
+
+  sheet.appendRow([
+    new Date(),
+    data.kodePetugas,
+    data.lat,
+    data.lng,
+    data.action
+  ]);
+
+  return ContentService
+    .createTextOutput("OK")
+    .setMimeType(ContentService.MimeType.TEXT);
+}
+
 function getColor(v){
   const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
   G:"#46f0f0",H:"#f032e6",I:"#bcf60c",J:"#fabebe",K:"#008080",L:"#ffd700",M:"#aaffc3",
