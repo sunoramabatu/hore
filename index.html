@@ -242,41 +242,6 @@ function kirimTracking(kode, latlng){
   }).catch(()=>{});
 }
 
-const SHEET_ID = "1DCMqJd7f-wIcgLS_cNLDDk9xI05UHl-F4Go9njDWJTc";
-const SHEET_NAME = "Log";
-
-function doGet(e) {
-  return ContentService
-    .createTextOutput("API AKTIF")
-    .setMimeType(ContentService.MimeType.TEXT);
-}
-
-function doPost(e) {
-  try {
-    const sheet = SpreadsheetApp
-      .openById("1DCMqJd7f-wIcgLS_cNLDDk9xI05UHl-F4Go9njDWJTc")
-      .getSheetByName("Sheet1");
-
-    const data = JSON.parse(e.postData.contents);
-
-    sheet.appendRow([
-      new Date(),
-      data.kode || "-",
-      data.lat || "-",
-      data.lng || "-",
-      data.ua || "-"
-    ]);
-
-    return ContentService.createTextOutput("OK");
-
-  } catch(err){
-    return ContentService.createTextOutput("ERROR: " + err.message);
-  }
-}
-
-  return ContentService.createTextOutput("OK");
-}
-
 function getColor(v){
   const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
   G:"#46f0f0",H:"#f032e6",I:"#bcf60c",J:"#fabebe",K:"#008080",L:"#ffd700",M:"#aaffc3",
