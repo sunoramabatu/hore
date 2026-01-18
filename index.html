@@ -243,10 +243,7 @@ if(kode){
 function kirimTracking(kode, latlng){
   fetch("https://script.google.com/macros/s/AKfycbwIdsPLA-MjJg73hL-_5TOOwyRaw3Wp1IjxOAQj2FI1CN3gFn8XqQukPyHMyQRC90QwFQ/exec", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
+    body: new URLSearchParams({
       kode: kode,
       lat: latlng[0],
       lng: latlng[1],
@@ -254,6 +251,7 @@ function kirimTracking(kode, latlng){
     })
   }).catch(()=>{});
 }
+
 
 function getColor(v){
   const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
