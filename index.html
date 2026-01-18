@@ -210,10 +210,12 @@ upload.onchange = e=>{
     const sheet = wb.Sheets[wb.SheetNames[0]];
     allRows = XLSX.utils.sheet_to_json(sheet);
 
+    localStorage.setItem("oyon_saved_rows", JSON.stringify(allRows));
+
     renderMarkers();
     statusText.innerText = "✅ Peta berhasil dibuat";
     zoomBtn.style.display="block";
-
+    
     // === AMBIL KODE PETUGAS DARI EXCEL ===
     const firstRow = allRows[0] || {};
 let kode = null;
@@ -302,12 +304,20 @@ function markDone(idpel){
   const found = allRows.find(r => String(r.IDPEL) === String(idpel));
   if(found){
     historyRows.push(found);
+
+    // simpan history
+    localStorage.setItem("oyon_history", JSON.stringify(historyRows));
   }
 
   allRows = allRows.filter(r=>String(r.IDPEL)!==String(idpel));
+
+  // update autosave utama
+  localStorage.setItem("oyon_saved_rows", JSON.stringify(allRows));
+
   renderMarkers();
   renderHistory();
 }
+
 function renderHistory(){
   const box = document.getElementById("historyList");
   box.innerHTML = "";
@@ -387,6 +397,24 @@ const officerIcon = L.icon({
   iconAnchor: [20,40],
   popupAnchor: [0,-35]
 });
+// === AUTO LOAD SAAT WEB DIBUKA ===
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem("oyon_saved_rows");
+  const hist = localStorage.getItem("oyon_history");
+
+  if(saved){
+    allRows = JSON.parse(saved);
+    renderMarkers();
+    statusText.innerText = "📂 Data dimuat otomatis";
+    zoomBtn.style.display = "block";
+  }
+
+  if(hist){
+    historyRows = JSON.parse(hist);
+    renderHistory();
+  }
+});
+
 
 if(navigator.geolocation){
   navigator.geolocation.watchPosition(pos=>{
