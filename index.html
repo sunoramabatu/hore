@@ -184,10 +184,10 @@
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
-const map = L.map('map', { maxZoom: 22 }).setView([-6.2,106.8], 12);
+const map = L.map('map', { maxZoom: 19 }).setView([-6.2,106.8], 12);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 22
+  maxZoom: 19
 }).addTo(map);
 
 setTimeout(()=>map.invalidateSize(),500);
