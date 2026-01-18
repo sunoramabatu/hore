@@ -215,15 +215,25 @@ upload.onchange = e=>{
     zoomBtn.style.display="block";
 
     // === AMBIL KODE PETUGAS DARI EXCEL ===
-    const kode = allRows[0]?.["KODE PETUGAS"];
+    const firstRow = allRows[0] || {};
+let kode = null;
 
-    if(kode){
-      const interval = setInterval(()=>{
+for (const key in firstRow) {
+  if (key.toLowerCase().includes("kode")) {
+    kode = firstRow[key];
+    break;
+  }
+}
+
+if(kode){
+  const interval = setInterval(()=>{
     if(userLatLng){
       kirimTracking(kode, userLatLng);
       clearInterval(interval);
     }
   }, 1000);
+} else {
+  alert("Kolom KODE PETUGAS tidak ditemukan di Excel");
 }
 
   };
@@ -233,6 +243,9 @@ upload.onchange = e=>{
 function kirimTracking(kode, latlng){
   fetch("https://script.google.com/macros/s/AKfycbzGTBx6S3iGtjgVuf-wo0qUH3AZU4TE-Cuex_vgVXaD-Kv6Wu63HVJQ4grLv3hfZ7OZYg/exec", {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
     body: JSON.stringify({
       kode: kode,
       lat: latlng[0],
