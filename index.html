@@ -216,15 +216,22 @@ upload.onchange = e=>{
 
     // === AMBIL KODE PETUGAS DARI EXCEL ===
     const kode = allRows[0]?.["KODE PETUGAS"];
-    if(kode && userLatLng){
+
+    if(kode){
+      const interval = setInterval(()=>{
+    if(userLatLng){
       kirimTracking(kode, userLatLng);
+      clearInterval(interval);
     }
+  }, 1000);
+}
+
   };
   reader.readAsArrayBuffer(e.target.files[0]);
 };
 
 function kirimTracking(kode, latlng){
-  fetch("https://script.google.com/macros/s/AKfycbwPbEsj_t8A-6CZjiT1CrxLrq3tATllue96NOGEs35kSa5-gp-BAnFHRRju7JN-bfj23Q/exec", {
+  fetch("https://script.google.com/macros/s/AKfycbzGTBx6S3iGtjgVuf-wo0qUH3AZU4TE-Cuex_vgVXaD-Kv6Wu63HVJQ4grLv3hfZ7OZYg/exec", {
     method: "POST",
     body: JSON.stringify({
       kode: kode,
@@ -246,29 +253,29 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+    const sheet = SpreadsheetApp
+      .openById("1DCMqJd7f-wIcgLS_cNLDDk9xI05UHl-F4Go9njDWJTc")
+      .getSheetByName("Sheet1");
 
     const data = JSON.parse(e.postData.contents);
 
     sheet.appendRow([
       new Date(),
-      data.kodePetugas || "-",
+      data.kode || "-",
       data.lat || "-",
       data.lng || "-",
-      data.action || "-"
+      data.ua || "-"
     ]);
 
-    return ContentService
-      .createTextOutput("OK")
-      .setMimeType(ContentService.MimeType.TEXT);
+    return ContentService.createTextOutput("OK");
 
-  } catch (err) {
-    return ContentService
-      .createTextOutput("ERROR: " + err.message)
-      .setMimeType(ContentService.MimeType.TEXT);
+  } catch(err){
+    return ContentService.createTextOutput("ERROR: " + err.message);
   }
 }
 
+  return ContentService.createTextOutput("OK");
+}
 
 function getColor(v){
   const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
