@@ -235,24 +235,40 @@ function kirimTracking(kode, latlng){
   }).catch(()=>{});
 }
 
-function doPost(e) {
-  const sheet = SpreadsheetApp.openById("KODE PETUGAS")
-    .getSheetByName("Log");
+const SHEET_ID = "1DCMqJd7f-wIcgLS_cNLDDk9xI05UHl-F4Go9njDWJTc";
+const SHEET_NAME = "Log";
 
-  const data = JSON.parse(e.postData.contents);
-
-  sheet.appendRow([
-    new Date(),
-    data.kodePetugas,
-    data.lat,
-    data.lng,
-    data.action
-  ]);
-
+function doGet(e) {
   return ContentService
-    .createTextOutput("OK")
+    .createTextOutput("API AKTIF")
     .setMimeType(ContentService.MimeType.TEXT);
 }
+
+function doPost(e) {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName(SHEET_NAME);
+
+    const data = JSON.parse(e.postData.contents);
+
+    sheet.appendRow([
+      new Date(),
+      data.kodePetugas || "-",
+      data.lat || "-",
+      data.lng || "-",
+      data.action || "-"
+    ]);
+
+    return ContentService
+      .createTextOutput("OK")
+      .setMimeType(ContentService.MimeType.TEXT);
+
+  } catch (err) {
+    return ContentService
+      .createTextOutput("ERROR: " + err.message)
+      .setMimeType(ContentService.MimeType.TEXT);
+  }
+}
+
 
 function getColor(v){
   const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
