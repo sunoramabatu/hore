@@ -112,11 +112,10 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
 
-      .ui-bar.minimized {
-      height: 48px;
-      overflow: hidden;
-      padding: 10px;
+      .ui-bar.minimized #uiContent {
+      display: none;
     }
+
 
     #historyToggleBtn {
       position: fixed;
@@ -146,6 +145,31 @@
       font-size: 14px;
     }
 
+      .toast {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #111827;
+      color: #fff;
+      padding: 16px 22px;
+      border-radius: 16px;
+      font-size: 15px;
+      max-width: 90%;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.4s ease;
+      z-index: 99999;
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+
+      .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+
   </style>
 </head>
 
@@ -153,21 +177,26 @@
 
 <div class="ui-bar" id="uiBar">
 
-  <!-- HEADER + TOMBOL MINIMIZE -->
+  <!-- HEADER (tidak pernah hilang) -->
   <div class="ui-header">
     <b>📍 OyonID Map</b>
     <button id="toggleBtn">➖</button>
   </div>
 
-  <input type="file" id="upload" accept=".xlsx,.xls" />
+  <!-- KONTEN (yang boleh di-hide) -->
+  <div id="uiContent">
 
-  <div id="statusText" class="status"></div>
+    <input type="file" id="upload" accept=".xlsx,.xls" />
 
-  <input id="searchInput" class="ui-input" placeholder="Masukkan 4 digit IDPEL / Meter" />
-  <button id="searchBtn" class="ui-btn">CARI</button>
+    <div id="statusText" class="status"></div>
 
-  <button id="zoomBtn" class="ui-btn ui-secondary" style="display:none;">Zoom Lokasi Tagging</button>
-  <button id="downloadBtn" class="ui-btn">Download Excel Update</button>
+    <input id="searchInput" class="ui-input" placeholder="Masukkan 4 digit IDPEL / Meter" />
+    <button id="searchBtn" class="ui-btn">CARI</button>
+
+    <button id="zoomBtn" class="ui-btn ui-secondary" style="display:none;">Zoom Lokasi Tagging</button>
+    <button id="downloadBtn" class="ui-btn">FINISH & Download RBM Update</button>
+
+  </div>
 </div>
 
 <div id="historyPanel" style="display:none;">
@@ -364,12 +393,20 @@ zoomBtn.onclick=()=>{
   map.fitBounds(group.getBounds(),{padding:[30,30]});
 };
 
-downloadBtn.onclick=()=>{
-  const ws=XLSX.utils.json_to_sheet(allRows);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,"Updated");
-  XLSX.writeFile(wb,"data_update.xlsx");
+downloadBtn.onclick = () => {
+  const ws = XLSX.utils.json_to_sheet(allRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Updated");
+
+  XLSX.writeFile(wb, "RBM_UPDATE.xlsx");
+
+  showToast(`
+    <b>✅ RBM berhasil diunduh</b><br><br>
+    Selamat beristirahat, wahai pejuang nafkah.<br>
+    Semoga setiap lelahmu bernilai ibadah 🤲
+  `);
 };
+
 
 function goToCustomer(lat,lng){
   if(!userLatLng) return alert("Lokasi belum terdeteksi");
@@ -446,11 +483,23 @@ function cancelRoute(){
   }
   document.getElementById("cancelRouteBtn").style.display = "none";
 }
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  toast.innerHTML = message;
+  toast.classList.add("show");
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+  }, 4000);
+}
+
 
 </script>
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
   ❌ BATAL DATANGI
 </button>
+
+<div id="toast" class="toast"></div>
 
 </body>
 </html>
