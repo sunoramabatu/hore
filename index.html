@@ -168,7 +168,28 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+        /* === Modern Marker Teardrop === */
+    .custom-marker {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #2dd4bf, #fb7185);
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid white;
+      box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+      position: relative;
+    }
 
+    .custom-marker::after {
+      content: "";
+      width: 12px;
+      height: 12px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 9px;
+      left: 9px;
+    }
 
   </style>
 </head>
@@ -313,23 +334,50 @@ function renderMarkers(){
 
     const color=getColor(row["HARI BACA ACMT"]);
 
-    const marker=L.circleMarker([lat,lng],{
-      radius:8,color,fillColor:color,fillOpacity:.9
-    }).addTo(map);
+    const iconHtml = `<div class="custom-marker"></div>`;
+
+    const customIcon = L.divIcon({
+      html: iconHtml,
+      className: "",
+      iconSize: [36, 36],
+      iconAnchor: [18, 36]
+    });
+
+    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+
     
     markers.push({ marker, row });
 
     marker.bindPopup(`
-      <b>${row.NAMA||""}</b><br>
-      IDPEL: ${row.IDPEL}<br>
-      DAYA: ${row.DAYA}<br>
-      MERK: ${row["MERK METER"]}<br>
-      NOMET: ${row["NOMOR METER"]}<br>
-      HARI BACA: ${row["HARI BACA ACMT"]}<br><br>
-      <button onclick="markDone('${row.IDPEL}'); map.closePopup();">SUDAH DIBACA</button>
-      <button onclick="goToCustomer(${lat},${lng}); map.closePopup();">DATANGI</button>
+  <div style="
+    font-family: Arial;
+    padding: 6px;
+    min-width:220px;
+  ">
+    <div style="font-size:16px;font-weight:bold;margin-bottom:4px;">
+      👤 ${row.NAMA || "-"}
+    </div>
 
-    `);
+    <div style="font-size:13px;line-height:1.5;">
+      📟 IDPEL: ${row.IDPEL}<br>
+      ⚡ DAYA: ${row.DAYA}<br>
+      🔢 METER: ${row["NOMOR METER"]}<br>
+      📅 HARI BACA: ${row["HARI BACA ACMT"]}
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:6px;">
+      <button style="flex:1;padding:8px;border-radius:10px;background:#2dd4bf;color:white;border:none"
+        onclick="goToCustomer(${lat},${lng});map.closePopup();">
+        🧭 Datangi
+      </button>
+      <button style="flex:1;padding:8px;border-radius:10px;background:#fb7185;color:white;border:none"
+        onclick="markDone('${row.IDPEL}');map.closePopup();">
+        ✅ Selesai
+      </button>
+    </div>
+  </div>
+`);
+
 
     searchIndex.push({
       idpel: String(row.IDPEL || "").replace(/\D/g, ""),
