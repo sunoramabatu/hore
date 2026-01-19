@@ -222,7 +222,18 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 setTimeout(()=>map.invalidateSize(),500);
 
 let allRows=[], markers=[], searchIndex=[];
-let historyRows = [];
+let historyRows = JSON.parse(localStorage.getItem("historyRows") || "[]");
+let lastHistoryDate = localStorage.getItem("historyDate");
+
+const today = new Date().toDateString();
+
+// Kalau beda hari → reset otomatis
+if(lastHistoryDate !== today){
+  historyRows = [];
+  localStorage.setItem("historyRows", JSON.stringify([]));
+  localStorage.setItem("historyDate", today);
+}
+
 let userLatLng=null, userMarker=null, routingControl=null;
 
 const upload = document.getElementById("upload");
@@ -334,15 +345,11 @@ function markDone(idpel){
   if(found){
     historyRows.push(found);
 
-    // simpan history
-    localStorage.setItem("oyon_history", JSON.stringify(historyRows));
+    // simpan ke localStorage
+    localStorage.setItem("historyRows", JSON.stringify(historyRows));
   }
 
   allRows = allRows.filter(r=>String(r.IDPEL)!==String(idpel));
-
-  // update autosave utama
-  localStorage.setItem("oyon_saved_rows", JSON.stringify(allRows));
-
   renderMarkers();
   renderHistory();
 }
@@ -492,7 +499,7 @@ function showToast(message) {
     toast.classList.remove("show");
   }, 4000);
 }
-
+renderHistory();
 
 </script>
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
