@@ -170,26 +170,26 @@
     }
         /* === Modern Marker Teardrop === */
     .custom-marker {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, #2dd4bf, #fb7185);
+      width: 34px;
+      height: 34px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
-      border: 3px solid white;
-      box-shadow: 0 6px 14px rgba(0,0,0,0.3);
       position: relative;
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
+      border: 2px solid #fff;
     }
 
     .custom-marker::after {
       content: "";
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
       background: white;
       border-radius: 50%;
       position: absolute;
-      top: 9px;
-      left: 9px;
+      top: 10px;
+      left: 10px;
     }
+
     .popup-card {
       font-size: 14px;
       line-height: 1.5;
@@ -394,8 +394,9 @@ function buildMarkers() {
     searchIndex.push({
       idpel: String(row.IDPEL || "").replace(/\D/g,""),
       meter: String(row["NOMOR METER"] || "").replace(/\D/g,""),
-      marker
-    });
+      marker,
+      row
+      });
   });
 }
 
@@ -431,12 +432,51 @@ document.getElementById("searchBtn").onclick = () => {
 
   if (!found) return alert("Tidak ditemukan");
 
+  const row = found.row;
+
   map.setView(found.marker.getLatLng(), 19);
-  found.marker.openPopup();
+
+  openDetail(row); // ← ini ganti popup jadi sidebar
+
+  // Highlight marker
+  const el = found.marker.getElement();
+  if(el){
+    el.classList.add("highlight");
+    setTimeout(()=>el.classList.remove("highlight"),1500);
+  }
 
   uiBar.classList.add("minimized");
   toggleBtn.innerText = "➕";
 };
+
+/* =========================
+   7.5 ZOOM ALL MARKERS
+========================= */
+zoomBtn.onclick = () => {
+  if (!markers.length) return alert("Belum ada data");
+  const group = L.featureGroup(markers.map(m => m.marker));
+  map.fitBounds(group.getBounds(), { padding: [40, 40] });
+};
+
+/* =========================
+   7.6 FINISH DOWNLOAD
+========================= */
+downloadBtn.onclick = () => {
+  const ws = XLSX.utils.json_to_sheet(allRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
+  XLSX.writeFile(wb, "RBM_UPDATE.xlsx");
+
+  showToast(`✅ RBM berhasil diunduh<br>
+  Selamat beristirahat wahai pejuang nafkah 🤲`);
+};
+
+function showToast(msg){
+  const toast = document.getElementById("toast");
+  toast.innerHTML = msg;
+  toast.classList.add("show");
+  setTimeout(()=>toast.classList.remove("show"),4000);
+}
 
 /* =========================
    8. ROUTING
@@ -488,9 +528,14 @@ navigator.geolocation?.watchPosition(pos => {
 /* =========================
    10. UTILITIES
 ========================= */
-function getColor(v) {
-  const c = {A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8"};
-  return c[(v||"").toUpperCase()] || "#999";
+function getColor(v){
+  const str = (v||"").toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = hash % 360;
+  return `hsl(${hue}, 75%, 55%)`;
 }
 
 function openDetail(row) {
