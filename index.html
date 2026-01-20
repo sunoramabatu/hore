@@ -169,26 +169,27 @@
       transform: translateX(-50%) translateY(0);
     }
         /* === Modern Marker Teardrop === */
-    .custom-marker {
-      width: 34px;
-      height: 34px;
+      .custom-marker {
+      width: 32px;
+      height: 32px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
-      position: relative;
-      box-shadow: 0 6px 18px rgba(0,0,0,.35);
       border: 2px solid #fff;
+      box-shadow: 0 4px 12px rgba(0,0,0,.35);
+      position: relative;
     }
 
     .custom-marker::after {
       content: "";
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       background: white;
       border-radius: 50%;
       position: absolute;
       top: 10px;
       left: 10px;
     }
+
 
     .popup-card {
       font-size: 14px;
@@ -298,6 +299,7 @@
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
+  <button onclick="closeDetail()" style="float:right;">❌</button>
   <div id="detailContent"></div>
 </div>
 
@@ -387,9 +389,10 @@ function buildMarkers() {
 
     marker.on("click", () => openDetail(row));
 
-    marker.bindPopup(popupTemplate(row, lat, lng));
-
     markers.push({ marker, row });
+    marker.on("click", () => {
+      openDetail(row);
+    });
 
     searchIndex.push({
       idpel: String(row.IDPEL || "").replace(/\D/g,""),
@@ -422,28 +425,18 @@ function popupTemplate(r, lat, lng) {
 /* =========================
    7. SEARCH ENGINE
 ========================= */
-document.getElementById("searchBtn").onclick = () => {
+searchBtn.onclick = () => {
   const key = searchInput.value.trim();
-  if (key.length < 4) return alert("Minimal 4 digit");
+  if(key.length < 4) return alert("Minimal 4 digit");
 
   const found = searchIndex.find(o =>
     o.idpel.endsWith(key) || o.meter.endsWith(key)
   );
 
-  if (!found) return alert("Tidak ditemukan");
-
-  const row = found.row;
+  if(!found) return alert("Tidak ditemukan");
 
   map.setView(found.marker.getLatLng(), 19);
-
-  openDetail(row); // ← ini ganti popup jadi sidebar
-
-  // Highlight marker
-  const el = found.marker.getElement();
-  if(el){
-    el.classList.add("highlight");
-    setTimeout(()=>el.classList.remove("highlight"),1500);
-  }
+  openDetail(found.row);
 
   uiBar.classList.add("minimized");
   toggleBtn.innerText = "➕";
@@ -529,25 +522,62 @@ navigator.geolocation?.watchPosition(pos => {
    10. UTILITIES
 ========================= */
 function getColor(v){
-  const str = (v||"").toUpperCase();
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const hue = hash % 360;
-  return `hsl(${hue}, 75%, 55%)`;
+  const map = {
+    A:"#22c55e", B:"#f97316", C:"#3b82f6", D:"#ef4444",
+    E:"#a855f7", F:"#14b8a6", G:"#eab308", H:"#ec4899",
+    I:"#6366f1", J:"#84cc16", K:"#06b6d4", L:"#f43f5e",
+    M:"#7c3aed", N:"#f59e0b", O:"#0ea5e9", P:"#10b981",
+    Q:"#d946ef", R:"#fb7185", S:"#0f766e", T:"#1e3a8a",
+    U:"#4d7c0f", V:"#be185d", W:"#0284c7", X:"#475569",
+    Y:"#fde047", Z:"#0f172a"
+  };
+  return map[(v||"").toUpperCase()] || "#64748b";
 }
 
-function openDetail(row) {
-  document.getElementById("detailPanel").classList.add("open");
-  document.getElementById("detailContent").innerHTML = `
-    <h3>${row.NAMA}</h3>
-    <p>IDPEL: ${row.IDPEL}</p>
-    <p>DAYA: ${row.DAYA}</p>
-    <p>MERK: ${row["MERK METER"]}</p>
-    <p>NOMOR: ${row["NOMOR METER"]}</p>
-    <p>HARI BACA: ${row["HARI BACA ACMT"]}</p>`;
+function openDetail(row){
+  const panel = document.getElementById("detailPanel");
+  const content = document.getElementById("detailContent");
+
+  content.innerHTML = `
+    <h3 style="margin-bottom:10px;">${row.NAMA}</h3>
+
+    <div>📟 IDPEL: ${row.IDPEL}</div>
+    <div>⚡ DAYA: ${row.DAYA}</div>
+    <div>🔧 MERK: ${row["MERK METER"]}</div>
+    <div>🔢 NOMOR: ${row["NOMOR METER"]}</div>
+    <div>📅 HARI BACA: ${row["HARI BACA ACMT"]}</div>
+
+    <div style="margin-top:12px;display:flex;gap:8px;">
+      <button class="btn-go" onclick="goToCustomer(${row.LAT},${row.LON})">🧭 Datangi</button>
+      <button class="btn-done" onclick="markDone('${row.IDPEL}')">✅ Selesai</button>
+    </div>
+  `;
+
+  panel.classList.add("open");
 }
+
+function markDone(idpel){
+  const idx = allRows.findIndex(r => String(r.IDPEL) === String(idpel));
+  if(idx === -1) return;
+
+  const row = allRows[idx];
+
+  historyRows.push(row);
+  localStorage.setItem("historyRows", JSON.stringify(historyRows));
+
+  allRows.splice(idx, 1);
+
+  renderMarkers();
+  renderHistory();
+  closeDetail();
+
+  showToast("✅ Data ditandai selesai");
+}
+
+function closeDetail(){
+  document.getElementById("detailPanel").classList.remove("open");
+}
+
 </script>
 
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
