@@ -190,6 +190,75 @@
       top: 9px;
       left: 9px;
     }
+    .popup-card {
+      font-size: 14px;
+      line-height: 1.5;
+      min-width: 220px;
+    }
+
+    .popup-title {
+      font-weight: bold;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    .popup-row {
+      margin-bottom: 2px;
+    }
+
+    .popup-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-go {
+      flex: 1;
+      background: #2dd4bf;
+      border: none;
+      color: white;
+      padding: 8px;
+      border-radius: 10px;
+    }
+
+    .btn-done {
+      flex: 1;
+      background: #fb7185;
+      border: none;
+      color: white;
+      padding: 8px;
+      border-radius: 10px;
+    }
+
+    .detail-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 320px;
+      height: 100%;
+      background: white;
+      z-index: 9999;
+      transform: translateX(-100%);
+      transition: 0.3s ease;
+      box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .detail-panel.open {
+      transform: translateX(0);
+    }
+
+    .highlight {
+      animation: pulse 0.4s ease-in-out 4;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+
 
   </style>
 </head>
@@ -228,6 +297,9 @@
 <button id="historyToggleBtn">📋 Riwayat</button>
 
 <div id="map"></div>
+<div id="detailPanel" class="detail-panel">
+  <div id="detailContent"></div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -332,9 +404,11 @@ function renderMarkers(){
     const lat=parseFloat(row.LAT), lng=parseFloat(row.LON);
     if(isNaN(lat)||isNaN(lng)) return;
 
-    const color=getColor(row["HARI BACA ACMT"]);
+    const color = getColor(row["HARI BACA ACMT"]);
 
-    const iconHtml = `<div class="custom-marker"></div>`;
+    const iconHtml = `
+      <div class="custom-marker" style="background:${color}"></div>
+    `;
 
     const customIcon = L.divIcon({
       html: iconHtml,
@@ -345,38 +419,25 @@ function renderMarkers(){
 
     const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
 
-    
-    markers.push({ marker, row });
+        markers.push({ marker, row });
 
     marker.bindPopup(`
-  <div style="
-    font-family: Arial;
-    padding: 6px;
-    min-width:220px;
-  ">
-    <div style="font-size:16px;font-weight:bold;margin-bottom:4px;">
-      👤 ${row.NAMA || "-"}
-    </div>
+  <div class="popup-card">
+    <div class="popup-title">👤 ${row.NAMA || "-"}</div>
 
-    <div style="font-size:13px;line-height:1.5;">
-      📟 IDPEL: ${row.IDPEL}<br>
-      ⚡ DAYA: ${row.DAYA}<br>
-      🔢 METER: ${row["NOMOR METER"]}<br>
-      📅 HARI BACA: ${row["HARI BACA ACMT"]}
-    </div>
+    <div class="popup-row">📟 IDPEL: ${row.IDPEL}</div>
+    <div class="popup-row">⚡ DAYA: ${row.DAYA}</div>
+    <div class="popup-row">🔧 MERK: ${row["MERK METER"]}</div>
+    <div class="popup-row">🔢 NOMOR: ${row["NOMOR METER"]}</div>
+    <div class="popup-row">📅 HARI BACA: ${row["HARI BACA ACMT"]}</div>
 
-    <div style="margin-top:10px;display:flex;gap:6px;">
-      <button style="flex:1;padding:8px;border-radius:10px;background:#2dd4bf;color:white;border:none"
-        onclick="goToCustomer(${lat},${lng});map.closePopup();">
-        🧭 Datangi
-      </button>
-      <button style="flex:1;padding:8px;border-radius:10px;background:#fb7185;color:white;border:none"
-        onclick="markDone('${row.IDPEL}');map.closePopup();">
-        ✅ Selesai
-      </button>
+    <div class="popup-actions">
+      <button class="btn-go" onclick="goToCustomer(${lat},${lng});map.closePopup();">🧭 Datangi</button>
+      <button class="btn-done" onclick="markDone('${row.IDPEL}');map.closePopup();">✅ Selesai</button>
     </div>
   </div>
 `);
+
 
 
     searchIndex.push({
@@ -391,12 +452,23 @@ function renderMarkers(){
 function markDone(idpel){
   const found = allRows.find(r => String(r.IDPEL) === String(idpel));
   if(found){
-    historyRows.push(found);
+  const m = found.marker;
 
+  map.setView(m.getLatLng(),22);
+  m.openPopup();
+
+  const el = m.getElement();
+  el.classList.add("highlight");
+
+  setTimeout(()=>{
+    el.classList.remove("highlight");
+  },1500);
+}
+    
     // simpan ke localStorage
     localStorage.setItem("historyRows", JSON.stringify(historyRows));
   }
-
+  
   allRows = allRows.filter(r=>String(r.IDPEL)!==String(idpel));
   renderMarkers();
   renderHistory();
@@ -548,6 +620,25 @@ function showToast(message) {
   }, 4000);
 }
 renderHistory();
+
+function openDetail(row){
+  const panel = document.getElementById("detailPanel");
+  const content = document.getElementById("detailContent");
+
+  content.innerHTML = `
+    <h3>${row.NAMA}</h3>
+    <p><b>IDPEL:</b> ${row.IDPEL}</p>
+    <p><b>DAYA:</b> ${row.DAYA}</p>
+    <p><b>MERK:</b> ${row["MERK METER"]}</p>
+    <p><b>NOMOR:</b> ${row["NOMOR METER"]}</p>
+    <p><b>HARI BACA:</b> ${row["HARI BACA ACMT"]}</p>
+  `;
+
+  panel.classList.add("open");
+}
+marker.on("click", () => {
+  openDetail(row);
+});
 
 </script>
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
