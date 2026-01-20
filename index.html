@@ -1,651 +1,199 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>OyonID Map</title>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css"/>
-
-  <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f3f4f6;
-    }
-
-    #upload {
-      width: 100%;
-      padding: 14px;
-      font-size: 16px;
-      border: none;
-    }
-
-    .ui-bar {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.2);
-      z-index: 999;
-    }
-
-    .ui-input {
-      padding: 14px;
-      font-size: 17px;
-      border-radius: 12px;
-      border: 1px solid #ccc;
-    }
-
-    .ui-btn {
-      padding: 14px;
-      font-size: 17px;
-      border-radius: 14px;
-      background: #2563eb;
-      color: #fff;
-      font-weight: bold;
-      border: none;
-      cursor: pointer;
-    }
-
-    .ui-secondary {
-      background: #059669;
-    }
-
-    .ui-btn:hover {
-      opacity: 0.9;
-    }
-
-    #map {
-      padding-bottom: 120px;
-      height: 100vh;
-      width: 100%;
-    }
-
-    .ui-bar {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      width: 320px;
-      border-radius: 16px;
-    }
-
-        .status {
-      font-weight: bold;
-    }
-
-        .ui-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-    }
-
-      #toggleBtn {
-      background: black;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 4px 10px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-        #cancelRouteBtn {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 14px 22px;
-      font-size: 16px;
-      border-radius: 30px;
-      background: #dc2626;
-      color: white;
-      font-weight: bold;
-      border: none;
-      z-index: 9999;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-
-      .ui-bar.minimized #uiContent {
-      display: none;
-    }
-
-
-    #historyToggleBtn {
-      position: fixed;
-      bottom: 90px;
-      right: 20px;
-      z-index: 9999;
-      padding: 10px 14px;
-      border-radius: 12px;
-      border: none;
-      background: #111827;
-      color: white;
-      font-weight: bold;
-    }
-
-      #historyPanel {
-      position: fixed;
-      top: 70px;
-      right: 20px;
-      width: 280px;
-      max-height: 60vh;
-      overflow-y: auto;
-      background: white;
-      border-radius: 16px;
-      padding: 12px;
-      box-shadow: 0 10px 25px rgba(0,0,0,.3);
-      z-index: 9998;
-      font-size: 14px;
-    }
-
-      .toast {
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%) translateY(20px);
-      background: #111827;
-      color: #fff;
-      padding: 16px 22px;
-      border-radius: 16px;
-      font-size: 15px;
-      max-width: 90%;
-      text-align: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: all 0.4s ease;
-      z-index: 99999;
-      box-shadow: 0 10px 30px rgba(0,0,0,.4);
-    }
-
-      .toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-        /* === Modern Marker Teardrop === */
-    .custom-marker {
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, #2dd4bf, #fb7185);
-      border-radius: 50% 50% 50% 0;
-      transform: rotate(-45deg);
-      border: 3px solid white;
-      box-shadow: 0 6px 14px rgba(0,0,0,0.3);
-      position: relative;
-    }
-
-    .custom-marker::after {
-      content: "";
-      width: 12px;
-      height: 12px;
-      background: white;
-      border-radius: 50%;
-      position: absolute;
-      top: 9px;
-      left: 9px;
-    }
-    .popup-card {
-      font-size: 14px;
-      line-height: 1.5;
-      min-width: 220px;
-    }
-
-    .popup-title {
-      font-weight: bold;
-      font-size: 16px;
-      margin-bottom: 6px;
-    }
-
-    .popup-row {
-      margin-bottom: 2px;
-    }
-
-    .popup-actions {
-      margin-top: 10px;
-      display: flex;
-      gap: 6px;
-    }
-
-    .btn-go {
-      flex: 1;
-      background: #2dd4bf;
-      border: none;
-      color: white;
-      padding: 8px;
-      border-radius: 10px;
-    }
-
-    .btn-done {
-      flex: 1;
-      background: #fb7185;
-      border: none;
-      color: white;
-      padding: 8px;
-      border-radius: 10px;
-    }
-
-    .detail-panel {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 320px;
-      height: 100%;
-      background: white;
-      z-index: 9999;
-      transform: translateX(-100%);
-      transition: 0.3s ease;
-      box-shadow: 4px 0 15px rgba(0,0,0,0.2);
-      padding: 16px;
-      overflow-y: auto;
-    }
-
-    .detail-panel.open {
-      transform: translateX(0);
-    }
-
-    .highlight {
-      animation: pulse 0.4s ease-in-out 4;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.4); }
-      100% { transform: scale(1); }
-    }
-
-
-  </style>
-</head>
-
-<body>
-
-<div class="ui-bar" id="uiBar">
-
-  <!-- HEADER (tidak pernah hilang) -->
-  <div class="ui-header">
-    <b>📍 OyonID Map</b>
-    <button id="toggleBtn">➖</button>
-  </div>
-
-  <!-- KONTEN (yang boleh di-hide) -->
-  <div id="uiContent">
-
-    <input type="file" id="upload" accept=".xlsx,.xls" />
-
-    <div id="statusText" class="status"></div>
-
-    <input id="searchInput" class="ui-input" placeholder="Masukkan 4 digit IDPEL / Meter" />
-    <button id="searchBtn" class="ui-btn">CARI</button>
-
-    <button id="zoomBtn" class="ui-btn ui-secondary" style="display:none;">Zoom Lokasi Tagging</button>
-    <button id="downloadBtn" class="ui-btn">FINISH & Download RBM Update</button>
-
-  </div>
-</div>
-
-<div id="historyPanel" style="display:none;">
-  <div style="font-weight:bold;margin-bottom:6px;">📋 Riwayat Dibaca</div>
-  <div id="historyList"></div>
-</div>
-
-<button id="historyToggleBtn">📋 Riwayat</button>
-
-<div id="map"></div>
-<div id="detailPanel" class="detail-panel">
-  <div id="detailContent"></div>
-</div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
-
 <script>
-const map = L.map('map', { maxZoom: 19 }).setView([-6.2,106.8], 12);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
-}).addTo(map);
-
-setTimeout(()=>map.invalidateSize(),500);
-
-let allRows=[], markers=[], searchIndex=[];
-let historyRows = JSON.parse(localStorage.getItem("historyRows") || "[]");
-let lastHistoryDate = localStorage.getItem("historyDate");
-
-const today = new Date().toDateString();
-
-// Kalau beda hari → reset otomatis
-if(lastHistoryDate !== today){
-  historyRows = [];
-  localStorage.setItem("historyRows", JSON.stringify([]));
-  localStorage.setItem("historyDate", today);
-}
-
-let userLatLng=null, userMarker=null, routingControl=null;
-
-const upload = document.getElementById("upload");
-const statusText = document.getElementById("statusText");
-const searchInput = document.getElementById("searchInput");
-const searchBtn = document.getElementById("searchBtn");
-const zoomBtn = document.getElementById("zoomBtn");
-const downloadBtn = document.getElementById("downloadBtn");
-
-upload.onchange = e=>{
-  const reader = new FileReader();
-  reader.onload = evt=>{
-    const wb = XLSX.read(new Uint8Array(evt.target.result), {type:'array'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    allRows = XLSX.utils.sheet_to_json(sheet);
-
-    localStorage.setItem("oyon_saved_rows", JSON.stringify(allRows));
-
-    renderMarkers();
-    statusText.innerText = "✅ Peta berhasil dibuat";
-    zoomBtn.style.display="block";
-    
-    // === AMBIL KODE PETUGAS DARI EXCEL ===
-    const firstRow = allRows[0] || {};
-let kode = null;
-
-for (const key in firstRow) {
-  if (key.toLowerCase().includes("kode")) {
-    kode = firstRow[key];
-    break;
-  }
-}
-
-if(kode){
-  const interval = setInterval(()=>{
-    if(userLatLng){
-      kirimTracking(kode, userLatLng);
-      clearInterval(interval);
-    }
-  }, 1000);
-} else {
-  alert("Kolom KODE PETUGAS tidak ditemukan di Excel");
-}
-
-  };
-  reader.readAsArrayBuffer(e.target.files[0]);
-};
-
-function kirimTracking(kode, latlng){
-  fetch("https://script.google.com/macros/s/AKfycbwIdsPLA-MjJg73hL-_5TOOwyRaw3Wp1IjxOAQj2FI1CN3gFn8XqQukPyHMyQRC90QwFQ/exec", {
-    method: "POST",
-    body: new URLSearchParams({
-      kode: kode,
-      lat: latlng[0],
-      lng: latlng[1],
-      ua: navigator.userAgent
-    })
-  }).catch(()=>{});
-}
-
-
-function getColor(v){
-  const c={A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8",E:"#f58231",F:"#911eb4",
-  G:"#46f0f0",H:"#f032e6",I:"#bcf60c",J:"#fabebe",K:"#008080",L:"#ffd700",M:"#aaffc3",
-  N:"#808000",O:"#ffd8b1",P:"#000075",Q:"#ff7f00",R:"#800000",S:"#a9a9a9",T:"#00ced1",
-  U:"#9400d3",V:"#228b22",W:"#ff1493",X:"#8a2be2",Y:"#7fff00",Z:"#dc143c"};
-  return c[(v||"").toUpperCase()] || "gray";
-}
-
-function renderMarkers(){
-  markers.forEach(m=>map.removeLayer(m.marker));
-  markers=[]; searchIndex=[];
-
-  allRows.forEach(row=>{
-    const lat=parseFloat(row.LAT), lng=parseFloat(row.LON);
-    if(isNaN(lat)||isNaN(lng)) return;
-
-    const color = getColor(row["HARI BACA ACMT"]);
-
-    const iconHtml = `
-      <div class="custom-marker" style="background:${color}"></div>
-    `;
-
-    const customIcon = L.divIcon({
-      html: iconHtml,
-      className: "",
-      iconSize: [36, 36],
-      iconAnchor: [18, 36]
-    });
-
-    const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
-
-        markers.push({ marker, row });
-
-    marker.bindPopup(`
-  <div class="popup-card">
-    <div class="popup-title">👤 ${row.NAMA || "-"}</div>
-
-    <div class="popup-row">📟 IDPEL: ${row.IDPEL}</div>
-    <div class="popup-row">⚡ DAYA: ${row.DAYA}</div>
-    <div class="popup-row">🔧 MERK: ${row["MERK METER"]}</div>
-    <div class="popup-row">🔢 NOMOR: ${row["NOMOR METER"]}</div>
-    <div class="popup-row">📅 HARI BACA: ${row["HARI BACA ACMT"]}</div>
-
-    <div class="popup-actions">
-      <button class="btn-go" onclick="goToCustomer(${lat},${lng});map.closePopup();">🧭 Datangi</button>
-      <button class="btn-done" onclick="markDone('${row.IDPEL}');map.closePopup();">✅ Selesai</button>
-    </div>
-  </div>
-`);
-
-
-
-    searchIndex.push({
-      idpel: String(row.IDPEL || "").replace(/\D/g, ""),
-      meter: String(row["NOMOR METER"] || "").replace(/\D/g, ""),
-      marker
-    });
-
-  });
-}
-
-function markDone(idpel){
-  const found = allRows.find(r => String(r.IDPEL) === String(idpel));
-  if(found){
-  const m = found.marker;
-
-  map.setView(m.getLatLng(),22);
-  m.openPopup();
-
-  const el = m.getElement();
-  el.classList.add("highlight");
-
-  setTimeout(()=>{
-    el.classList.remove("highlight");
-  },1500);
-}
-    
-    // simpan ke localStorage
-    localStorage.setItem("historyRows", JSON.stringify(historyRows));
-  }
-  
-  allRows = allRows.filter(r=>String(r.IDPEL)!==String(idpel));
-  renderMarkers();
-  renderHistory();
-}
-
-function renderHistory(){
-  const box = document.getElementById("historyList");
-  box.innerHTML = "";
-
-  if(historyRows.length === 0){
-    box.innerHTML = "<i>Belum ada data</i>";
-    return;
-  }
-
-  historyRows.slice().reverse().forEach(r=>{
-    const div = document.createElement("div");
-    div.style.borderBottom = "1px solid #eee";
-    div.style.padding = "6px 0";
-    div.innerHTML = `
-      <b>${r.NAMA}</b><br>
-      IDPEL: ${r.IDPEL}<br>
-      Meter: ${r["NOMOR METER"]}
-    `;
-    box.appendChild(div);
-  });
-}
-document.getElementById("historyToggleBtn").onclick = () => {
-  const panel = document.getElementById("historyPanel");
-  panel.style.display = panel.style.display === "none" ? "block" : "none";
-};
-
-searchBtn.onclick=()=>{
-  const key=searchInput.value.trim();
-  if(key.length<4) return alert("Minimal 4 digit");
-  const found=searchIndex.find(o=>o.idpel.endsWith(key)||o.meter.endsWith(key));
-  if(found){
-    map.setView(found.marker.getLatLng(),22);
-    found.marker.openPopup();
-    minimized = true;
-    uiBar.classList.add("minimized");
-    toggleBtn.innerText = "➕";
-
-  } else alert("Tidak ditemukan");
-};
-
-zoomBtn.onclick=()=>{
-  if(!markers.length) return;
-  const group=L.featureGroup(markers.map(m=>m.marker));
-  map.fitBounds(group.getBounds(),{padding:[30,30]});
-};
-
-downloadBtn.onclick = () => {
-  const ws = XLSX.utils.json_to_sheet(allRows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Updated");
-
-  XLSX.writeFile(wb, "RBM_UPDATE.xlsx");
-
-  showToast(`
-    <b>✅ RBM berhasil diunduh</b><br><br>
-    Selamat beristirahat, wahai pejuang nafkah.<br>
-    Semoga setiap lelahmu bernilai ibadah 🤲
-  `);
-};
-
-
-function goToCustomer(lat,lng){
-  if(!userLatLng) return alert("Lokasi belum terdeteksi");
-
-  if(routingControl) map.removeControl(routingControl);
-
-  routingControl = L.Routing.control({
-    waypoints:[
-      L.latLng(userLatLng),
-      L.latLng(lat,lng)
-    ],
-    addWaypoints:false,
-    draggableWaypoints:false,
-    fitSelectedRoutes:true
-  }).addTo(map);
-
-  document.getElementById("cancelRouteBtn").style.display = "block";
-}
-
-
-// GPS Live
-const officerIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/9131/9131529.png",
-  iconSize: [40,40],
-  iconAnchor: [20,40],
-  popupAnchor: [0,-35]
-});
-// === AUTO LOAD SAAT WEB DIBUKA ===
-window.addEventListener("load", () => {
-  const saved = localStorage.getItem("oyon_saved_rows");
-  const hist = localStorage.getItem("oyon_history");
-
-  if(saved){
-    allRows = JSON.parse(saved);
-    renderMarkers();
-    statusText.innerText = "📂 Data dimuat otomatis";
-    zoomBtn.style.display = "block";
-  }
-
-  if(hist){
-    historyRows = JSON.parse(hist);
-    renderHistory();
-  }
-});
-
-
-if(navigator.geolocation){
-  navigator.geolocation.watchPosition(pos=>{
-    userLatLng=[pos.coords.latitude,pos.coords.longitude];
-    if(!userMarker){
-      userMarker = L.marker(userLatLng,{icon:officerIcon})
-        .addTo(map)
-        .bindPopup("👮 Lokasi Anda");
-    } else {
-      userMarker.setLatLng(userLatLng);
-    }
-  });
-}
+/* =========================
+   1. GLOBAL STATE
+========================= */
+let map, routingControl;
+let allRows = [];
+let markers = [];
+let searchIndex = [];
+let userLatLng = null;
+let userMarker = null;
 
 const uiBar = document.getElementById("uiBar");
 const toggleBtn = document.getElementById("toggleBtn");
+const upload = document.getElementById("upload");
+const statusText = document.getElementById("statusText");
+const searchInput = document.getElementById("searchInput");
+const zoomBtn = document.getElementById("zoomBtn");
+const downloadBtn = document.getElementById("downloadBtn");
 
 let minimized = false;
 
+/* =========================
+   2. INIT MAP
+========================= */
+map = L.map("map").setView([-6.2, 106.8], 12);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19
+}).addTo(map);
+
+/* =========================
+   3. UI CONTROLS
+========================= */
 toggleBtn.onclick = () => {
   minimized = !minimized;
   uiBar.classList.toggle("minimized");
   toggleBtn.innerText = minimized ? "➕" : "➖";
 };
-function cancelRoute(){
-  if(routingControl){
-    map.removeControl(routingControl);
-    routingControl = null;
-  }
+
+/* =========================
+   4. EXCEL LOADER
+========================= */
+upload.onchange = e => {
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    allRows = XLSX.utils.sheet_to_json(sheet);
+
+    localStorage.setItem("oyon_saved_rows", JSON.stringify(allRows));
+
+    buildMarkers();
+    statusText.innerText = "✅ Peta berhasil dibuat";
+    zoomBtn.style.display = "block";
+  };
+  reader.readAsArrayBuffer(e.target.files[0]);
+};
+
+/* =========================
+   5. MARKER ENGINE
+========================= */
+function buildMarkers() {
+  markers.forEach(m => map.removeLayer(m.marker));
+  markers = [];
+  searchIndex = [];
+
+  allRows.forEach(row => {
+    const lat = parseFloat(row.LAT);
+    const lng = parseFloat(row.LON);
+    if (!lat || !lng) return;
+
+    const color = getColor(row["HARI BACA ACMT"]);
+    const icon = L.divIcon({
+      html: `<div class="custom-marker" style="background:${color}"></div>`,
+      iconSize: [36,36],
+      iconAnchor: [18,36]
+    });
+
+    const marker = L.marker([lat, lng], { icon }).addTo(map);
+
+    marker.on("click", () => openDetail(row));
+
+    marker.bindPopup(popupTemplate(row, lat, lng));
+
+    markers.push({ marker, row });
+
+    searchIndex.push({
+      idpel: String(row.IDPEL || "").replace(/\D/g,""),
+      meter: String(row["NOMOR METER"] || "").replace(/\D/g,""),
+      marker
+    });
+  });
+}
+
+/* =========================
+   6. POPUP TEMPLATE
+========================= */
+function popupTemplate(r, lat, lng) {
+  return `
+  <div class="popup-card">
+    <div class="popup-title">👤 ${r.NAMA}</div>
+    <div>📟 IDPEL: ${r.IDPEL}</div>
+    <div>⚡ DAYA: ${r.DAYA}</div>
+    <div>🔧 MERK: ${r["MERK METER"]}</div>
+    <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
+    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
+    <div class="popup-actions">
+      <button class="btn-go" onclick="goToCustomer(${lat},${lng})">🧭 Datangi</button>
+      <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
+    </div>
+  </div>`;
+}
+
+/* =========================
+   7. SEARCH ENGINE
+========================= */
+document.getElementById("searchBtn").onclick = () => {
+  const key = searchInput.value.trim();
+  if (key.length < 4) return alert("Minimal 4 digit");
+
+  const found = searchIndex.find(o =>
+    o.idpel.endsWith(key) || o.meter.endsWith(key)
+  );
+
+  if (!found) return alert("Tidak ditemukan");
+
+  map.setView(found.marker.getLatLng(), 19);
+  found.marker.openPopup();
+
+  uiBar.classList.add("minimized");
+  toggleBtn.innerText = "➕";
+};
+
+/* =========================
+   8. ROUTING
+========================= */
+function goToCustomer(lat, lng) {
+  if (!userLatLng) return alert("GPS belum aktif");
+
+  if (routingControl) map.removeControl(routingControl);
+
+  routingControl = L.Routing.control({
+    waypoints: [
+      L.latLng(userLatLng),
+      L.latLng(lat, lng)
+    ],
+    addWaypoints: false,
+    draggableWaypoints: false
+  }).addTo(map);
+
+  document.getElementById("cancelRouteBtn").style.display = "block";
+}
+
+function cancelRoute() {
+  if (routingControl) map.removeControl(routingControl);
+  routingControl = null;
   document.getElementById("cancelRouteBtn").style.display = "none";
 }
-function showToast(message) {
-  const toast = document.getElementById("toast");
-  toast.innerHTML = message;
-  toast.classList.add("show");
 
-  setTimeout(() => {
-    toast.classList.remove("show");
-  }, 4000);
-}
-renderHistory();
-
-function openDetail(row){
-  const panel = document.getElementById("detailPanel");
-  const content = document.getElementById("detailContent");
-
-  content.innerHTML = `
-    <h3>${row.NAMA}</h3>
-    <p><b>IDPEL:</b> ${row.IDPEL}</p>
-    <p><b>DAYA:</b> ${row.DAYA}</p>
-    <p><b>MERK:</b> ${row["MERK METER"]}</p>
-    <p><b>NOMOR:</b> ${row["NOMOR METER"]}</p>
-    <p><b>HARI BACA:</b> ${row["HARI BACA ACMT"]}</p>
-  `;
-
-  panel.classList.add("open");
-}
-marker.on("click", () => {
-  openDetail(row);
+/* =========================
+   9. GPS USER
+========================= */
+const officerIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/9131/9131529.png",
+  iconSize: [40,40],
+  iconAnchor: [20,40]
 });
 
+navigator.geolocation?.watchPosition(pos => {
+  userLatLng = [pos.coords.latitude, pos.coords.longitude];
+
+  if (!userMarker) {
+    userMarker = L.marker(userLatLng, { icon: officerIcon })
+      .addTo(map)
+      .bindPopup("👮 Lokasi Anda");
+  } else {
+    userMarker.setLatLng(userLatLng);
+  }
+});
+
+/* =========================
+   10. UTILITIES
+========================= */
+function getColor(v) {
+  const c = {A:"#e6194b",B:"#3cb44b",C:"#ffe119",D:"#4363d8"};
+  return c[(v||"").toUpperCase()] || "#999";
+}
+
+function openDetail(row) {
+  document.getElementById("detailPanel").classList.add("open");
+  document.getElementById("detailContent").innerHTML = `
+    <h3>${row.NAMA}</h3>
+    <p>IDPEL: ${row.IDPEL}</p>
+    <p>DAYA: ${row.DAYA}</p>
+    <p>MERK: ${row["MERK METER"]}</p>
+    <p>NOMOR: ${row["NOMOR METER"]}</p>
+    <p>HARI BACA: ${row["HARI BACA ACMT"]}</p>`;
+}
 </script>
-<button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
-  ❌ BATAL DATANGI
-</button>
-
-<div id="toast" class="toast"></div>
-
-</body>
-</html>
