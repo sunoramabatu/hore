@@ -346,56 +346,45 @@
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
-/* =========================
-   1. GLOBAL STATE
-========================= */
-let map, routingControl;
+/* ======================
+   GLOBAL STATE
+====================== */
+let map;
 let allRows = [];
 let markers = [];
 let searchIndex = [];
 let userLatLng = null;
-let userMarker = null;
-let historyRows = JSON.parse(localStorage.getItem("historyRows") || "[]");
+let routingControl = null;
+let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
 
-const uiBar = document.getElementById("uiBar");
-const toggleBtn = document.getElementById("toggleBtn");
+/* ======================
+   DOM
+====================== */
 const upload = document.getElementById("upload");
 const statusText = document.getElementById("statusText");
+const searchBtn = document.getElementById("searchBtn");
 const searchInput = document.getElementById("searchInput");
 const zoomBtn = document.getElementById("zoomBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
-let minimized = false;
-
-/* =========================
-   2. INIT MAP
-========================= */
-map = L.map("map").setView([-6.2, 106.8], 12);
+/* ======================
+   INIT MAP
+====================== */
+map = L.map("map").setView([-6.2,106.8], 13);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 20
 }).addTo(map);
 
-/* =========================
-   3. UI CONTROLS
-========================= */
-toggleBtn.onclick = () => {
-  minimized = !minimized;
-  uiBar.classList.toggle("minimized");
-  toggleBtn.innerText = minimized ? "➕" : "➖";
-};
-
-/* =========================
-   4. EXCEL LOADER
-========================= */
+/* ======================
+   LOAD EXCEL
+====================== */
 upload.onchange = e => {
   const reader = new FileReader();
   reader.onload = evt => {
     const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     allRows = XLSX.utils.sheet_to_json(sheet);
-
-    localStorage.setItem("oyon_saved_rows", JSON.stringify(allRows));
 
     buildMarkers();
     statusText.innerText = "✅ Peta berhasil dibuat";
@@ -404,10 +393,10 @@ upload.onchange = e => {
   reader.readAsArrayBuffer(e.target.files[0]);
 };
 
-/* =========================
-   5. MARKER ENGINE
-========================= */
-function buildMarkers() {
+/* ======================
+   BUILD MARKERS
+====================== */
+function buildMarkers(){
   markers.forEach(m => map.removeLayer(m.marker));
   markers = [];
   searchIndex = [];
@@ -415,69 +404,34 @@ function buildMarkers() {
   allRows.forEach(row => {
     const lat = parseFloat(row.LAT);
     const lng = parseFloat(row.LON);
-    if (!lat || !lng) return;
+    if(!lat || !lng) return;
 
     const color = getColor(row["HARI BACA ACMT"]);
+
     const icon = L.divIcon({
-    html: `<div class="custom-marker" style="background:${color}"></div>`,
-    iconSize: [22,22],
-    iconAnchor: [11,22],
-    className: ""
+      html: `<div class="custom-marker" style="background:${color}"></div>`,
+      iconSize: [22,22],
+      iconAnchor: [11,22],
+      className: ""
     });
 
-
-    const marker = L.marker([lat, lng], { icon }).addTo(map);
-
+    const marker = L.marker([lat,lng], {icon}).addTo(map);
     marker.on("click", () => openDetail(row));
 
-    markers.push({ marker, row });
-    marker.on("click", () => {
-      openDetail(row);
-    });
+    markers.push({marker,row});
 
     searchIndex.push({
-      idpel: String(row.IDPEL || "").replace(/\D/g,""),
-      meter: String(row["NOMOR METER"] || "").replace(/\D/g,""),
+      idpel: String(row.IDPEL||"").replace(/\D/g,""),
+      meter: String(row["NOMOR METER"]||"").replace(/\D/g,""),
       marker,
       row
-      });
+    });
   });
 }
 
-function tandaiSelesai(data) {
-  historyList.push({
-    ...data,
-    waktu: new Date().toLocaleTimeString()
-  });
-
-  localStorage.setItem("riwayat", JSON.stringify(historyList));
-  renderHistory();
-}
-btnSelesai.onclick = () => tandaiSelesai(itemData);
-
-
-/* =========================
-   6. POPUP TEMPLATE
-========================= */
-function popupTemplate(r, lat, lng) {
-  return `
-  <div class="popup-card">
-    <div class="popup-title">👤 ${r.NAMA}</div>
-    <div>📟 IDPEL: ${r.IDPEL}</div>
-    <div>⚡ DAYA: ${r.DAYA}</div>
-    <div>🔧 MERK: ${r["MERK METER"]}</div>
-    <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
-    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
-    <div class="popup-actions">
-      <button class="btn-go" onclick="goToCustomer(${lat},${lng})">🧭 Tampil Rute</button>
-      <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
-    </div>
-  </div>`;
-}
-
-/* =========================
-   7. SEARCH ENGINE
-========================= */
+/* ======================
+   SEARCH
+====================== */
 searchBtn.onclick = () => {
   const key = searchInput.value.trim();
   if(key.length < 4) return alert("Minimal 4 digit");
@@ -488,178 +442,123 @@ searchBtn.onclick = () => {
 
   if(!found) return alert("Tidak ditemukan");
 
-  map.setView(found.marker.getLatLng(), 20);
+  map.setView(found.marker.getLatLng(), 19, {animate:true});
+  highlight(found.marker);
   openDetail(found.row);
-
-  found.marker.getElement()?.classList.add("highlight");
-  setTimeout(() => {
-  found.marker.getElement()?.classList.remove("highlight");
-  }, 1500);
-
-  uiBar.classList.add("minimized");
-  toggleBtn.innerText = "➕";
 };
 
-map.setView(marker.getLatLng(), 20, { animate: true });
-highlightMarker(marker);
-showSidebarData(data);
+function highlight(marker){
+  const el = marker.getElement();
+  if(!el) return;
+  el.classList.add("highlight");
+  setTimeout(()=>el.classList.remove("highlight"),1500);
+}
 
-/* =========================
-   7.5 ZOOM ALL MARKERS
-========================= */
+/* ======================
+   ZOOM ALL
+====================== */
 zoomBtn.onclick = () => {
-  if (!markers.length) return alert("Belum ada data");
-  const group = L.featureGroup(markers.map(m => m.marker));
-  map.fitBounds(group.getBounds(), { padding: [40, 40] });
+  if(!markers.length) return;
+  const group = L.featureGroup(markers.map(m=>m.marker));
+  map.fitBounds(group.getBounds(), {padding:[40,40]});
 };
 
-
-marker.bindTooltip(data.NAMA, {
-  permanent: true,
-  direction: "top",
-  className: "marker-label"
-});
-
-
-function highlightMarker(marker) {
-  marker.setZIndexOffset(1000);
-
-  marker._icon.classList.add("highlight-marker");
-
-  setTimeout(() => {
-    marker._icon.classList.remove("highlight-marker");
-  }, 3000);
-}
-
-
-/* =========================
-   7.6 FINISH DOWNLOAD
-========================= */
-downloadBtn.onclick = () => {
-  const ws = XLSX.utils.json_to_sheet(allRows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
-  XLSX.writeFile(wb, "RBM_UPDATE.xlsx");
-
-  showToast(`✅ RBM berhasil diunduh<br>
-  Selamat beristirahat wahai pejuang nafkah 🤲`);
-};
-
-function showToast(msg){
-  const toast = document.getElementById("toast");
-  toast.innerHTML = msg;
-  toast.classList.add("show");
-  setTimeout(()=>toast.classList.remove("show"),4000);
-}
-
-/* =========================
-   8. ROUTING
-========================= */
-function goToCustomer(lat, lng) {
-  if (!userLatLng) return alert("GPS belum aktif");
-
-  if (routingControl) map.removeControl(routingControl);
-
-  routingControl = L.Routing.control({
-    waypoints: [
-      L.latLng(userLatLng),
-      L.latLng(lat, lng)
-    ],
-    addWaypoints: false,
-    draggableWaypoints: false,
-    fitSelectedRoutes: true,
-    show: false,
-    collapsible: true,
-    createMarker: () => null
-  }).addTo(map);
-
-  document.getElementById("cancelRouteBtn").style.display = "block";
-}
-
-function cancelRoute() {
-  if (routingControl) map.removeControl(routingControl);
-  routingControl = null;
-  document.getElementById("cancelRouteBtn").style.display = "none";
-}
-
-/* =========================
-   9. GPS USER
-========================= */
-const officerIcon = L.icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/9131/9131529.png",
-  iconSize: [40,40],
-  iconAnchor: [20,40]
-});
-
-navigator.geolocation?.watchPosition(pos => {
-  userLatLng = [pos.coords.latitude, pos.coords.longitude];
-
-  if (!userMarker) {
-    userMarker = L.marker(userLatLng, { icon: officerIcon })
-      .addTo(map)
-      .bindPopup("👮 Lokasi Anda");
-  } else {
-    userMarker.setLatLng(userLatLng);
-  }
-});
-
-/* =========================
-   10. UTILITIES
-========================= */
-function getColor(v){
-  const map = {
-    A:"#22c55e", B:"#f97316", C:"#3b82f6", D:"#ef4444",
-    E:"#a855f7", F:"#14b8a6", G:"#eab308", H:"#ec4899",
-    I:"#6366f1", J:"#84cc16", K:"#06b6d4", L:"#f43f5e",
-    M:"#7c3aed", N:"#f59e0b", O:"#0ea5e9", P:"#10b981",
-    Q:"#d946ef", R:"#fb7185", S:"#0f766e", T:"#1e3a8a",
-    U:"#4d7c0f", V:"#be185d", W:"#0284c7", X:"#475569",
-    Y:"#fde047", Z:"#0f172a"
-  };
-  return map[(v||"").toUpperCase()] || "#64748b";
-}
-
-function openDetail(row){
+/* ======================
+   DETAIL PANEL
+====================== */
+function openDetail(r){
   const panel = document.getElementById("detailPanel");
   const content = document.getElementById("detailContent");
 
   content.innerHTML = `
-    <h3 style="margin-bottom:10px;">${row.NAMA}</h3>
-
-    <div>📟 IDPEL: ${row.IDPEL}</div>
-    <div>⚡ DAYA: ${row.DAYA}</div>
-    <div>🔧 MERK: ${row["MERK METER"]}</div>
-    <div>🔢 NOMOR: ${row["NOMOR METER"]}</div>
-    <div>📅 HARI BACA: ${row["HARI BACA ACMT"]}</div>
+    <h3>${r.NAMA}</h3>
+    <div>📟 IDPEL: ${r.IDPEL}</div>
+    <div>⚡ DAYA: ${r.DAYA}</div>
+    <div>🔧 MERK: ${r["MERK METER"]}</div>
+    <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
+    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
 
     <div style="margin-top:12px;display:flex;gap:8px;">
-      <button class="btn-go" onclick="goToCustomer(${row.LAT},${row.LON})">🧭 Tampil Rute</button>
-      <button class="btn-done" onclick="markDone('${row.IDPEL}')">✅ Selesai</button>
+      <button class="btn-go" onclick="goTo(${r.LAT},${r.LON})">🧭 Tampil Rute</button>
+      <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
     </div>
   `;
 
   panel.classList.add("open");
 }
 
-function markDone(idpel){
-  const idx = allRows.findIndex(r => String(r.IDPEL) === String(idpel));
-  if(idx === -1) return;
-
-  allRows.splice(idx, 1);
-
-  buildMarkers();
-  closeDetail();
-
-  showToast("✅ Data ditandai selesai");
-}
-
-
 function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
 }
 
+/* ======================
+   ROUTING
+====================== */
+function goTo(lat,lng){
+  if(!userLatLng) return alert("GPS belum aktif");
 
+  if(routingControl) map.removeControl(routingControl);
+
+  routingControl = L.Routing.control({
+    waypoints: [L.latLng(userLatLng), L.latLng(lat,lng)],
+    addWaypoints:false,
+    draggableWaypoints:false,
+    createMarker:()=>null
+  }).addTo(map);
+
+  document.getElementById("cancelRouteBtn").style.display="block";
+}
+
+function cancelRoute(){
+  if(routingControl) map.removeControl(routingControl);
+  routingControl = null;
+  document.getElementById("cancelRouteBtn").style.display="none";
+}
+
+/* ======================
+   DONE + HISTORY
+====================== */
+function markDone(idpel){
+  history.push({idpel, time:new Date().toLocaleTimeString()});
+  localStorage.setItem("oyon_history", JSON.stringify(history));
+
+  allRows = allRows.filter(r => String(r.IDPEL) !== String(idpel));
+  buildMarkers();
+  closeDetail();
+  showToast("✅ Data ditandai selesai");
+}
+
+/* ======================
+   TOAST
+====================== */
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.innerHTML = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"),3000);
+}
+
+/* ======================
+   GPS
+====================== */
+navigator.geolocation?.watchPosition(pos=>{
+  userLatLng=[pos.coords.latitude,pos.coords.longitude];
+});
+
+/* ======================
+   COLOR MAP
+====================== */
+function getColor(v){
+  const map={
+    A:"#22c55e",B:"#f97316",C:"#3b82f6",D:"#ef4444",
+    E:"#a855f7",F:"#14b8a6",G:"#eab308",H:"#ec4899",
+    I:"#6366f1",J:"#84cc16",K:"#06b6d4",L:"#f43f5e",
+    M:"#7c3aed",N:"#f59e0b",O:"#0ea5e9",P:"#10b981"
+  };
+  return map[(v||"").toUpperCase()] || "#64748b";
+}
 </script>
+
 
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
   ❌ TUTUP RUTE
