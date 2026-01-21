@@ -569,25 +569,25 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
-  const row = allRows.find(r => String(r.IDPEL) === String(idpel));
-  if(!row) return;
+  const found = allRows.find(r => String(r.IDPEL) === String(idpel));
+  if (!found) return;
 
-  historyData.push({
-    nama: row.NAMA,
-    idpel: row.IDPEL,
-    waktu: new Date().toLocaleString()
+  // simpan FULL DATA ke history
+  history.push({
+    row: found,
+    time: new Date().toLocaleTimeString()
   });
 
-  localStorage.setItem("historyData", JSON.stringify(historyData));
+  localStorage.setItem("oyon_history", JSON.stringify(history));
 
-  renderHistory(); // ← INI YANG SEBELUMNYA TIDAK PERNAH TERPANGGIL
-
+  // hapus dari peta
   allRows = allRows.filter(r => String(r.IDPEL) !== String(idpel));
-  buildMarkers();
-  closeDetail();
-  showToast("✅ Masuk ke riwayat");
-}
 
+  buildMarkers();
+  renderHistory();
+  closeDetail();
+  showToast("✅ Ditandai selesai");
+}
 
 /* ======================
    DONE + HISTORY
@@ -602,23 +602,31 @@ function finishReading(data) {
   localStorage.setItem("historyData", JSON.stringify(historyData));
   renderHistory();
 }
+
 function renderHistory() {
   const el = document.getElementById("historyList");
   if (!el) return;
 
-  if (historyData.length === 0) {
+  if (history.length === 0) {
     el.innerHTML = "<p>Belum ada riwayat hari ini.</p>";
     return;
   }
 
-  el.innerHTML = historyData.map(item => `
-    <div style="border-bottom:1px solid #eee;padding:6px">
-      <strong>${item.nama}</strong><br>
-      IDPEL: ${item.idpel}<br>
-      ${item.time}
+  el.innerHTML = history.map((item, index) => `
+    <div style="border-bottom:1px solid #eee;padding:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong>${item.row.NAMA}</strong><br>
+        IDPEL: ${item.row.IDPEL}<br>
+        <small>${item.time}</small>
+      </div>
+      <button onclick="undoHistory(${index})"
+        style="background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:8px;font-size:12px;">
+        Undo
+      </button>
     </div>
   `).join("");
 }
+
 /* ======================
    reset history 23.00
 ====================== */
@@ -657,13 +665,12 @@ downloadBtn.onclick = () => {
 
   // Buat timestamp
   const now = new Date();
-  const yyyy = now.getFullYear();
   const dd = String(now.getDate()).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const hh = String(now.getHours()).padStart(2, "0");
   const min = String(now.getMinutes()).padStart(2, "0");
 
-  const filename = `RBM_${kodePetugas}_${yyyy}-${dd}-${mm}_${hh}-${min}.xlsx`;
+  const filename = `RBM_${kodePetugas}_${dd}-${mm}_${hh}-${min}.xlsx`;
 
   // Generate Excel
   const ws = XLSX.utils.json_to_sheet(allRows);
