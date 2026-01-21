@@ -565,6 +565,48 @@ function markDone(idpel){
 }
 
 /* ======================
+   DONE + HISTORY
+====================== */
+let historyData = JSON.parse(localStorage.getItem("historyData")) || [];
+function finishReading(data) {
+  historyData.push({
+    ...data,
+    time: new Date().toLocaleString()
+  });
+
+  localStorage.setItem("historyData", JSON.stringify(historyData));
+  renderHistory();
+}
+function renderHistory() {
+  const el = document.getElementById("historyList");
+  if (!el) return;
+
+  if (historyData.length === 0) {
+    el.innerHTML = "<p>Belum ada riwayat hari ini.</p>";
+    return;
+  }
+
+  el.innerHTML = historyData.map(item => `
+    <div style="border-bottom:1px solid #eee;padding:6px">
+      <strong>${item.nama}</strong><br>
+      IDPEL: ${item.idpel}<br>
+      ${item.time}
+    </div>
+  `).join("");
+}
+/* ======================
+   reset history 23.00
+====================== */
+
+const today = new Date().toDateString();
+const savedDate = localStorage.getItem("historyDate");
+
+if (savedDate !== today) {
+  localStorage.removeItem("historyData");
+  localStorage.setItem("historyDate", today);
+}
+
+/* ======================
    TOAST
 ====================== */
 function showToast(msg){
