@@ -458,6 +458,15 @@ function highlightMarker(marker) {
   }, 2000);
 }
 
+function showLabel(marker) {
+  marker.openTooltip();
+
+  setTimeout(() => {
+    marker.closeTooltip();
+  }, 4000); // nama tampil 4 detik lalu hilang otomatis
+}
+
+
 /* ======================
    SEARCH
 ====================== */
@@ -471,15 +480,16 @@ searchBtn.onclick = () => {
 
   if(!found) return alert("Tidak ditemukan");
 
-  map.setView(found.marker.getLatLng(), 19, {animate:true});
-  highlightMarker(found.marker);
   map.setView(found.marker.getLatLng(), 20, { animate: true });
+
   highlightMarker(found.marker);
+  showLabel(found.marker);
   openDetail(found.row);
-  
+
   document.getElementById("uiBar").classList.add("minimized");
   document.getElementById("toggleBtn").innerText = "➕";
 };
+
 
 
 function highlightMarker(marker){
