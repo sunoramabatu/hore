@@ -639,7 +639,7 @@ function showToast(msg){
   const t = document.getElementById("toast");
   t.innerHTML = msg;
   t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),3000);
+  setTimeout(()=>t.classList.remove("show"),5000);
 }
 /* ======================
    FINISH DAN SIMPAN RBM UPDATE
@@ -650,17 +650,31 @@ downloadBtn.onclick = () => {
     return;
   }
 
-  // Convert data ke worksheet
+  // Ambil KODE PETUGAS dari baris pertama
+  const kodePetugas = (allRows[0]["KODE PETUGAS"] || "UNKNOWN")
+    .toString()
+    .replace(/\s+/g, "_");
+
+  // Buat timestamp
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const dd = String(now.getDate()).padStart(2, "0");
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+
+  const filename = `RBM_${kodePetugas}_${yyyy}-${dd}-${mm}_${hh}-${min}.xlsx`;
+
+  // Generate Excel
   const ws = XLSX.utils.json_to_sheet(allRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
 
-  // Download file
-  XLSX.writeFile(wb, "RBM_UPDATE.xlsx");
+  XLSX.writeFile(wb, filename);
 
-  // Notifikasi estetik
-  showToast("✅ RBM berhasil diunduh.<br>Selamat beristirahat, wahai pejuang nafkah.<br>Semoga setiap lelahmu bernilai ibadah.");
+  showToast(`✅ RBM berhasil diunduh<br><b>${filename}</b><br>Selamat beristirahat, wahai pejuang nafkah.<br>Semoga setiap lelahmu bernilai ibadah.`);
 };
+
 
 /* ======================
    GPS
