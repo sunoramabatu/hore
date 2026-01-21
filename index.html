@@ -641,6 +641,26 @@ function showToast(msg){
   t.classList.add("show");
   setTimeout(()=>t.classList.remove("show"),3000);
 }
+/* ======================
+   FINISH DAN SIMPAN RBM UPDATE
+====================== */
+downloadBtn.onclick = () => {
+  if (allRows.length === 0) {
+    showToast("⚠️ Tidak ada data untuk diunduh");
+    return;
+  }
+
+  // Convert data ke worksheet
+  const ws = XLSX.utils.json_to_sheet(allRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
+
+  // Download file
+  XLSX.writeFile(wb, "RBM_UPDATE.xlsx");
+
+  // Notifikasi estetik
+  showToast("✅ RBM berhasil diunduh.<br>Selamat beristirahat, wahai pejuang nafkah.<br>Semoga setiap lelahmu bernilai ibadah.");
+};
 
 /* ======================
    GPS
