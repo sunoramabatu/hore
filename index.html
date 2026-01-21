@@ -362,6 +362,15 @@ let searchIndex = [];
 let userLatLng = null;
 let routingControl = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
+// Reset history setiap hari
+const today = new Date().toDateString();
+const savedDate = localStorage.getItem("oyon_history_date");
+
+if (savedDate !== today) {
+  history = [];
+  localStorage.setItem("oyon_history", "[]");
+  localStorage.setItem("oyon_history_date", today);
+}
 
 /* ======================
    DOM
@@ -596,8 +605,11 @@ function renderHistory() {
   const el = document.getElementById("historyList");
   if (!el) return;
 
-  if (history.length === 0) {
-    el.innerHTML = "<p>Belum ada riwayat hari ini.</p>";
+  if (!history || history.length === 0) {
+    el.innerHTML = `
+      <div style="padding:10px;color:#666;text-align:center">
+        📭 Belum ada pelanggan selesai hari ini
+      </div>`;
     return;
   }
 
