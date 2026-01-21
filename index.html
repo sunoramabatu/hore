@@ -251,16 +251,6 @@
     }
 
 
-    .highlight {
-      animation: pulse 0.4s ease-in-out 4;
-    }
-
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.4); }
-      100% { transform: scale(1); }
-    }
-
     .leaflet-routing-container {
       display: none !important;
     }
@@ -270,7 +260,7 @@
     bottom: 0;
     left: 0;
     right: 0;
-    max-height: 35vh;   /* sebelumnya kemungkinan 60–80vh */
+    max-height: 22vh;   /* sebelumnya kemungkinan 60–80vh */
     background: #fff;
     border-top: 1px solid #ddd;
     border-radius: 16px 16px 0 0;
@@ -279,6 +269,12 @@
     box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
     font-size: 14px;
     }
+
+    #sidebar {
+      backdrop-filter: blur(6px);
+      background: rgba(255,255,255,0.95);
+    }
+
 
     .highlight-marker {
     animation: pulse 1s infinite;
@@ -297,6 +293,16 @@
       font-weight: bold;
       font-size: 11px;
       text-shadow: 0 1px 2px white;
+    }
+
+    .highlight {
+      animation: pulse 0.4s ease-in-out 4;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.4); }
+      100% { transform: scale(1); }
     }
 
   </style>
@@ -443,16 +449,21 @@ searchBtn.onclick = () => {
   if(!found) return alert("Tidak ditemukan");
 
   map.setView(found.marker.getLatLng(), 19, {animate:true});
-  highlight(found.marker);
+  highlightMarker(found.marker);
   openDetail(found.row);
 };
 
-function highlight(marker){
+function highlightMarker(marker){
   const el = marker.getElement();
   if(!el) return;
+
   el.classList.add("highlight");
-  setTimeout(()=>el.classList.remove("highlight"),1500);
+
+  setTimeout(() => {
+    el.classList.remove("highlight");
+  }, 1500);
 }
+
 
 /* ======================
    ZOOM ALL
