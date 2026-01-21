@@ -592,17 +592,6 @@ function markDone(idpel){
 /* ======================
    DONE + HISTORY
 ====================== */
-let historyData = JSON.parse(localStorage.getItem("historyData")) || [];
-function finishReading(data) {
-  historyData.push({
-    ...data,
-    time: new Date().toLocaleString()
-  });
-
-  localStorage.setItem("historyData", JSON.stringify(historyData));
-  renderHistory();
-}
-
 function renderHistory() {
   const el = document.getElementById("historyList");
   if (!el) return;
@@ -626,6 +615,8 @@ function renderHistory() {
     </div>
   `).join("");
 }
+
+
 function undoHistory(index){
   const item = history[index];
   if (!item) return;
@@ -651,13 +642,7 @@ function undoHistory(index){
    reset history 23.00
 ====================== */
 
-const today = new Date().toDateString();
-const savedDate = localStorage.getItem("historyDate");
 
-if (savedDate !== today) {
-  localStorage.removeItem("historyData");
-  localStorage.setItem("historyDate", today);
-}
 
 
 /* ======================
@@ -727,6 +712,7 @@ renderHistory();
 document.getElementById("historyToggleBtn").onclick = () => {
   const panel = document.getElementById("historyPanel");
   panel.style.display = panel.style.display === "none" ? "block" : "none";
+  renderHistory();
 };
 /* ======================
    minimize btn
