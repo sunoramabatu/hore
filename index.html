@@ -265,6 +265,40 @@
       display: none !important;
     }
 
+    #sidebar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 35vh;   /* sebelumnya kemungkinan 60–80vh */
+    background: #fff;
+    border-top: 1px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+    box-shadow: 0 -5px 20px rgba(0,0,0,0.15);
+    font-size: 14px;
+    }
+
+    .highlight-marker {
+    animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.25); }
+      100% { transform: scale(1); }
+    }
+
+    .marker-label {
+      background: transparent;
+      border: none;
+      color: #111;
+      font-weight: bold;
+      font-size: 11px;
+      text-shadow: 0 1px 2px white;
+    }
+
   </style>
 </head>
 
@@ -339,7 +373,7 @@ let minimized = false;
 map = L.map("map").setView([-6.2, 106.8], 12);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19
+  maxZoom: 20
 }).addTo(map);
 
 /* =========================
@@ -410,6 +444,18 @@ function buildMarkers() {
   });
 }
 
+function tandaiSelesai(data) {
+  historyList.push({
+    ...data,
+    waktu: new Date().toLocaleTimeString()
+  });
+
+  localStorage.setItem("riwayat", JSON.stringify(historyList));
+  renderHistory();
+}
+btnSelesai.onclick = () => tandaiSelesai(itemData);
+
+
 /* =========================
    6. POPUP TEMPLATE
 ========================= */
@@ -423,7 +469,7 @@ function popupTemplate(r, lat, lng) {
     <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
     <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
     <div class="popup-actions">
-      <button class="btn-go" onclick="goToCustomer(${lat},${lng})">🧭 Datangi</button>
+      <button class="btn-go" onclick="goToCustomer(${lat},${lng})">🧭 Tampil Rute</button>
       <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
     </div>
   </div>`;
@@ -442,7 +488,7 @@ searchBtn.onclick = () => {
 
   if(!found) return alert("Tidak ditemukan");
 
-  map.setView(found.marker.getLatLng(), 19);
+  map.setView(found.marker.getLatLng(), 20);
   openDetail(found.row);
 
   found.marker.getElement()?.classList.add("highlight");
@@ -454,6 +500,10 @@ searchBtn.onclick = () => {
   toggleBtn.innerText = "➕";
 };
 
+map.setView(marker.getLatLng(), 20, { animate: true });
+highlightMarker(marker);
+showSidebarData(data);
+
 /* =========================
    7.5 ZOOM ALL MARKERS
 ========================= */
@@ -462,6 +512,25 @@ zoomBtn.onclick = () => {
   const group = L.featureGroup(markers.map(m => m.marker));
   map.fitBounds(group.getBounds(), { padding: [40, 40] });
 };
+
+
+marker.bindTooltip(data.NAMA, {
+  permanent: true,
+  direction: "top",
+  className: "marker-label"
+});
+
+
+function highlightMarker(marker) {
+  marker.setZIndexOffset(1000);
+
+  marker._icon.classList.add("highlight-marker");
+
+  setTimeout(() => {
+    marker._icon.classList.remove("highlight-marker");
+  }, 3000);
+}
+
 
 /* =========================
    7.6 FINISH DOWNLOAD
@@ -564,7 +633,7 @@ function openDetail(row){
     <div>📅 HARI BACA: ${row["HARI BACA ACMT"]}</div>
 
     <div style="margin-top:12px;display:flex;gap:8px;">
-      <button class="btn-go" onclick="goToCustomer(${row.LAT},${row.LON})">🧭 Datangi</button>
+      <button class="btn-go" onclick="goToCustomer(${row.LAT},${row.LON})">🧭 Tampil Rute</button>
       <button class="btn-done" onclick="markDone('${row.IDPEL}')">✅ Selesai</button>
     </div>
   `;
@@ -589,10 +658,11 @@ function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
 }
 
+
 </script>
 
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
-  ❌ BATAL DATANGI
+  ❌ TUTUP RUTE
 </button>
 
 <div id="toast" class="toast"></div>
