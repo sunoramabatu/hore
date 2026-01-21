@@ -261,6 +261,9 @@
       100% { transform: scale(1); }
     }
 
+    .leaflet-routing-container {
+      display: none !important;
+    }
 
   </style>
 </head>
@@ -504,10 +507,6 @@ function goToCustomer(lat, lng) {
   document.getElementById("cancelRouteBtn").style.display = "block";
 }
 
-.leaflet-routing-container {
-  display: none !important;
-}
-
 function cancelRoute() {
   if (routingControl) map.removeControl(routingControl);
   routingControl = null;
@@ -577,19 +576,14 @@ function markDone(idpel){
   const idx = allRows.findIndex(r => String(r.IDPEL) === String(idpel));
   if(idx === -1) return;
 
-  const row = allRows[idx];
-
-  historyRows.push(row);
-  localStorage.setItem("historyRows", JSON.stringify(historyRows));
-
   allRows.splice(idx, 1);
 
   buildMarkers();
-  renderHistory();
   closeDetail();
 
   showToast("✅ Data ditandai selesai");
 }
+
 
 function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
