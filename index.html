@@ -626,6 +626,26 @@ function renderHistory() {
     </div>
   `).join("");
 }
+function undoHistory(index){
+  const item = history[index];
+  if (!item) return;
+
+  // kembalikan data ke peta
+  allRows.push(item.row);
+
+  // hapus dari history
+  history.splice(index, 1);
+
+  // simpan ulang
+  localStorage.setItem("oyon_history", JSON.stringify(history));
+
+  // rebuild map
+  buildMarkers();
+  renderHistory();
+
+  showToast("↩️ Data dikembalikan ke peta");
+}
+
 
 /* ======================
    reset history 23.00
