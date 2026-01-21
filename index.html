@@ -235,7 +235,7 @@
       bottom: 0;
       left: 0;
       right: 0;
-      height: 50vh;
+      height: 26vh;
       background: white;
       z-index: 9999;
       transform: translateY(100%);
@@ -422,6 +422,14 @@ function buildMarkers(){
     });
 
     const marker = L.marker([lat,lng], {icon}).addTo(map);
+    marker.bindTooltip(row.NAMA, {
+      permanent: false,
+      direction: "top",
+      offset: [0, -10],
+      opacity: 0.9,
+      className: "marker-label"
+    });
+  
     marker.on("click", () => openDetail(row));
 
     markers.push({marker,row});
@@ -433,6 +441,21 @@ function buildMarkers(){
       row
     });
   });
+}
+
+/* ======================
+   HIGHLIGHT MARKER
+====================== */
+
+function highlightMarker(marker) {
+  const el = marker.getElement();
+  if (!el) return;
+
+  el.classList.add("highlight");
+
+  setTimeout(() => {
+    el.classList.remove("highlight");
+  }, 2000);
 }
 
 /* ======================
@@ -450,8 +473,10 @@ searchBtn.onclick = () => {
 
   map.setView(found.marker.getLatLng(), 19, {animate:true});
   highlightMarker(found.marker);
+  map.setView(found.marker.getLatLng(), 20, { animate: true });
+  highlightMarker(found.marker);
   openDetail(found.row);
-};
+  };
 
 function highlightMarker(marker){
   const el = marker.getElement();
