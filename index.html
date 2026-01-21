@@ -477,9 +477,8 @@ searchBtn.onclick = () => {
   highlightMarker(found.marker);
   openDetail(found.row);
   
-  toggleBtn.onclick = () => {
-  uiBar.classList.toggle("minimized");
-  toggleBtn.innerText = uiBar.classList.contains("minimized") ? "➕" : "➖";
+  document.getElementById("uiBar").classList.add("minimized");
+  document.getElementById("toggleBtn").innerText = "➕";
 };
 
   };
