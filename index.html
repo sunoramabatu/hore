@@ -555,14 +555,25 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
-  history.push({idpel, time:new Date().toLocaleTimeString()});
-  localStorage.setItem("oyon_history", JSON.stringify(history));
+  const row = allRows.find(r => String(r.IDPEL) === String(idpel));
+  if(!row) return;
+
+  historyData.push({
+    nama: row.NAMA,
+    idpel: row.IDPEL,
+    waktu: new Date().toLocaleString()
+  });
+
+  localStorage.setItem("historyData", JSON.stringify(historyData));
+
+  renderHistory(); // ← INI YANG SEBELUMNYA TIDAK PERNAH TERPANGGIL
 
   allRows = allRows.filter(r => String(r.IDPEL) !== String(idpel));
   buildMarkers();
   closeDetail();
-  showToast("✅ Data ditandai selesai");
+  showToast("✅ Masuk ke riwayat");
 }
+
 
 /* ======================
    DONE + HISTORY
@@ -606,6 +617,7 @@ if (savedDate !== today) {
   localStorage.setItem("historyDate", today);
 }
 
+
 /* ======================
    TOAST
 ====================== */
@@ -635,6 +647,13 @@ function getColor(v){
   };
   return map[(v||"").toUpperCase()] || "#64748b";
 }
+
+renderHistory();
+document.getElementById("historyToggleBtn").onclick = () => {
+  const panel = document.getElementById("historyPanel");
+  panel.style.display = panel.style.display === "none" ? "block" : "none";
+};
+
 </script>
 
 
