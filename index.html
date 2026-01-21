@@ -476,6 +476,12 @@ searchBtn.onclick = () => {
   map.setView(found.marker.getLatLng(), 20, { animate: true });
   highlightMarker(found.marker);
   openDetail(found.row);
+  
+  toggleBtn.onclick = () => {
+  uiBar.classList.toggle("minimized");
+  toggleBtn.innerText = uiBar.classList.contains("minimized") ? "➕" : "➖";
+};
+
   };
 
 function highlightMarker(marker){
@@ -652,6 +658,15 @@ renderHistory();
 document.getElementById("historyToggleBtn").onclick = () => {
   const panel = document.getElementById("historyPanel");
   panel.style.display = panel.style.display === "none" ? "block" : "none";
+};
+/* ======================
+   minimize btn
+====================== */
+const uiBar = document.getElementById("uiBar");
+const toggleBtn = document.getElementById("toggleBtn");
+
+toggleBtn.onclick = () => {
+  uiBar.classList.toggle("minimized");
 };
 
 </script>
