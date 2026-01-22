@@ -313,6 +313,24 @@
       50% { transform: scale(1.4); }
       100% { transform: scale(1); }
     }
+    /* === Marker Petugas (LIVE GPS) === */
+    .petugas-marker {
+      width: 38px;
+      height: 38px;
+      background: #2563eb;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 14px rgba(37,99,235,0.6);
+      border: 2px solid white;
+    }
+
+    .petugas-marker img {
+      width: 22px;
+      height: 22px;
+    }
+
 
   </style>
 </head>
@@ -378,6 +396,7 @@ let markers = [];
 let searchIndex = [];
 let userLatLng = null;
 let routingControl = null;
+let petugasMarker = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
 // Reset history setiap hari
 const today = new Date().toDateString();
@@ -562,8 +581,8 @@ function openDetail(r){
     </div>
   `;
 
-  left.innerHTML = cardHTML("📍 Lokasi A");
-  right.innerHTML = cardHTML("📍 Lokasi B");
+  left.innerHTML = cardHTML("📍 Lokasi DIJ");
+  right.innerHTML = cardHTML("📍 Lokasi TAGGING TAHUN LALU");
 
   panel.classList.add("open");
 }
@@ -726,8 +745,36 @@ downloadBtn.onclick = () => {
 /* ======================
    GPS
 ====================== */
-navigator.geolocation?.watchPosition(pos=>{
-  userLatLng=[pos.coords.latitude,pos.coords.longitude];
+navigator.geolocation?.watchPosition(pos => {
+  userLatLng = [pos.coords.latitude, pos.coords.longitude];
+
+  const icon = L.divIcon({
+    html: `
+      <div class="petugas-marker">
+        <img src="https://cdn-icons-png.flaticon.com/512/4140/4140048.png" />
+      </div>
+    `,
+    iconSize: [38,38],
+    iconAnchor: [19,19],
+    className: ""
+  });
+
+  if (!petugasMarker) {
+    petugasMarker = L.marker(userLatLng, { icon }).addTo(map);
+    petugasMarker.bindTooltip("📍 Lokasi Anda", {
+      permanent: false,
+      direction: "top"
+    });
+  } else {
+    petugasMarker.setLatLng(userLatLng);
+  }
+
+}, err => {
+  console.warn("GPS error:", err);
+}, {
+  enableHighAccuracy: true,
+  maximumAge: 1000,
+  timeout: 10000
 });
 
 /* ======================
