@@ -244,6 +244,15 @@
       box-shadow: 0 -10px 25px rgba(0,0,0,0.2);
       padding: 16px;
       overflow-y: auto;
+      #detailSplit {
+      flex-direction: row;
+    }
+
+    @media (max-width: 600px) {
+      #detailSplit {
+        flex-direction: column;
+      }
+    }
     }
 
     .detail-panel.open {
@@ -343,9 +352,17 @@
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
-  <button onclick="closeDetail()" style="float:right;">❌</button>
-  <div id="detailContent"></div>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <b>Detail Pelanggan</b>
+    <button onclick="closeDetail()">❌</button>
+  </div>
+
+  <div id="detailSplit" style="display:flex; gap:12px; margin-top:10px;">
+    <div id="detailLeft" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
+    <div id="detailRight" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
+  </div>
 </div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -388,7 +405,7 @@ const downloadBtn = document.getElementById("downloadBtn");
 map = L.map("map").setView([-6.2,106.8], 13);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 20
+  maxZoom: 19
 }).addTo(map);
 
 /* ======================
@@ -489,7 +506,7 @@ searchBtn.onclick = () => {
 
   if(!found) return alert("Tidak ditemukan");
 
-  map.setView(found.marker.getLatLng(), 20, { animate: true });
+  map.setView(found.marker.getLatLng(), 19, { animate: true });
 
   highlightMarker(found.marker);
   showLabel(found.marker);
@@ -527,24 +544,30 @@ zoomBtn.onclick = () => {
 ====================== */
 function openDetail(r){
   const panel = document.getElementById("detailPanel");
-  const content = document.getElementById("detailContent");
+  const left = document.getElementById("detailLeft");
+  const right = document.getElementById("detailRight");
 
-  content.innerHTML = `
-    <h3>${r.NAMA}</h3>
+  const cardHTML = (label) => `
+    <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
+    <h3 style="margin:4px 0">${r.NAMA}</h3>
     <div>📟 IDPEL: ${r.IDPEL}</div>
     <div>⚡ DAYA: ${r.DAYA}</div>
     <div>🔧 MERK: ${r["MERK METER"]}</div>
     <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
     <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
 
-    <div style="margin-top:12px;display:flex;gap:8px;">
+    <div style="margin-top:10px;display:flex;gap:6px;">
       <button class="btn-go" onclick="goTo(${r.LAT},${r.LON})">🧭 Tampil Rute</button>
       <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
     </div>
   `;
 
+  left.innerHTML = cardHTML("📍 Lokasi A");
+  right.innerHTML = cardHTML("📍 Lokasi B");
+
   panel.classList.add("open");
 }
+
 
 function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
