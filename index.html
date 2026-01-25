@@ -331,6 +331,39 @@
       height: 22px;
     }
 
+    /* === UI Compact Mode === */
+
+    .small-input {
+      padding: 8px 10px;
+      font-size: 14px;
+      border-radius: 10px;
+    }
+
+    .small-btn {
+      padding: 8px 12px;
+      font-size: 13px;
+      border-radius: 10px;
+    }
+
+    .ui-header b {
+      font-size: 15px;
+    }
+
+    .status {
+      font-size: 13px;
+    }
+
+    #uiBar {
+      max-width: 280px;
+    }
+
+    #downloadBtn {
+      background: #1f2937;
+    }
+
+    #zoomBtn {
+      background: #0f766e;
+    }
 
   </style>
 </head>
@@ -352,11 +385,18 @@
     <div id="fileNameLabel" style="font-size:13px;color:#444;"></div>
     <div id="statusText" class="status"></div>
 
-    <input id="searchInput" class="ui-input" placeholder="Masukkan 4 digit IDPEL / Meter" />
-    <button id="searchBtn" class="ui-btn">CARI</button>
+    <button id="zoomBtn" class="ui-btn ui-secondary small-btn" style="display:none;">
+      🔍 Zoom Area Tagging
+    </button>
 
-    <button id="zoomBtn" class="ui-btn ui-secondary" style="display:none;">Zoom Lokasi Tagging</button>
-    <button id="downloadBtn" class="ui-btn">FINISH & Download RBM Update</button>
+    <div style="display:flex; gap:6px;">
+      <input id="searchInput" class="ui-input small-input" placeholder="4 digit IDPEL / Meter" />
+      <button id="searchBtn" class="ui-btn small-btn">Cari</button>
+    </div>
+
+    <button id="downloadBtn" class="ui-btn small-btn">
+      Finish & Download
+    </button>
 
   </div>
 </div>
