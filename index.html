@@ -398,7 +398,10 @@ let userLatLng = null;
 let routingControl = null;
 let petugasMarker = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
-let kodePetugasAktif = null;
+let originalRows = [];
+let workingRows = [];
+
+const STORAGE_KEY = "RBM_WORKING_STATE";
 
 
 // Reset history setiap hari
@@ -409,6 +412,9 @@ if (savedDate !== today) {
   history = [];
   localStorage.setItem("oyon_history", "[]");
   localStorage.setItem("oyon_history_date", today);
+  localStorage.removeItem("oyon_history");
+  renderHistory();
+
 }
 
 /* ======================
@@ -438,30 +444,44 @@ upload.onchange = e => {
   reader.onload = evt => {
     const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
-    allRows = XLSX.utils.sheet_to_json(sheet);
+    originalRows = XLSX.utils.sheet_to_json(sheet);
 
-    kodePetugasAktif = (allRows[0]["KODE PETUGAS"] || "UNKNOWN")
-      .toString()
-      .trim();
+    // reset session kerja
+    localStorage.removeItem(STORAGE_KEY);
 
-    const savedDone = JSON.parse(
-      localStorage.getItem("done_" + kodePetugasAktif) || "[]"
-    );
+    // buat working copy
+    workingRows = structuredClone(originalRows);
 
-    // Filter yang belum selesai saja
-    allRows = allRows.filter(r =>
-      !savedDone.includes(String(r.IDPEL))
-    );
+    // simpan state awal
+    saveState();
 
+    // render
     buildMarkers();
-    statusText.innerText = `✅ Peta dibuat (${allRows.length} belum dibaca)`;
-    zoomBtn.style.display = "block";
+    renderHistory();
 
     statusText.innerText = "✅ Peta berhasil dibuat";
     zoomBtn.style.display = "block";
   };
   reader.readAsArrayBuffer(e.target.files[0]);
 };
+/* ======================
+   SAAT LOAD
+====================== */
+window.addEventListener("load", () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    workingRows = JSON.parse(saved);
+    buildMarkers();
+    renderHistory();
+  }
+});
+/* ======================
+   SIMPAN STATE
+====================== */
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
+}
+
 
 /* ======================
    BUILD MARKERS
@@ -471,7 +491,7 @@ function buildMarkers(){
   markers = [];
   searchIndex = [];
 
-  allRows.forEach(row => {
+  workingRows.forEach(row => {
     const lat = parseFloat(row.LAT);
     const lng = parseFloat(row.LON);
     if(!lat || !lng) return;
@@ -639,25 +659,24 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
-  if (!kodePetugasAktif) return;
+  const found = workingRows.find(r => String(r.IDPEL) === String(idpel));
+  if (!found) return;
 
-  // simpan daftar selesai
-  const key = "done_" + kodePetugasAktif;
-  const doneList = JSON.parse(localStorage.getItem(key) || "[]");
+  history.push({
+    row: found,
+    time: new Date().toLocaleTimeString()
+  });
 
-  if (!doneList.includes(String(idpel))) {
-    doneList.push(String(idpel));
-  }
+  localStorage.setItem("oyon_history", JSON.stringify(history));
 
-  localStorage.setItem(key, JSON.stringify(doneList));
+  workingRows = workingRows.filter(r => String(r.IDPEL) !== String(idpel));
 
-  // hilangkan dari map
-  allRows = allRows.filter(r => String(r.IDPEL) !== String(idpel));
+  saveState();
   buildMarkers();
   renderHistory();
   closeDetail();
 
-  showToast("✅ Ditandai selesai dan disimpan permanen");
+  showToast("✅ Ditandai selesai");
 }
 
 /* ======================
@@ -696,7 +715,9 @@ function undoHistory(index){
   if (!item) return;
 
   // kembalikan data ke peta
-  allRows.push(item.row);
+  workingRows.push(item.row);
+saveState();
+
 
   // hapus dari history
   history.splice(index, 1);
