@@ -398,6 +398,9 @@ let userLatLng = null;
 let routingControl = null;
 let petugasMarker = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
+let kodePetugasAktif = null;
+
+
 // Reset history setiap hari
 const today = new Date().toDateString();
 const savedDate = localStorage.getItem("oyon_history_date");
@@ -437,7 +440,23 @@ upload.onchange = e => {
     const sheet = wb.Sheets[wb.SheetNames[0]];
     allRows = XLSX.utils.sheet_to_json(sheet);
 
+    kodePetugasAktif = (allRows[0]["KODE PETUGAS"] || "UNKNOWN")
+      .toString()
+      .trim();
+
+    const savedDone = JSON.parse(
+      localStorage.getItem("done_" + kodePetugasAktif) || "[]"
+    );
+
+    // Filter yang belum selesai saja
+    allRows = allRows.filter(r =>
+      !savedDone.includes(String(r.IDPEL))
+    );
+
     buildMarkers();
+    statusText.innerText = `✅ Peta dibuat (${allRows.length} belum dibaca)`;
+    zoomBtn.style.display = "block";
+
     statusText.innerText = "✅ Peta berhasil dibuat";
     zoomBtn.style.display = "block";
   };
@@ -620,24 +639,25 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
-  const found = allRows.find(r => String(r.IDPEL) === String(idpel));
-  if (!found) return;
+  if (!kodePetugasAktif) return;
 
-  // simpan FULL DATA ke history
-  history.push({
-    row: found,
-    time: new Date().toLocaleTimeString()
-  });
+  // simpan daftar selesai
+  const key = "done_" + kodePetugasAktif;
+  const doneList = JSON.parse(localStorage.getItem(key) || "[]");
 
-  localStorage.setItem("oyon_history", JSON.stringify(history));
+  if (!doneList.includes(String(idpel))) {
+    doneList.push(String(idpel));
+  }
 
-  // hapus dari peta
+  localStorage.setItem(key, JSON.stringify(doneList));
+
+  // hilangkan dari map
   allRows = allRows.filter(r => String(r.IDPEL) !== String(idpel));
-
   buildMarkers();
   renderHistory();
   closeDetail();
-  showToast("✅ Ditandai selesai");
+
+  showToast("✅ Ditandai selesai dan disimpan permanen");
 }
 
 /* ======================
