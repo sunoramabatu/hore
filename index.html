@@ -391,7 +391,6 @@
    GLOBAL STATE
 ====================== */
 let map;
-let allRows = [];
 let markers = [];
 let searchIndex = [];
 let userLatLng = null;
@@ -753,13 +752,13 @@ function showToast(msg){
    FINISH DAN SIMPAN RBM UPDATE
 ====================== */
 downloadBtn.onclick = () => {
-  if (allRows.length === 0) {
+  if (workingRows.length === 0) {
     showToast("⚠️ Tidak ada data untuk diunduh");
     return;
   }
 
   // Ambil KODE PETUGAS dari baris pertama
-  const kodePetugas = (allRows[0]["KODE PETUGAS"] || "UNKNOWN")
+  const kodePetugas = (workingRows[0]["KODE PETUGAS"] || "UNKNOWN")
     .toString()
     .replace(/\s+/g, "_");
 
@@ -773,7 +772,7 @@ downloadBtn.onclick = () => {
   const filename = `RBM_${kodePetugas}_${dd}-${mm}_${hh}-${min}.xlsx`;
 
   // Generate Excel
-  const ws = XLSX.utils.json_to_sheet(allRows);
+  const ws = XLSX.utils.json_to_sheet(workingRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
 
