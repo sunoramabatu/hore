@@ -87,12 +87,6 @@
       font-weight: bold;
     }
 
-    #map {
-      transform: translateZ(0);
-      will-change: transform;
-    }
-
-
       #toggleBtn {
       background: black;
       color: white;
@@ -475,28 +469,11 @@ const downloadBtn = document.getElementById("downloadBtn");
 /* ======================
    INIT MAP
 ====================== */
-const map = L.map("map", { preferCanvas: true }).setView([-6.2, 106.8], 12);
-map.setMaxZoom(20);
+map = L.map("map").setView([-6.2,106.8], 13);
 
-const tileLayer = L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  {
-    maxZoom: 20,
-    detectRetina: true,
-    crossOrigin: true
-  }
-).addTo(map);
-
-tileLayer.on("tileerror", () => {
-  console.warn("Tile error, switching fallback...");
-  map.removeLayer(tileLayer);
-
-  L.tileLayer("https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
-    maxZoom: 20
-  }).addTo(map);
-});
-
-
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 21
+}).addTo(map);
 
 /* ======================
    LOAD EXCEL
@@ -564,8 +541,7 @@ window.addEventListener("load", () => {
 function zoomToAllMarkers() {
   if (!markers.length) return;
   const group = L.featureGroup(markers.map(m => m.marker));
-  map.fitBounds(markerGroup.getBounds(), { padding: [40, 40] });
-
+  map.fitBounds(group.getBounds(), { padding: [40, 40] });
 }
 
 /* ======================
@@ -582,58 +558,46 @@ function saveState() {
 /* ======================
    BUILD MARKERS
 ====================== */
-function buildMarkers() {
+function buildMarkers(){
   markers.forEach(m => map.removeLayer(m.marker));
   markers = [];
   searchIndex = [];
 
-  const bounds = [];
-
   workingRows.forEach(row => {
     const lat = parseFloat(row.LAT);
     const lng = parseFloat(row.LON);
-    if (!lat || !lng) return;
+    if(!lat || !lng) return;
 
     const color = getColor(row["HARI BACA ACMT"]);
 
-    // GANTI divIcon → circleMarker (jauh lebih ringan)
-    const marker = L.circleMarker([lat, lng], {
-      radius: 6,
-      color: color,
-      weight: 1,
-      fillColor: color,
-      fillOpacity: 0.9
-    }).addTo(map);
+    const icon = L.divIcon({
+      html: `<div class="custom-marker" style="background:${color}"></div>`,
+      iconSize: [22,22],
+      iconAnchor: [11,22],
+      className: ""
+    });
 
-    // Tooltip nama pelanggan
-    marker.bindTooltip(row.NAMA || "", {
+    const marker = L.marker([lat,lng], {icon}).addTo(map);
+    marker.bindTooltip(row.NAMA, {
       permanent: false,
       direction: "top",
-      offset: [0, -8],
+      offset: [0, -10],
       opacity: 0.9,
       className: "marker-label"
     });
-
+  
     marker.on("click", () => openDetail(row));
 
-    markers.push({ marker, row });
+    markers.push({marker,row});
 
     searchIndex.push({
-      idpel: String(row.IDPEL || "").replace(/\D/g, ""),
-      meter: String(row["NOMOR METER"] || "").replace(/\D/g, ""),
+      idpel: String(row.IDPEL||"").replace(/\D/g,""),
+      meter: String(row["NOMOR METER"]||"").replace(/\D/g,""),
       marker,
       row
     });
-
-    bounds.push([lat, lng]);
   });
-
-  // Zoom ke semua marker (sekali saja, aman)
-  if (bounds.length > 0) {
-    map.fitBounds(bounds, { padding: [40, 40] });
-  }
 }
-
 
 /* ======================
    HIGHLIGHT MARKER
