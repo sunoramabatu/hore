@@ -349,7 +349,7 @@
   <div id="uiContent">
 
     <input type="file" id="upload" accept=".xlsx,.xls" />
-
+    <div id="fileNameLabel" style="font-size:13px;color:#444;"></div>
     <div id="statusText" class="status"></div>
 
     <input id="searchInput" class="ui-input" placeholder="Masukkan 4 digit IDPEL / Meter" />
@@ -439,39 +439,43 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
    LOAD EXCEL
 ====================== */
 upload.onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // SIMPAN nama file
+  localStorage.setItem("RBM_FILENAME", file.name);
+
   const reader = new FileReader();
   reader.onload = evt => {
     const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     originalRows = XLSX.utils.sheet_to_json(sheet);
 
-    // reset session kerja
     localStorage.removeItem(STORAGE_KEY);
-
-    // buat working copy
     workingRows = structuredClone(originalRows);
-
-    // simpan state awal
     saveState();
 
-    // render
     buildMarkers();
     renderHistory();
 
     statusText.innerText = "✅ Peta berhasil dibuat";
     zoomBtn.style.display = "block";
+
+    // auto zoom setelah upload
+    zoomToAllMarkers();
   };
-  reader.readAsArrayBuffer(e.target.files[0]);
+  reader.readAsArrayBuffer(file);
 };
+
 /* ======================
    SAAT LOAD
 ====================== */
 window.addEventListener("load", () => {
 
-  // restore filename
+  // Restore filename
   const savedFilename = localStorage.getItem("RBM_FILENAME");
   if (savedFilename) {
-    document.getElementById("fileNameLabel").innerText = savedFilename;
+    document.getElementById("fileNameLabel").innerText = "📄 " + savedFilename;
   }
 
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -482,21 +486,22 @@ window.addEventListener("load", () => {
     map.whenReady(() => {
       buildMarkers();
       renderHistory();
-      restoreMapView();
+
+      // Tampilkan tombol zoom
+      if (workingRows.length > 0) {
+        zoomBtn.style.display = "block";
+      }
+
+      // Auto zoom ke marker
+      zoomToAllMarkers();
     });
   }
-  
-  if (saved && workingRows.length > 0) {
-  document.getElementById("zoomBtn").style.display = "block";
-  }
-
 });
 
 function zoomToAllMarkers() {
-  const group = L.featureGroup(markersLayer.getLayers());
-  if (group.getLayers().length > 0) {
-    map.fitBounds(group.getBounds(), { padding: [50, 50] });
-  }
+  if (!markers.length) return;
+  const group = L.featureGroup(markers.map(m => m.marker));
+  map.fitBounds(group.getBounds(), { padding: [40, 40] });
 }
 
 /* ======================
