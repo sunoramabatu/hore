@@ -467,18 +467,37 @@ upload.onchange = e => {
    SAAT LOAD
 ====================== */
 window.addEventListener("load", () => {
-  console.log("STATE:", localStorage.getItem("RBM_WORKING_STATE"));
+
+  // restore filename
+  const savedFilename = localStorage.getItem("RBM_FILENAME");
+  if (savedFilename) {
+    document.getElementById("fileNameLabel").innerText = savedFilename;
+  }
 
   const saved = localStorage.getItem(STORAGE_KEY);
+
   if (saved) {
     workingRows = JSON.parse(saved);
 
     map.whenReady(() => {
       buildMarkers();
       renderHistory();
+      restoreMapView();
     });
   }
+  
+  if (saved && workingRows.length > 0) {
+  document.getElementById("zoomBtn").style.display = "block";
+  }
+
 });
+
+function zoomToAllMarkers() {
+  const group = L.featureGroup(markersLayer.getLayers());
+  if (group.getLayers().length > 0) {
+    map.fitBounds(group.getBounds(), { padding: [50, 50] });
+  }
+}
 
 /* ======================
    SIMPAN STATE
@@ -486,7 +505,18 @@ window.addEventListener("load", () => {
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
 }
+/* ======================
+   TAMPILKAN NAMA FILE SAAT REFRESH
+====================== */
+fileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
 
+  if (!file) return;
+
+  localStorage.setItem("RBM_FILENAME", file.name);
+
+  handleExcel(file); // fungsi lama Anda
+});
 
 /* ======================
    BUILD MARKERS
@@ -735,6 +765,31 @@ saveState();
   renderHistory();
 
   showToast("↩️ Data dikembalikan ke peta");
+}
+/* ======================
+   TAMPILAN KEMBALI KE AREA TAGGING
+====================== */
+
+function saveMapView() {
+  const center = map.getCenter();
+  const zoom = map.getZoom();
+
+  localStorage.setItem("RBM_MAP_VIEW", JSON.stringify({
+    lat: center.lat,
+    lng: center.lng,
+    zoom: zoom
+  }));
+}
+
+function restoreMapView() {
+  const savedView = localStorage.getItem("RBM_MAP_VIEW");
+
+  if (savedView) {
+    const view = JSON.parse(savedView);
+    map.setView([view.lat, view.lng], view.zoom);
+  } else {
+    zoomToAllMarkers(); // fallback
+  }
 }
 
 
