@@ -467,13 +467,19 @@ upload.onchange = e => {
    SAAT LOAD
 ====================== */
 window.addEventListener("load", () => {
+  console.log("STATE:", localStorage.getItem("RBM_WORKING_STATE"));
+
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     workingRows = JSON.parse(saved);
-    buildMarkers();
-    renderHistory();
+
+    map.whenReady(() => {
+      buildMarkers();
+      renderHistory();
+    });
   }
 });
+
 /* ======================
    SIMPAN STATE
 ====================== */
