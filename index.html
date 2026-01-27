@@ -389,10 +389,14 @@
       🔍 Zoom Area Tagging
     </button>
 
-    <div style="display:flex; gap:6px;">
+        <div style="display:flex; gap:6px;">
       <input id="searchInput" class="ui-input small-input" placeholder="4 digit IDPEL / Meter" />
       <button id="searchBtn" class="ui-btn small-btn">Cari</button>
     </div>
+
+    <button onclick="enableCompass()" class="ui-btn ui-secondary">
+  🧭 Ikuti Arah
+    </button>
 
     <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
@@ -423,6 +427,7 @@
 
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
@@ -430,7 +435,6 @@
 /* ======================
    GLOBAL STATE
 ====================== */
-let map;
 let markers = [];
 let searchIndex = [];
 let userLatLng = null;
@@ -451,7 +455,6 @@ if (savedDate !== today) {
   history = [];
   localStorage.setItem("oyon_history", "[]");
   localStorage.setItem("oyon_history_date", today);
-  localStorage.removeItem("oyon_history");
   renderHistory();
 
 }
@@ -469,11 +472,32 @@ const downloadBtn = document.getElementById("downloadBtn");
 /* ======================
    INIT MAP
 ====================== */
-map = L.map("map").setView([-6.2,106.8], 13);
+const map = L.map("map", {
+  preferCanvas: true,
+  rotate: true,
+  touchRotate: true,
+  rotateControl: true
+}).setView([-7.974155,112.6181065], 12);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 21
 }).addTo(map);
+
+/* ======================
+   IKUT KOMPAS
+====================== */
+function enableCompass() {
+  if (window.DeviceOrientationEvent) {
+    window.addEventListener("deviceorientation", (event) => {
+      if (event.alpha !== null) {
+        map.setBearing(360 - event.alpha);
+      }
+    });
+    showToast("🧭 Mode kompas aktif");
+  } else {
+    showToast("HP tidak mendukung sensor kompas");
+  }
+}
 
 /* ======================
    LOAD EXCEL
