@@ -418,9 +418,20 @@
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
-  <div style="display:flex; justify-content:space-between; align-items:center;">
-    <b>Detail Pelanggan</b>
-    <button onclick="closeDetail()">❌</button>
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+  
+  <!-- Kiri -->
+  <b style="flex:1;">Detail Pelanggan</b>
+
+  <!-- Tengah -->
+  <label style="flex:1; display:flex; justify-content:center; align-items:center; gap:6px; font-size:14px; font-weight:600;">
+    <input type="checkbox" onchange="toggleCompare(this)">
+    Bandingkan
+  </label>
+
+  <!-- Kanan -->
+  <button onclick="closeDetail()" style="flex:1; text-align:right;">❌</button>
+
   </div>
 
   <div id="detailSplit" style="display:flex; gap:12px; margin-top:10px;">
