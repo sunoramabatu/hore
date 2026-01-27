@@ -190,6 +190,10 @@
       left: 7px;
     }
 
+    .custom-marker.black {
+      background: #000;
+    }
+
     .popup-card {
       font-size: 14px;
       line-height: 1.5;
@@ -588,38 +592,70 @@ function buildMarkers(){
   searchIndex = [];
 
   workingRows.forEach(row => {
+    // ==========================
+    // MARKER 1 — LOKASI DIJ
+    // ==========================
     const lat = parseFloat(row.LAT);
     const lng = parseFloat(row.LON);
-    if(!lat || !lng) return;
 
-    const color = getColor(row["HARI BACA ACMT"]);
+    if(lat && lng){
+      const color = getColor(row["HARI BACA ACMT"]);
 
-    const icon = L.divIcon({
-      html: `<div class="custom-marker" style="background:${color}"></div>`,
-      iconSize: [22,22],
-      iconAnchor: [11,22],
-      className: ""
-    });
+      const iconDIJ = L.divIcon({
+        html: `<div class="custom-marker" style="background:${color}"></div>`,
+        iconSize: [22,22],
+        iconAnchor: [11,22],
+        className: ""
+      });
 
-    const marker = L.marker([lat,lng], {icon}).addTo(map);
-    marker.bindTooltip(row.NAMA, {
-      permanent: false,
-      direction: "top",
-      offset: [0, -10],
-      opacity: 0.9,
-      className: "marker-label"
-    });
-  
-    marker.on("click", () => openDetail(row));
+      const markerDIJ = L.marker([lat,lng], {icon: iconDIJ}).addTo(map);
 
-    markers.push({marker,row});
+      markerDIJ.bindTooltip(row.NAMA, {
+        permanent: false,
+        direction: "top",
+        offset: [0, -10],
+        opacity: 0.9,
+        className: "marker-label"
+      });
 
-    searchIndex.push({
-      idpel: String(row.IDPEL||"").replace(/\D/g,""),
-      meter: String(row["NOMOR METER"]||"").replace(/\D/g,""),
-      marker,
-      row
-    });
+      markerDIJ.on("click", () => openDetail(row));
+
+      markers.push({marker: markerDIJ, row});
+
+      searchIndex.push({
+        idpel: String(row.IDPEL||"").replace(/\D/g,""),
+        meter: String(row["NOMOR METER"]||"").replace(/\D/g,""),
+        marker: markerDIJ,
+        row
+      });
+    }
+
+    // ==========================
+    // MARKER 2 — TAGGING TAHUN LALU (HITAM)
+    // ==========================
+    const latTH = parseFloat(row.LATTH);
+    const lonTH = parseFloat(row.LONTH);
+
+    if(latTH && lonTH){
+      const iconTH = L.divIcon({
+        html: `<div class="custom-marker" style="background:#000"></div>`,
+        iconSize: [18,18],
+        iconAnchor: [9,18],
+        className: ""
+      });
+
+      const markerTH = L.marker([latTH, lonTH], {icon: iconTH}).addTo(map);
+
+      markerTH.bindTooltip("📍 Tagging Tahun Lalu", {
+        permanent: false,
+        direction: "top",
+        offset: [0, -10],
+        opacity: 0.8,
+        className: "marker-label"
+      });
+
+      markers.push({marker: markerTH, row});
+    }
   });
 }
 
