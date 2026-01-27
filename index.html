@@ -603,8 +603,8 @@ function buildMarkers(){
 
       const iconDIJ = L.divIcon({
         html: `<div class="custom-marker" style="background:${color}"></div>`,
-        iconSize: [22,22],
-        iconAnchor: [11,22],
+        iconSize: [16,16],
+        iconAnchor: [8,16],
         className: ""
       });
 
@@ -639,8 +639,8 @@ function buildMarkers(){
     if(latTH && lonTH){
       const iconTH = L.divIcon({
         html: `<div class="custom-marker" style="background:#000"></div>`,
-        iconSize: [18,18],
-        iconAnchor: [9,18],
+        iconSize: [12,12],
+        iconAnchor: [6,12],
         className: ""
       });
 
@@ -724,6 +724,10 @@ function openDetail(r){
   const right = document.getElementById("detailRight");
 
   const cardHTML = (label) => `
+    <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px;">
+    <input type="checkbox" onchange="toggleCompare(this,'${r.IDPEL}')">
+    Bandingkan
+    </label>
     <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
     <h3 style="margin:4px 0">${r.NAMA}</h3>
     <div>📟 IDPEL: ${r.IDPEL}</div>
@@ -747,6 +751,31 @@ function openDetail(r){
 
 function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
+}
+
+function toggleCompare(checkbox, idpel) {
+  if (checkbox.checked) {
+    const active = [];
+
+    markers.forEach(m => map.removeLayer(m.marker));
+
+    markers.forEach(m => {
+      if (String(m.row.IDPEL) === String(idpel)) {
+        m.marker.addTo(map);
+        active.push(m.marker);
+      }
+    });
+
+    if (active.length > 0) {
+      const group = L.featureGroup(active);
+      map.fitBounds(group.getBounds(), { padding: [60, 60] });
+    }
+
+    showToast("🔍 Mode bandingkan aktif");
+  } else {
+    markers.forEach(m => m.marker.addTo(map));
+    showToast("📍 Semua marker ditampilkan kembali");
+  }
 }
 
 /* ======================
