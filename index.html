@@ -723,11 +723,17 @@ function openDetail(r){
   const left = document.getElementById("detailLeft");
   const right = document.getElementById("detailRight");
 
-  const cardHTML = (label) => `
-    <label style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px;">
-    <input type="checkbox" onchange="toggleCompare(this,'${r.IDPEL}')">
-    Bandingkan
+  // simpan IDPEL yang sedang dibuka (global state kecil)
+  window.currentCompareIDPEL = r.IDPEL;
+
+  const compareHTML = `
+    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;font-weight:bold;">
+      <input type="checkbox" onchange="toggleCompare(this)">
+      Bandingkan lokasi pelanggan ini
     </label>
+  `;
+
+  const cardHTML = (label) => `
     <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
     <h3 style="margin:4px 0">${r.NAMA}</h3>
     <div>📟 IDPEL: ${r.IDPEL}</div>
@@ -742,7 +748,8 @@ function openDetail(r){
     </div>
   `;
 
-  left.innerHTML = cardHTML("📍 Lokasi DIJ");
+  // tampilkan compare hanya sekali di atas
+  left.innerHTML = compareHTML + cardHTML("📍 Lokasi DIJ");
   right.innerHTML = cardHTML("📍 Lokasi TAGGING TAHUN LALU");
 
   panel.classList.add("open");
@@ -753,12 +760,17 @@ function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
 }
 
-function toggleCompare(checkbox, idpel) {
+function toggleCompare(checkbox) {
+  const idpel = window.currentCompareIDPEL;
+  if (!idpel) return;
+
   if (checkbox.checked) {
     const active = [];
 
+    // hide semua
     markers.forEach(m => map.removeLayer(m.marker));
 
+    // tampilkan hanya marker pelanggan ini
     markers.forEach(m => {
       if (String(m.row.IDPEL) === String(idpel)) {
         m.marker.addTo(map);
@@ -766,6 +778,7 @@ function toggleCompare(checkbox, idpel) {
       }
     });
 
+    // auto zoom ke 2 marker
     if (active.length > 0) {
       const group = L.featureGroup(active);
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
@@ -773,6 +786,7 @@ function toggleCompare(checkbox, idpel) {
 
     showToast("🔍 Mode bandingkan aktif");
   } else {
+    // restore semua marker
     markers.forEach(m => m.marker.addTo(map));
     showToast("📍 Semua marker ditampilkan kembali");
   }
