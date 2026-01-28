@@ -398,9 +398,20 @@
       <button id="searchBtn" class="ui-btn small-btn">Cari</button>
     </div>
 
-    <button onclick="enableCompass()" class="ui-btn ui-secondary">
-  🧭 Ikuti Arah
-    </button>
+    <label>
+      <input type="checkbox" id="filterDIJ" checked onchange="applyMarkerFilter()">
+      Marker DIJ
+    </label>
+
+    <label>
+      <input type="checkbox" id="filterTH" checked onchange="applyMarkerFilter()">
+      Marker Tahun Lalu
+    </label>
+
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+      <input type="checkbox" onchange="toggleRoute(this, ${r.LAT}, ${r.LON})">
+      Ikuti arah
+    </label>
 
     <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
@@ -418,21 +429,28 @@
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
-  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-  
+  <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
+
   <!-- Kiri -->
-  <b style="flex:1;">Detail Pelanggan</b>
+  <b>Detail Pelanggan</b>
 
   <!-- Tengah -->
-  <label style="flex:1; display:flex; justify-content:center; align-items:center; gap:6px; font-size:14px; font-weight:600;">
+  <label style="display:flex; justify-content:center; align-items:center; gap:6px; font-size:14px; font-weight:600;">
     <input type="checkbox" onchange="toggleCompare(this)">
     Bandingkan
   </label>
 
   <!-- Kanan -->
-  <button onclick="closeDetail()" style="flex:1; text-align:right;">❌</button>
+  <button onclick="closeDetail()" style="
+    background:#eee;
+    border:none;
+    border-radius:8px;
+    padding:6px 10px;
+    font-size:16px;
+    cursor:pointer;
+  ">❌</button>
 
-  </div>
+</div>
 
   <div id="detailSplit" style="display:flex; gap:12px; margin-top:10px;">
     <div id="detailLeft" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
@@ -657,7 +675,7 @@ function buildMarkers(){
 
       const markerTH = L.marker([latTH, lonTH], {icon: iconTH}).addTo(map);
 
-      markerTH.bindTooltip("📍 Tagging Tahun Lalu", {
+      markerTH.bindTooltip(`<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`, {
         permanent: false,
         direction: "top",
         offset: [0, -10],
@@ -692,6 +710,16 @@ function showLabel(marker) {
   }, 4000); // nama tampil 4 detik lalu hilang otomatis
 }
 
+function toggleRoute(cb, lat, lon) {
+  if (cb.checked) {
+    goTo(lat, lon);
+  } else {
+    if (routingControl) {
+      map.removeControl(routingControl);
+      routingControl = null;
+    }
+  }
+}
 
 /* ======================
    SEARCH
@@ -736,13 +764,7 @@ function openDetail(r){
 
   // simpan IDPEL yang sedang dibuka (global state kecil)
   window.currentCompareIDPEL = r.IDPEL;
-
-  const compareHTML = `
-    <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:14px;font-weight:bold;">
-      <input type="checkbox" onchange="toggleCompare(this)">
-      Bandingkan lokasi pelanggan ini
-    </label>
-  `;
+  
 
   const cardHTML = (label) => `
     <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
