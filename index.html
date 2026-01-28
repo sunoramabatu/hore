@@ -116,6 +116,10 @@
       display: none;
     }
 
+    .ui-bar.minimized {
+      width: auto;
+      padding-bottom: 6px;
+    }
 
     #historyToggleBtn {
       position: fixed;
@@ -521,33 +525,36 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 ====================== */
 let lastBearing = null;
 let lastUpdate = 0;
+let compassHandler = null;
 
 function enableCompass() {
-  if (!window.DeviceOrientationEvent) {
-    showToast("HP tidak mendukung sensor kompas");
-    return;
-  }
+  if (compassHandler) return; // sudah aktif
 
-  window.addEventListener("deviceorientation", (event) => {
+  compassHandler = (event) => {
     const now = Date.now();
-    if (now - lastUpdate < 120) return; // throttle ~8fps
-
+    if (now - lastUpdate < 120) return;
     if (event.alpha == null) return;
 
     const target = 360 - event.alpha;
-
     if (lastBearing == null) lastBearing = target;
 
-    // smoothing (low-pass filter)
     const smooth = lastBearing + (target - lastBearing) * 0.25;
-
     map.setBearing(smooth);
 
     lastBearing = smooth;
     lastUpdate = now;
-  });
+  };
 
-  showToast("🧭 Kompas stabil aktif");
+  window.addEventListener("deviceorientation", compassHandler);
+  showToast("🧭 Kompas aktif");
+}
+
+function disableCompass() {
+  if (compassHandler) {
+    window.removeEventListener("deviceorientation", compassHandler);
+    compassHandler = null;
+    showToast("🛑 Kompas mati");
+  }
 }
 
 /* ======================
@@ -565,8 +572,7 @@ upload.onchange = e => {
     const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
     const sheet = wb.Sheets[wb.SheetNames[0]];
     originalRows = XLSX.utils.sheet_to_json(sheet);
-
-    localStorage.removeItem(STORAGE_KEY);
+    
     workingRows = structuredClone(originalRows);
     saveState();
 
@@ -789,6 +795,7 @@ function toggleRoute(cb) {
     enableCompass(); // ini sekarang kepakai
   } else {
     cancelRoute();
+    disableCompass();
   }
 }
 
@@ -811,6 +818,11 @@ searchBtn.onclick = () => {
     return;
   }
 
+  if (searchIndex.length === 0) {
+  showToast("Data belum siap, upload dulu");
+  return;
+  }
+
   map.setView(found.marker.getLatLng(), 19, { animate: true });
 
   highlightMarker(found.marker);
@@ -826,9 +838,17 @@ searchBtn.onclick = () => {
    ZOOM ALL
 ====================== */
 zoomBtn.onclick = () => {
-  if(!markers.length) return;
-  const group = L.featureGroup(markers.map(m=>m.marker));
-  map.fitBounds(group.getBounds(), {padding:[40,40]});
+  const active = markers
+    .map(m => m.marker)
+    .filter(m => map.hasLayer(m));
+
+  if (!active.length) {
+    showToast("Tidak ada marker aktif");
+    return;
+  }
+
+  const group = L.featureGroup(active);
+  map.fitBounds(group.getBounds(), { padding: [40,40] });
 };
 
 /* ======================
