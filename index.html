@@ -112,13 +112,12 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
 
-      .ui-bar.minimized #uiContent {
-      display: none;
+    .ui-bar.minimized {
+      height: auto;
     }
 
-    .ui-bar.minimized {
-      width: auto;
-      padding-bottom: 6px;
+    .ui-bar.minimized #uiContent {
+      display: none;
     }
 
     #historyToggleBtn {
@@ -469,6 +468,10 @@
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
+  window.onerror = function (msg, src, line, col, err) {
+  alert("JS ERROR:\n" + msg + "\nLine: " + line);
+  console.error(err);
+};
 /* ======================
    GLOBAL STATE
 ====================== */
