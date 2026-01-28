@@ -409,8 +409,8 @@
     </label>
 
     <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-      <input type="checkbox" onchange="toggleRoute(this, ${r.LAT}, ${r.LON})">
-      Ikuti arah
+      <input type="checkbox" onchange="toggleRoute(this)">
+      Ikuti kompas
     </label>
 
     <button id="downloadBtn" class="ui-btn small-btn">
@@ -683,7 +683,11 @@ function buildMarkers(){
 
       markerDIJ.on("click", () => openDetail(row));
 
-      markers.push({marker: markerDIJ, row});
+      markers.push({
+        marker: markerDIJ,
+        row,
+        type: "DIJ"
+      });
 
       searchIndex.push({
         idpel: String(row.IDPEL||"").replace(/\D/g,""),
@@ -717,7 +721,11 @@ function buildMarkers(){
         className: "marker-label"
       });
 
-      markers.push({marker: markerTH, row});
+      markers.push({
+        marker: markerTH,
+        row,
+        type: "TH"
+      });
     }
   });
 }
@@ -744,14 +752,25 @@ function showLabel(marker) {
   }, 4000); // nama tampil 4 detik lalu hilang otomatis
 }
 
-function toggleRoute(cb, lat, lon) {
+
+function toggleRoute(cb) {
+  if (!window.currentCompareIDPEL) {
+    showToast("Pilih pelanggan dulu");
+    cb.checked = false;
+    return;
+  }
+
+  const row = workingRows.find(r => String(r.IDPEL) === String(window.currentCompareIDPEL));
+  if (!row) return;
+
+  const lat = parseFloat(row.LAT);
+  const lon = parseFloat(row.LON);
+
   if (cb.checked) {
     goTo(lat, lon);
+    enableCompass(); // ini sekarang kepakai
   } else {
-    if (routingControl) {
-      map.removeControl(routingControl);
-      routingControl = null;
-    }
+    cancelRoute();
   }
 }
 
