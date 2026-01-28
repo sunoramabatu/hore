@@ -519,17 +519,35 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 /* ======================
    IKUT KOMPAS
 ====================== */
+let lastBearing = null;
+let lastUpdate = 0;
+
 function enableCompass() {
-  if (window.DeviceOrientationEvent) {
-    window.addEventListener("deviceorientation", (event) => {
-      if (event.alpha !== null) {
-        map.setBearing(360 - event.alpha);
-      }
-    });
-    showToast("🧭 Mode kompas aktif");
-  } else {
+  if (!window.DeviceOrientationEvent) {
     showToast("HP tidak mendukung sensor kompas");
+    return;
   }
+
+  window.addEventListener("deviceorientation", (event) => {
+    const now = Date.now();
+    if (now - lastUpdate < 120) return; // throttle ~8fps
+
+    if (event.alpha == null) return;
+
+    const target = 360 - event.alpha;
+
+    if (lastBearing == null) lastBearing = target;
+
+    // smoothing (low-pass filter)
+    const smooth = lastBearing + (target - lastBearing) * 0.25;
+
+    map.setBearing(smooth);
+
+    lastBearing = smooth;
+    lastUpdate = now;
+  });
+
+  showToast("🧭 Kompas stabil aktif");
 }
 
 /* ======================
@@ -779,13 +797,19 @@ function toggleRoute(cb) {
 ====================== */
 searchBtn.onclick = () => {
   const key = searchInput.value.trim();
-  if(key.length < 4) return alert("Minimal 4 digit");
+  if(key.length < 4) {
+    showToast("Masukkan minimal 4 digit");
+    return;
+  }
 
   const found = searchIndex.find(o =>
     o.idpel.endsWith(key) || o.meter.endsWith(key)
   );
 
-  if(!found) return alert("Tidak ditemukan");
+  if(!found) {
+    showToast("Tidak ditemukan");
+    return;
+  }
 
   map.setView(found.marker.getLatLng(), 19, { animate: true });
 
@@ -1104,20 +1128,27 @@ function getColor(v){
 }
 
 renderHistory();
-document.getElementById("historyToggleBtn").onclick = () => {
-  const panel = document.getElementById("historyPanel");
-  panel.style.display = panel.style.display === "none" ? "block" : "none";
-  renderHistory();
-};
+window.addEventListener("DOMContentLoaded", () => {
+
+  document.getElementById("historyToggleBtn").onclick = () => {
+    const panel = document.getElementById("historyPanel");
+    panel.style.display = panel.style.display === "none" ? "block" : "none";
+    renderHistory();
+  };
+
+});
 /* ======================
    minimize btn
 ====================== */
-const uiBar = document.getElementById("uiBar");
-const toggleBtn = document.getElementById("toggleBtn");
+window.addEventListener("DOMContentLoaded", () => {
+  const uiBar = document.getElementById("uiBar");
+  const toggleBtn = document.getElementById("toggleBtn");
 
-toggleBtn.onclick = () => {
-  uiBar.classList.toggle("minimized");
-};
+  toggleBtn.onclick = () => {
+    uiBar.classList.toggle("minimized");
+    toggleBtn.innerText = uiBar.classList.contains("minimized") ? "➕" : "➖";
+  };
+});
 
 </script>
 
