@@ -608,6 +608,40 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
 }
 /* ======================
+   TAMPILKAN marker dij/tahun lalu saja
+====================== */
+function applyMarkerFilter() {
+  // Jika mode bandingkan aktif, jangan ganggu
+  const compareCheckbox = document.querySelector('input[onchange="toggleCompare(this)"]');
+  if (compareCheckbox && compareCheckbox.checked) return;
+
+  const showDIJ = document.getElementById("filterDIJ")?.checked;
+  const showTH = document.getElementById("filterTH")?.checked;
+
+  markers.forEach(m => {
+    const isTH = m.type === "TH";   // marker tahun lalu
+    const isDIJ = m.type === "DIJ"; // marker utama
+
+    if ((isDIJ && showDIJ) || (isTH && showTH)) {
+      m.marker.addTo(map);
+    } else {
+      map.removeLayer(m.marker);
+    }
+  });
+}
+
+markers.push({
+  marker: markerDIJ,
+  row: row,
+  type: "DIJ"
+});
+
+markers.push({
+  marker: markerTH,
+  row: row,
+  type: "TH"
+});
+/* ======================
    TAMPILKAN NAMA FILE SAAT REFRESH
 ====================== */
 
