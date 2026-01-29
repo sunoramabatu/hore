@@ -901,6 +901,17 @@ function toggleCompare(checkbox) {
     // hide semua
     markers.forEach(m => map.removeLayer(m.marker));
 
+    // debug
+
+    markers.forEach(m => {
+  if (String(m.row.IDPEL) === String(idpel)) {
+    console.log("DEBUG MARKER:", m.marker);
+
+    m.marker.addTo(map);
+    active.push(m.marker);
+  }
+});
+
     // tampilkan hanya marker pelanggan ini
     markers.forEach(m => {
       if (String(m.row.IDPEL) === String(idpel)) {
