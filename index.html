@@ -484,7 +484,7 @@ let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
 let originalRows = [];
 let workingRows = [];
 let MarkerDIJ = [];        // ← WAJIB ADA
-let MarkerTahunLalu = [];  // ← biasanya ini juga kamu pakai
+let markerTH = [];  // ← biasanya ini juga kamu pakai
 
 const STORAGE_KEY = "RBM_WORKING_STATE";
 
@@ -659,17 +659,7 @@ function applyMarkerFilter() {
   });
 }
 
-markers.push({
-  marker: MarkerDIJ,
-  row: row,
-  type: "DIJ"
-});
 
-markers.push({
-  marker: markerTH,
-  row: row,
-  type: "TH"
-});
 /* ======================
    TAMPILKAN NAMA FILE SAAT REFRESH
 ====================== */
@@ -716,6 +706,12 @@ function buildMarkers(){
         marker: MarkerDIJ,
         row,
         type: "DIJ"
+      });
+
+      markers.push({
+        marker: markerTH,
+        row: row,
+        type: "TH"
       });
 
       searchIndex.push({
