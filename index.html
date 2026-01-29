@@ -903,22 +903,19 @@ function toggleCompare(checkbox) {
 
     // debug
 
-    markers.forEach(m => {
-  if (String(m.row.IDPEL) === String(idpel)) {
-    console.log("DEBUG MARKER:", m.marker);
-
-    m.marker.addTo(map);
-    active.push(m.marker);
-  }
-});
-
+    
     // tampilkan hanya marker pelanggan ini
     markers.forEach(m => {
-      if (String(m.row.IDPEL) === String(idpel)) {
-        m.marker.addTo(map);
-        active.push(m.marker);
-      }
-    });
+  if (String(m.row.IDPEL) === String(idpel)) {
+
+    const marker = Array.isArray(m.marker)
+      ? m.marker[0]
+      : m.marker;
+
+    marker.addTo(map);
+    active.push(marker);
+  }
+});
 
     // auto zoom ke 2 marker
     if (active.length > 0) {
