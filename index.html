@@ -908,14 +908,18 @@ function toggleCompare(checkbox) {
     markers.forEach(m => {
   if (String(m.row.IDPEL) === String(idpel)) {
 
-    const marker = Array.isArray(m.marker)
-      ? m.marker[0]
-      : m.marker;
+    if (!m.marker) return; // ← ini kunci stabilitas
 
-    marker.addTo(map);
-    active.push(marker);
-  }
-});
+        const marker = Array.isArray(m.marker)
+          ? m.marker[0]
+          : m.marker;
+
+        if (!marker || typeof marker.addTo !== "function") return;
+
+        marker.addTo(map);
+        active.push(marker);
+      }
+    });
 
     // auto zoom ke 2 marker
     if (active.length > 0) {
