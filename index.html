@@ -659,6 +659,19 @@ function applyMarkerFilter() {
   });
 }
 
+function safeAddMarker(m, map, activeArr = null) {
+  if (!m || !m.marker) return;
+
+  const marker = Array.isArray(m.marker)
+    ? m.marker[0]
+    : m.marker;
+
+  if (!marker || typeof marker.addTo !== "function") return;
+
+  marker.addTo(map);
+  if (activeArr) activeArr.push(marker);
+}
+
 
 /* ======================
    TAMPILKAN NAMA FILE SAAT REFRESH
@@ -934,6 +947,19 @@ function toggleCompare(checkbox) {
     showToast("📍 Semua marker ditampilkan kembali");
   }
 }
+
+    function safeAddMarker(m, map, activeArr = null) {
+      if (!m || !m.marker) return;
+
+      const marker = Array.isArray(m.marker)
+        ? m.marker[0]
+        : m.marker;
+
+      if (!marker || typeof marker.addTo !== "function") return;
+
+      marker.addTo(map);
+      if (activeArr) activeArr.push(marker);
+    }
 
 /* ======================
    ROUTING
