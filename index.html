@@ -734,12 +734,6 @@ function buildMarkers(){
 
       const markerDIJ = L.marker([lat, lng], { icon: iconDIJ });
 
-      markers.push({
-        marker: markerDIJ,
-        row: row,
-        type: "DIJ"
-      });
-
       markerDIJ.bindTooltip(row.NAMA, {
       permanent: false,
       direction: "top",
@@ -747,16 +741,15 @@ function buildMarkers(){
       opacity: 0.9,
       className: "marker-label"
     });
-
-    markerDIJ.on("click", () => openDetail(row));
-
+      markerDIJ.on("click", () => openDetail(row));
 
       markers.push({
-        marker: MarkerDIJ,
-        row,
+        marker: markerDIJ,
+        row: row,
         type: "DIJ"
       });
-
+   
+      
       markers.push({
         marker: markerTH,
         row: row,
@@ -766,7 +759,7 @@ function buildMarkers(){
       searchIndex.push({
         idpel: String(row.IDPEL||"").replace(/\D/g,""),
         meter: String(row["NOMOR METER"]||"").replace(/\D/g,""),
-        marker: MarkerDIJ,
+        marker: markerDIJ,
         row
       });
     }
