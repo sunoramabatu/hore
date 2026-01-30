@@ -486,20 +486,15 @@ let workingRows = [];
 let MarkerDIJ = [];        // ← WAJIB ADA
 let markerTH = [];  // ← biasanya ini juga kamu pakai
 
-const STORAGE_KEY = "RBM_WORKING_STATE";
-
-function renderMarker(m, map, activeArr = null) {
-  if (!m || !m.marker) return;
-
-  const marker = Array.isArray(m.marker)
-    ? m.marker[0]
-    : m.marker;
-
-  if (!marker || typeof renderMarker !== "function") return;
-
-  renderMarker(m, map);
-  if (activeArr) activeArr.push(marker);
+function addMarkerToMap(marker) {
+  if (!marker) return;
+  if (!map.hasLayer(marker)) {
+    marker.addTo(map);
+  }
 }
+
+
+const STORAGE_KEY = "RBM_WORKING_STATE";
 
 
 // Reset history setiap hari
@@ -644,19 +639,6 @@ function zoomToAllMarkers() {
   map.fitBounds(group.getBounds(), { padding: [40, 40] });
 }
 
-function renderMarker(m, map, activeArr = null) {
-  if (!m || !m.marker) return;
-
-  const marker = Array.isArray(m.marker)
-    ? m.marker[0]
-    : m.marker;
-
-  if (!marker || typeof renderMarker !== "function") return;
-
-  renderMarker(m, map);
-  if (activeArr) activeArr.push(marker);
-}
-
 /* ======================
    SIMPAN STATE
 ====================== */
@@ -667,38 +649,21 @@ function saveState() {
    TAMPILKAN marker dij/tahun lalu saja
 ====================== */
 function applyMarkerFilter() {
-  // Jika mode bandingkan aktif, jangan ganggu
-  const compareCheckbox = document.querySelector('input[onchange="toggleCompare(this)"]');
-  if (compareCheckbox && compareCheckbox.checked) return;
-
-  const showDIJ = document.getElementById("filterDIJ")?.checked;
-  const showTH = document.getElementById("filterTH")?.checked;
+  const showDIJ = document.getElementById("filterDIJ").checked;
+  const showTH  = document.getElementById("filterTH").checked;
 
   markers.forEach(m => {
-    const isTH = m.type === "TH";   // marker tahun lalu
-    const isDIJ = m.type === "DIJ"; // marker utama
+    const isDIJ = m.type === "DIJ";
+    const isTH  = m.type === "TH";
 
     if ((isDIJ && showDIJ) || (isTH && showTH)) {
-      renderMarker(m, map)
-    } 
-    
-    else {
-      map.removeLayer(m.marker);
+      addMarkerToMap(m.marker);
+    } else {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
+      }
     }
   });
-}
-
-function safeAddMarker(m, map, activeArr = null) {
-  if (!m || !m.marker) return;
-
-  const marker = Array.isArray(m.marker)
-    ? m.marker[0]
-    : m.marker;
-
-  if (!marker || typeof renderMarker !== "function") return;
-
-  renderMarker(m, map);
-  if (activeArr) activeArr.push(marker);
 }
 
 
@@ -711,7 +676,7 @@ function safeAddMarker(m, map, activeArr = null) {
    BUILD MARKERS
 ====================== */
 function buildMarkers(){
-  markers.forEach(m => map.removeLayer(m.marker));
+  markers.forEach(m => addMarkerToMap(m.marker));
   markers = [];
   searchIndex = [];
 
@@ -983,19 +948,7 @@ function toggleCompare(checkbox) {
   }
 }
 
-    function safeAddMarker(m, map, activeArr = null) {
-      if (!m || !m.marker) return;
-
-      const marker = Array.isArray(m.marker)
-        ? m.marker[0]
-        : m.marker;
-
-      if (!marker || typeof renderMarker !== "function") return;
-
-      renderMarker(m, map);
-      if (activeArr) activeArr.push(marker);
-    }
-
+    
 /* ======================
    ROUTING
 ====================== */
