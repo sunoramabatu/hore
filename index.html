@@ -507,14 +507,6 @@ function addMarkerToMap(marker) {
 }
 
 
-function addMarkerToMap(marker) {
-  if (!marker) return;
-  if (!map.hasLayer(marker)) {
-    marker.addTo(map);
-  }
-}
-
-
 const STORAGE_KEY = "RBM_WORKING_STATE";
 
 
@@ -553,6 +545,7 @@ const map = L.map("map", {
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 21
 }).addTo(map);
+updateMarkers();
 
 
 /* ======================
@@ -697,7 +690,13 @@ function applyMarkerFilter() {
    BUILD MARKERS
 ====================== */
 function buildMarkers(){
-  markers.forEach(m => addMarkerToMap(m.marker));
+  // 🔥 HAPUS SEMUA MARKER LAMA DARI MAP
+markers.forEach(m => {
+  if (map.hasLayer(m.marker)) {
+    map.removeLayer(m.marker);
+    }
+  });
+
   markers = [];
   searchIndex = [];
 
@@ -742,6 +741,7 @@ function buildMarkers(){
         marker: markerDIJ,
         row
       });
+      applyMarkerFilter();
     }
 
     // ==========================
@@ -847,6 +847,8 @@ searchBtn.onclick = () => {
   return;
   }
 
+  addMarkerToMap(found.marker);
+
   map.setView(found.marker.getLatLng(), 19, { animate: true });
 
   highlightMarker(found.marker);
@@ -921,30 +923,22 @@ function toggleCompare(checkbox) {
   if (checkbox.checked) {
     const active = [];
 
-    // hide semua
-    markers.forEach(m => map.removeLayer(m.marker));
-
-    // debug
-
-    
-    // tampilkan hanya marker pelanggan ini
+    // 🔥 hide semua marker
     markers.forEach(m => {
-  if (String(m.row.IDPEL) === String(idpel)) {
-
-    if (!m.marker) return; // ← ini kunci stabilitas
-
-        const marker = Array.isArray(m.marker)
-          ? m.marker[0]
-          : m.marker;
-
-        if (!marker || typeof renderMarker !== "function") return;
-
-        renderMarker(m, map);
-        active.push(marker);
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
       }
     });
 
-    // auto zoom ke 2 marker
+    // 🔥 tampilkan hanya marker pelanggan ini
+    markers.forEach(m => {
+      if (String(m.row.IDPEL) === String(idpel)) {
+        addMarkerToMap(m.marker);
+        active.push(m.marker);
+      }
+    });
+
+    // zoom ke 2 marker
     if (active.length > 0) {
       const group = L.featureGroup(active);
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
@@ -952,11 +946,12 @@ function toggleCompare(checkbox) {
 
     showToast("🔍 Mode bandingkan aktif");
   } else {
-    // restore semua marker
-    markers.forEach(m => renderMarker(m, map));
+    // 🔥 KEMBALIKAN SESUAI CHECKBOX
+    applyMarkerFilter();
     showToast("📍 Semua marker ditampilkan kembali");
   }
 }
+
 
     
 /* ======================
