@@ -135,17 +135,25 @@
 
       #historyPanel {
       position: fixed;
-      top: 70px;
-      right: 20px;
-      width: 280px;
-      max-height: 60vh;
-      overflow-y: auto;
-      background: white;
-      border-radius: 16px;
-      padding: 12px;
-      box-shadow: 0 10px 25px rgba(0,0,0,.3);
-      z-index: 9998;
-      font-size: 14px;
+      top: 70px;              /* jangan 0, biar tidak nutup header */
+      left: 50%;
+      transform: translateX(-50%);
+      width: 92%;
+      max-width: 420px;
+
+      max-height: 60vh;       /* 🔥 INI KUNCI */
+      overflow-y: auto;       /* 🔥 scroll ke dalam */
+
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+      z-index: 9999;
+    }
+
+      #map {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
     }
 
       .toast {
@@ -372,10 +380,7 @@
       background: #0f766e;
     }
 
-    #historyPanel {
-      position: relative;
-    }
-
+    
     .close-history {
       position: absolute;
       top: 6px;
