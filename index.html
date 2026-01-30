@@ -372,6 +372,30 @@
       background: #0f766e;
     }
 
+    #historyPanel {
+      position: relative;
+    }
+
+    .close-history {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      border: none;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 16px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .close-history:hover {
+      background: rgba(0,0,0,0.85);
+    }
+
+
   </style>
 </head>
 
@@ -426,6 +450,7 @@
 </div>
 
 <div id="historyPanel" style="display:none;">
+  <button class="close-history" onclick="closeHistory()">✕</button>
   <div style="font-weight:bold;margin-bottom:6px;">📋 Riwayat Dibaca</div>
   <div id="historyList"></div>
 </div>
@@ -513,6 +538,16 @@ const STORAGE_KEY = "RBM_WORKING_STATE";
 // Reset history setiap hari
 const today = new Date().toDateString();
 const savedDate = localStorage.getItem("oyon_history_date");
+
+function closeHistory() {
+  const panel = document.getElementById("historyPanel");
+  if (panel) {
+    panel.style.display = "none";
+  }
+}
+
+document.getElementById("historyPanel").style.display = "block";
+
 
 if (savedDate !== today) {
   history = [];
