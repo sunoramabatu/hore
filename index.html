@@ -746,59 +746,49 @@ markers.forEach(m => {
     }
 
     // ==========================
-    // MARKER 2 — TAGGING TAHUN LALU (HITAM)
-    // ==========================
-    const latTH = parseFloat(row.LATTH);
-    const lonTH = parseFloat(row.LONTH);
+// MARKER 2 — TAGGING TAHUN LALU (HITAM)
+// ==========================
+const latTH = parseFloat(row.LATTH);
+const lonTH = parseFloat(row.LONTH);
 
-    const hasTHLocation =
-      latTH && lonTH &&
-      !isNaN(latTH) &&
-      !isNaN(lonTH);
+const hasTHLocation =
+  latTH && lonTH &&
+  !isNaN(latTH) &&
+  !isNaN(lonTH);
 
-    if (hasTHLocation) {
-      const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
+if (hasTHLocation) {
 
-      markerTH.on("click", () => {
-        renderBottomBar(row, "TH");
-      });
+  // ICON TAHUN LALU (WAJIB DULU)
+  const iconTH = L.divIcon({
+    html: `<div class="custom-marker" style="background:#000"></div>`,
+    iconSize: [12, 12],
+    iconAnchor: [6, 12],
+    className: ""
+  });
 
-      markers.push({
-        marker: markerTH,
-        row,
-        type: "TH"
-      });
+  // MARKER TAHUN LALU
+  const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
+
+  markerTH.bindTooltip(
+    `<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`,
+    {
+      permanent: false,
+      direction: "top",
+      offset: [0, -10],
+      opacity: 0.8,
+      className: "marker-label"
     }
+  );
 
-    if(latTH && lonTH){
-      const iconTH = L.divIcon({
-        html: `<div class="custom-marker" style="background:#000"></div>`,
-        iconSize: [12,12],
-        iconAnchor: [6,12],
-        className: ""
-      });
+  markerTH.on("click", () => openDetail(row));
 
-      const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
-
-      markerTH.bindTooltip(`<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`, {
-        permanent: false,
-        direction: "top",
-        offset: [0, -10],
-        opacity: 0.8,
-        className: "marker-label"
-      });
-
-      markerTH.on("click", () => openDetail(row));
-
-      markers.push({
-        marker: markerTH,
-        row: row,
-        type: "TH"
-      });
-
-    }
+  markers.push({
+    marker: markerTH,
+    row,
+    type: "TH"
   });
 }
+
 
 /* ======================
    HIGHLIGHT MARKER
