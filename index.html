@@ -740,15 +740,16 @@ function buildMarkers(){
         type: "DIJ"
       });
 
-      MarkerDIJ.bindTooltip(row.NAMA, {
-        permanent: false,
-        direction: "top",
-        offset: [0, -10],
-        opacity: 0.9,
-        className: "marker-label"
-      });
+      markerDIJ.bindTooltip(row.NAMA, {
+      permanent: false,
+      direction: "top",
+      offset: [0, -10],
+      opacity: 0.9,
+      className: "marker-label"
+    });
 
-      MarkerDIJ.on("click", () => openDetail(row));
+    markerDIJ.on("click", () => openDetail(row));
+
 
       markers.push({
         marker: MarkerDIJ,
