@@ -485,8 +485,6 @@ let petugasMarker = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
 let originalRows = [];
 let workingRows = [];
-let MarkerDIJ = [];        // ← WAJIB ADA
-let markerTH = [];  // ← biasanya ini juga kamu pakai
 
 function renderMarker(m, map) {
   if (!m || !m.marker) return;
@@ -742,8 +740,9 @@ markers.forEach(m => {
         marker: markerDIJ,
         row
       });
-      applyMarkerFilter();
+      
     }
+    applyMarkerFilter();
 
     // ==========================
 // MARKER 2 — TAGGING TAHUN LALU (HITAM)
@@ -788,6 +787,8 @@ if (hasTHLocation) {
     type: "TH"
   });
 }
+  }); // ← TUTUP workingRows.forEach
+}     // ← TUTUP function buildMarkers
 
 
 /* ======================
