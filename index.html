@@ -488,6 +488,15 @@ let markerTH = [];  // ← biasanya ini juga kamu pakai
 
 function addMarkerToMap(marker) {
   if (!marker) return;
+  if (typeof marker.addTo !== "function") return;
+  if (!map.hasLayer(marker)) {
+    marker.addTo(map);
+  }
+}
+
+
+function addMarkerToMap(marker) {
+  if (!marker) return;
   if (!map.hasLayer(marker)) {
     marker.addTo(map);
   }
