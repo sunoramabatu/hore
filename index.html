@@ -488,6 +488,19 @@ let markerTH = [];  // ← biasanya ini juga kamu pakai
 
 const STORAGE_KEY = "RBM_WORKING_STATE";
 
+function renderMarker(m, map, activeArr = null) {
+  if (!m || !m.marker) return;
+
+  const marker = Array.isArray(m.marker)
+    ? m.marker[0]
+    : m.marker;
+
+  if (!marker || typeof renderMarker !== "function") return;
+
+  renderMarker(m, map);
+  if (activeArr) activeArr.push(marker);
+}
+
 
 // Reset history setiap hari
 const today = new Date().toDateString();
@@ -523,7 +536,7 @@ const map = L.map("map", {
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 21
-}).addTo(map);
+})renderMarker(m, map);
 
 /* ======================
    IKUT KOMPAS
@@ -630,6 +643,19 @@ function zoomToAllMarkers() {
   map.fitBounds(group.getBounds(), { padding: [40, 40] });
 }
 
+function renderMarker(m, map, activeArr = null) {
+  if (!m || !m.marker) return;
+
+  const marker = Array.isArray(m.marker)
+    ? m.marker[0]
+    : m.marker;
+
+  if (!marker || typeof renderMarker !== "function") return;
+
+  renderMarker(m, map);
+  if (activeArr) activeArr.push(marker);
+}
+
 /* ======================
    SIMPAN STATE
 ====================== */
@@ -652,8 +678,10 @@ function applyMarkerFilter() {
     const isDIJ = m.type === "DIJ"; // marker utama
 
     if ((isDIJ && showDIJ) || (isTH && showTH)) {
-      m.marker.addTo(map);
-    } else {
+      renderMarker(m, map)
+    } 
+    
+    else {
       map.removeLayer(m.marker);
     }
   });
@@ -666,9 +694,9 @@ function safeAddMarker(m, map, activeArr = null) {
     ? m.marker[0]
     : m.marker;
 
-  if (!marker || typeof marker.addTo !== "function") return;
+  if (!marker || typeof renderMarker !== "function") return;
 
-  marker.addTo(map);
+  renderMarker(m, map);
   if (activeArr) activeArr.push(marker);
 }
 
@@ -703,7 +731,7 @@ function buildMarkers(){
         className: ""
       });
 
-      const MarkerDIJ = L.marker([lat,lng], {icon: iconDIJ}).addTo(map);
+      const MarkerDIJ = L.marker([lat,lng], {icon: iconDIJ})renderMarker(m, map);
 
       MarkerDIJ.bindTooltip(row.NAMA, {
         permanent: false,
@@ -749,7 +777,7 @@ function buildMarkers(){
         className: ""
       });
 
-      const markerTH = L.marker([latTH, lonTH], {icon: iconTH}).addTo(map);
+      const markerTH = L.marker([latTH, lonTH], {icon: iconTH})renderMarker(m, map);
 
       markerTH.bindTooltip(`<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`, {
         permanent: false,
@@ -927,9 +955,9 @@ function toggleCompare(checkbox) {
           ? m.marker[0]
           : m.marker;
 
-        if (!marker || typeof marker.addTo !== "function") return;
+        if (!marker || typeof renderMarker !== "function") return;
 
-        marker.addTo(map);
+        renderMarker(m, map);
         active.push(marker);
       }
     });
@@ -943,7 +971,7 @@ function toggleCompare(checkbox) {
     showToast("🔍 Mode bandingkan aktif");
   } else {
     // restore semua marker
-    markers.forEach(m => m.marker.addTo(map));
+    markers.forEach(m => renderMarker(m, map));
     showToast("📍 Semua marker ditampilkan kembali");
   }
 }
@@ -955,9 +983,9 @@ function toggleCompare(checkbox) {
         ? m.marker[0]
         : m.marker;
 
-      if (!marker || typeof marker.addTo !== "function") return;
+      if (!marker || typeof renderMarker !== "function") return;
 
-      marker.addTo(map);
+      renderMarker(m, map);
       if (activeArr) activeArr.push(marker);
     }
 
@@ -974,7 +1002,7 @@ function goTo(lat,lng){
     addWaypoints:false,
     draggableWaypoints:false,
     createMarker:()=>null
-  }).addTo(map);
+  })renderMarker(m, map);
 
   document.getElementById("cancelRouteBtn").style.display="block";
 }
@@ -1156,7 +1184,7 @@ navigator.geolocation?.watchPosition(pos => {
   });
 
   if (!petugasMarker) {
-    petugasMarker = L.marker(userLatLng, { icon }).addTo(map);
+    petugasMarker = L.marker(userLatLng, { icon })renderMarker(m, map);
     petugasMarker.bindTooltip("📍 Lokasi Anda", {
       permanent: false,
       direction: "top"
