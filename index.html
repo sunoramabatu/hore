@@ -420,6 +420,8 @@
       Finish & Download
     </button>
 
+    <button id="historyToggleBtn">📋 Riwayat</button>
+
   </div>
 </div>
 
@@ -428,7 +430,7 @@
   <div id="historyList"></div>
 </div>
 
-<button id="historyToggleBtn">📋 Riwayat</button>
+
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
@@ -538,6 +540,7 @@ const downloadBtn = document.getElementById("downloadBtn");
 const map = L.map("map", {
   preferCanvas: true,
   rotate: true,
+  zoomControl: false
   touchRotate: true,
   rotateControl: true
 }).setView([-7.974155,112.6181065], 12);
@@ -748,6 +751,25 @@ markers.forEach(m => {
     const latTH = parseFloat(row.LATTH);
     const lonTH = parseFloat(row.LONTH);
 
+    const hasTHLocation =
+      latTH && lonTH &&
+      !isNaN(latTH) &&
+      !isNaN(lonTH);
+
+    if (hasTHLocation) {
+      const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
+
+      markerTH.on("click", () => {
+        renderBottomBar(row, "TH");
+      });
+
+      markers.push({
+        marker: markerTH,
+        row,
+        type: "TH"
+      });
+    }
+
     if(latTH && lonTH){
       const iconTH = L.divIcon({
         html: `<div class="custom-marker" style="background:#000"></div>`,
@@ -765,6 +787,8 @@ markers.forEach(m => {
         opacity: 0.8,
         className: "marker-label"
       });
+
+      markerTH.on("click", () => openDetail(row));
 
       markers.push({
         marker: markerTH,
@@ -800,24 +824,12 @@ function showLabel(marker) {
 
 
 function toggleRoute(cb) {
-  if (!window.currentCompareIDPEL) {
-    showToast("Pilih pelanggan dulu");
-    cb.checked = false;
-    return;
-  }
-
-  const row = workingRows.find(r => String(r.IDPEL) === String(window.currentCompareIDPEL));
-  if (!row) return;
-
-  const lat = parseFloat(row.LAT);
-  const lon = parseFloat(row.LON);
-
   if (cb.checked) {
-    goTo(lat, lon);
-    enableCompass(); // ini sekarang kepakai
+    enableCompass();
+    showToast("🧭 Ikuti kompas aktif");
   } else {
-    cancelRoute();
     disableCompass();
+    showToast("🛑 Ikuti kompas mati");
   }
 }
 
