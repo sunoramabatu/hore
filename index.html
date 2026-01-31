@@ -445,6 +445,17 @@
       Ikuti kompas
     </label>
 
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+      <input type="checkbox" id="oneDayCheck">
+      1 Hari Baca
+    </label>
+
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button onclick="prevHari()">◀</button>
+      <b id="hariBacaLabel">HARI: -</b>
+      <button onclick="nextHari()">▶</button>
+    </div>
+
     <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
     </button>
