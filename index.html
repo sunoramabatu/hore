@@ -736,26 +736,25 @@ function zoomToAllMarkers() {
 ====================== */
 function applyHariBacaFilter() {
 
-  const showDIJ = document.getElementById("lokasiDIJ")?.checked;
-  const showTH  = document.getElementById("tahunLalu")?.checked;
+  const showDIJ = document.getElementById("chkDIJ")?.checked ?? true;
+  const showTH  = document.getElementById("chkTH")?.checked ?? true;
 
   markers.forEach(m => {
 
     let visible = true;
 
-    // ===== FILTER DIJ / TH =====
+    // filter jenis marker
     if (m.type === "DIJ" && !showDIJ) visible = false;
     if (m.type === "TH"  && !showTH)  visible = false;
 
-    // ===== FILTER 1 HARI BACA =====
+    // filter 1 hari baca
     if (filterHariBacaAktif) {
-      const hari = String(m.row["HARI BACA ACMT"] || "").trim();
-      if (hari !== hariBacaList[hariBacaIndex]) {
+      const hari = (m.row["HARI BACA ACMT"] || "").toUpperCase();
+      if (hari !== daftarHariBaca[indexHariBaca]) {
         visible = false;
       }
     }
 
-    // ===== TAMPIL / SEMBUNYI MARKER =====
     if (visible) {
       if (!map.hasLayer(m.marker)) m.marker.addTo(map);
     } else {
@@ -763,12 +762,12 @@ function applyHariBacaFilter() {
     }
   });
 
-  // update label
-  document.getElementById("hariBacaLabel").textContent =
+  document.getElementById("hariBacaLabel").innerText =
     filterHariBacaAktif
-      ? `HARI: ${hariBacaList[hariBacaIndex]}`
+      ? `HARI: ${daftarHariBaca[indexHariBaca]}`
       : "HARI: ALL";
 }
+
 
 
 
@@ -782,7 +781,7 @@ function saveState() {
    TAMPILKAN marker dij/tahun lalu saja
 ====================== */
 function applyMarkerFilter() {}
-
+/* ======================
 function applyHariBacaFilter() {
   if (!filterHariBacaAktif) {
     applyMarkerFilter();
@@ -805,6 +804,7 @@ function applyHariBacaFilter() {
 
   updateHariBacaLabel();
 }
+  ====================== */
 
 function nextHari(){
   if (!filterHariBacaAktif) return;
@@ -923,7 +923,7 @@ markers.forEach(m => {
       });
       
     }
-    applyHariBacaFilter();
+    
 
     // ==========================
 // MARKER 2 — TAGGING TAHUN LALU (HITAM)
@@ -980,12 +980,14 @@ updateHariBacaLabel();
 
   }); // ← TUTUP workingRows.forEach
 }     // ← TUTUP function buildMarkers
-
+applyHariBacaFilter();
+markers.forEach(m => m.marker.addTo(map));
+/* ======================
 markers.forEach(m => {
   if (m.marker && m.marker.addTo) {
     m.marker.addTo(map);
   }
-});
+});====================== */
 
 /* ======================
    HIGHLIGHT MARKER
