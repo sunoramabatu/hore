@@ -515,6 +515,10 @@ let petugasMarker = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
 let originalRows = [];
 let workingRows = [];
+let hariBacaList = [];
+let hariBacaIndex = 0;
+let filterHariBacaAktif = false;
+
 
 function renderMarker(m, map) {
   if (!m || !m.marker) return;
@@ -654,6 +658,14 @@ upload.onchange = e => {
   };
   reader.readAsArrayBuffer(file);
 };
+/* ======================
+   KUMPULKAN HARI BACA
+====================== */
+hariBacaList = [...new Set(
+  workingRows
+    .map(r => String(r["HARI BACA ACMT"]).trim())
+    .filter(v => v !== "")
+)].sort((a,b)=>a-b);
 
 /* ======================
    SAAT LOAD
@@ -691,6 +703,37 @@ function zoomToAllMarkers() {
   const group = L.featureGroup(markers.map(m => m.marker));
   map.fitBounds(group.getBounds(), { padding: [40, 40] });
 }
+/* ======================
+   FUNGSI FILTER MARKER HARI BACA
+====================== */
+function applyHariBacaFilter(){
+  if(!filterHariBacaAktif){
+    // tampilkan semua marker DIJ
+    markers.forEach(m => {
+      if(m.type === "DIJ"){
+        m.marker.addTo(map);
+      }
+    });
+    return;
+  }
+
+  const hariAktif = hariBacaList[hariBacaIndex];
+
+  markers.forEach(m => {
+    if(m.type !== "DIJ") return;
+
+    const hari = String(m.row["HARI BACA ACMT"]).trim();
+
+    if(hari === hariAktif){
+      m.marker.addTo(map);
+    }else{
+      map.removeLayer(m.marker);
+    }
+  });
+
+  document.getElementById("hariBacaLabel").innerText =
+    "HARI: " + hariAktif;
+}
 
 /* ======================
    SIMPAN STATE
@@ -717,6 +760,36 @@ function applyMarkerFilter() {
       }
     }
   });
+}
+/* ======================
+   CHECKBOX “1 HARI BACA”
+====================== */
+document.getElementById("oneDayCheck").onchange = e => {
+  filterHariBacaAktif = e.target.checked;
+  applyHariBacaFilter();
+};
+
+/* ======================
+   TOMBOL NEXT / PREV
+====================== */
+function nextHari(){
+  if(!filterHariBacaAktif) return;
+
+  hariBacaIndex++;
+  if(hariBacaIndex >= hariBacaList.length){
+    hariBacaIndex = 0;
+  }
+  applyHariBacaFilter();
+}
+
+function prevHari(){
+  if(!filterHariBacaAktif) return;
+
+  hariBacaIndex--;
+  if(hariBacaIndex < 0){
+    hariBacaIndex = hariBacaList.length - 1;
+  }
+  applyHariBacaFilter();
 }
 
 
