@@ -526,9 +526,9 @@ let petugasMarker = null;
 let history = JSON.parse(localStorage.getItem("oyon_history") || "[]");
 let originalRows = [];
 let workingRows = [];
-let hariBacaList = [];
-let hariBacaIndex = 0;
 let filterHariBacaAktif = false;
+let daftarHariBaca = [];
+let indexHariBaca = 0;
 
 
 function renderMarker(m, map) {
@@ -772,6 +772,72 @@ function applyMarkerFilter() {
     }
   });
 }
+
+function applyHariBacaFilter() {
+  if (!filterHariBacaAktif) {
+    applyMarkerFilter();
+    return;
+  }
+
+  const hariAktif = daftarHariBaca[indexHariBaca];
+
+  markers.forEach(m => {
+    const hariRow = (m.row["HARI BACA ACMT"] || "").toUpperCase();
+
+    if (hariRow === hariAktif) {
+      addMarkerToMap(m.marker);
+    } else {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
+      }
+    }
+  });
+
+  updateHariBacaLabel();
+}
+
+function nextHari() {
+  if (!daftarHariBaca.length) return;
+  indexHariBaca = (indexHariBaca + 1) % daftarHariBaca.length;
+  applyHariBacaFilter();
+}
+
+function prevHari() {
+  if (!daftarHariBaca.length) return;
+  indexHariBaca =
+    (indexHariBaca - 1 + daftarHariBaca.length) % daftarHariBaca.length;
+  applyHariBacaFilter();
+}
+
+function updateHariBacaLabel() {
+  const el = document.getElementById("hariBacaLabel");
+  if (!el) return;
+
+  el.innerText = filterHariBacaAktif
+    ? `HARI: ${daftarHariBaca[indexHariBaca]}`
+    : "HARI: ALL";
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  const cb = document.getElementById("oneDayCheck");
+  if (!cb) return;
+
+  cb.onchange = e => {
+    filterHariBacaAktif = e.target.checked;
+
+    if (filterHariBacaAktif && daftarHariBaca.length === 0) {
+      showToast("⚠️ Data hari baca kosong");
+      cb.checked = false;
+      filterHariBacaAktif = false;
+      return;
+    }
+
+    applyHariBacaFilter();
+  };
+});
+
+
+
 /* ======================
    CHECKBOX “1 HARI BACA”
 ====================== */
@@ -911,6 +977,16 @@ if (hasTHLocation) {
     type: "TH"
   });
 }
+// ===== KUMPULKAN HARI BACA UNIK =====
+daftarHariBaca = [...new Set(
+  workingRows
+    .map(r => (r["HARI BACA ACMT"] || "").toUpperCase())
+    .filter(v => v)
+)].sort();
+
+indexHariBaca = 0;
+updateHariBacaLabel();
+
   }); // ← TUTUP workingRows.forEach
 }     // ← TUTUP function buildMarkers
 
