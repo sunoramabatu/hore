@@ -796,18 +796,32 @@ function applyHariBacaFilter() {
   updateHariBacaLabel();
 }
 
-function nextHari() {
+function nextHari(){
+  if (!filterHariBacaAktif) return;
   if (!daftarHariBaca.length) return;
-  indexHariBaca = (indexHariBaca + 1) % daftarHariBaca.length;
+
+  indexHariBaca++;
+
+  if (indexHariBaca >= daftarHariBaca.length) {
+    indexHariBaca = 0;
+  }
+
   applyHariBacaFilter();
 }
 
-function prevHari() {
+function prevHari(){
+  if (!filterHariBacaAktif) return;
   if (!daftarHariBaca.length) return;
-  indexHariBaca =
-    (indexHariBaca - 1 + daftarHariBaca.length) % daftarHariBaca.length;
+
+  indexHariBaca--;
+
+  if (indexHariBaca < 0) {
+    indexHariBaca = daftarHariBaca.length - 1;
+  }
+
   applyHariBacaFilter();
 }
+
 
 function updateHariBacaLabel() {
   const el = document.getElementById("hariBacaLabel");
