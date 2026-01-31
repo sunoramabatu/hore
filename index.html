@@ -445,16 +445,31 @@
       Ikuti kompas
     </label>
 
+    <!-- FILTER HARI BACA -->
     <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
       <input type="checkbox" id="oneDayCheck">
       1 Hari Baca
     </label>
 
-    <div style="display:flex;gap:6px;align-items:center;">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
       <button onclick="prevHari()">◀</button>
       <b id="hariBacaLabel">HARI: -</b>
       <button onclick="nextHari()">▶</button>
     </div>
+
+    <hr>
+
+    <!-- FILTER JENIS MARKER -->
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="chkDIJ" checked>
+      Lokasi DIJ
+    </label>
+
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="chkTH" checked>
+      Tahun Lalu
+    </label>
+
 
     <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
@@ -529,6 +544,8 @@ let workingRows = [];
 let filterHariBacaAktif = false;
 let daftarHariBaca = [];
 let indexHariBaca = 0;
+let showDIJ = true;
+let showTH = true;
 
 
 function renderMarker(m, map) {
@@ -717,34 +734,36 @@ function zoomToAllMarkers() {
 /* ======================
    FUNGSI FILTER MARKER HARI BACA
 ====================== */
-function applyHariBacaFilter(){
-  if(!filterHariBacaAktif){
-    // tampilkan semua marker DIJ
-    markers.forEach(m => {
-      if(m.type === "DIJ"){
-        m.marker.addTo(map);
-      }
-    });
-    return;
-  }
-
-  const hariAktif = daftarHariBaca[hariBacaIndex];
+function applyHariBacaFilter() {
+  const showDIJ = document.getElementById("filterDIJ").checked;
+  const showTH  = document.getElementById("filterTH").checked;
 
   markers.forEach(m => {
-    if(m.type !== "DIJ") return;
+    let tampil = true;
 
-    const hari = String(m.row["HARI BACA ACMT"]).trim();
+    // filter jenis marker
+    if (m.type === "DIJ" && !showDIJ) tampil = false;
+    if (m.type === "TH"  && !showTH)  tampil = false;
 
-    if(hari === hariAktif){
-      m.marker.addTo(map);
-    }else{
-      map.removeLayer(m.marker);
+    // filter hari baca
+    if (filterHariBacaAktif) {
+      const hariAktif = daftarHariBaca[indexHariBaca];
+      const hariRow = (m.row["HARI BACA ACMT"] || "").toUpperCase();
+      if (hariRow !== hariAktif) tampil = false;
+    }
+
+    if (tampil) {
+      addMarkerToMap(m.marker);
+    } else {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
+      }
     }
   });
 
-  document.getElementById("hariBacaLabel").innerText =
-    "HARI: " + hariAktif;
+  updateHariBacaLabel();
 }
+
 
 /* ======================
    SIMPAN STATE
@@ -756,22 +775,9 @@ function saveState() {
    TAMPILKAN marker dij/tahun lalu saja
 ====================== */
 function applyMarkerFilter() {
-  const showDIJ = document.getElementById("filterDIJ").checked;
-  const showTH  = document.getElementById("filterTH").checked;
-
-  markers.forEach(m => {
-    const isDIJ = m.type === "DIJ";
-    const isTH  = m.type === "TH";
-
-    if ((isDIJ && showDIJ) || (isTH && showTH)) {
-      addMarkerToMap(m.marker);
-    } else {
-      if (map.hasLayer(m.marker)) {
-        map.removeLayer(m.marker);
-      }
-    }
-  });
+  applyHariBacaFilter();
 }
+
 
 function applyHariBacaFilter() {
   if (!filterHariBacaAktif) {
@@ -851,46 +857,6 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 
-
-/* ======================
-   CHECKBOX “1 HARI BACA”
-====================== */
-document.getElementById("oneDayCheck").onchange = e => {
-  filterHariBacaAktif = e.target.checked;
-  applyHariBacaFilter();
-};
-
-/* ======================
-   TOMBOL NEXT / PREV
-====================== */
-function nextHari(){
-  if (!filterHariBacaAktif) return;
-  if (!daftarHariBaca.length) return;
-
-  indexHariBaca++;
-
-  if (indexHariBaca >= daftarHariBaca.length) {
-    indexHariBaca = 0;
-  }
-
-  applyHariBacaFilter();
-}
-
-
-function prevHari(){
-  if (!filterHariBacaAktif) return;
-  if (!daftarHariBaca.length) return;
-
-  indexHariBaca--;
-
-  if (indexHariBaca < 0) {
-    indexHariBaca = daftarHariBaca.length - 1;
-  }
-
-  applyHariBacaFilter();
-}
-
-
 /* ======================
    TAMPILKAN NAMA FILE SAAT REFRESH
 ====================== */
@@ -953,7 +919,7 @@ markers.forEach(m => {
       });
       
     }
-    applyMarkerFilter();
+    applyHariBacaFilter();
 
     // ==========================
 // MARKER 2 — TAGGING TAHUN LALU (HITAM)
@@ -1183,7 +1149,7 @@ function toggleCompare(checkbox) {
     showToast("🔍 Mode bandingkan aktif");
   } else {
     // 🔥 KEMBALIKAN SESUAI CHECKBOX
-    applyMarkerFilter();
+    applyHariBacaFilter();
     showToast("📍 Semua marker ditampilkan kembali");
   }
 }
