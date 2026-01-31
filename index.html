@@ -929,28 +929,42 @@ function openDetail(r){
   // simpan IDPEL yang sedang dibuka (global state kecil)
   window.currentCompareIDPEL = r.IDPEL;
   
+  const cardHTML = (label, lat, lon, isTH = false) => `
+  <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
+  <h3 style="margin:4px 0">${r.NAMA}</h3>
+  <div>📟 IDPEL: ${r.IDPEL}</div>
+  <div>⚡ DAYA: ${r.DAYA}</div>
+  <div>🔧 MERK: ${r["MERK METER"]}</div>
+  <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
+  <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
 
-  const cardHTML = (label) => `
-    <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
-    <h3 style="margin:4px 0">${r.NAMA}</h3>
-    <div>📟 IDPEL: ${r.IDPEL}</div>
-    <div>⚡ DAYA: ${r.DAYA}</div>
-    <div>🔧 MERK: ${r["MERK METER"]}</div>
-    <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
-    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
-
-    <div style="margin-top:10px;display:flex;gap:6px;">
-      <button class="btn-go" onclick="goTo(${r.LAT},${r.LON})">🧭 Tampil Rute</button>
-      <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
-    </div>
-  `;
+  <div style="margin-top:10px;display:flex;gap:6px;">
+    ${
+      (!isTH || (lat && lon))
+      ? `<button class="btn-go" onclick="goTo(${lat},${lon})">🧭 Tampil Rute</button>`
+      : ``
+    }
+    <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
+  </div>
+`;
 
   // tampilkan compare hanya sekali di atas
-  left.innerHTML = cardHTML("📍 Lokasi DIJ");
-  right.innerHTML = cardHTML("📍 Lokasi TAGGING TAHUN LALU");
+  left.innerHTML = cardHTML(
+    "📍 Lokasi DIJ",
+    r.LAT,
+    r.LON,
+    false
+  );
 
-  panel.classList.add("open");
-}
+  right.innerHTML = cardHTML(
+    "📍 Lokasi TAGGING TAHUN LALU",
+    r.LATTH,
+    r.LONTH,
+    true
+  );
+
+    panel.classList.add("open");
+  }
 
 
 function closeDetail(){
