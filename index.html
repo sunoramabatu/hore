@@ -583,9 +583,6 @@ function closeHistory() {
   }
 }
 
-document.getElementById("historyPanel").style.display = "block";
-
-
 if (savedDate !== today) {
   history = [];
   localStorage.setItem("oyon_history", "[]");
@@ -1396,11 +1393,19 @@ function getColor(v){
 renderHistory();
 window.addEventListener("DOMContentLoaded", () => {
 
-  document.getElementById("historyToggleBtn").onclick = () => {
-    const panel = document.getElementById("historyPanel");
-    panel.style.display = panel.style.display === "none" ? "block" : "none";
-    renderHistory();
-  };
+  function openHistory(){
+  const panel = document.getElementById("historyPanel");
+  panel.style.display = "block";
+  renderHistory();
+}
+
+function closeHistory(){
+  const panel = document.getElementById("historyPanel");
+  panel.style.display = "none";
+}
+
+document.getElementById("historyToggleBtn").onclick = openHistory;
+
 
 });
 /* ======================
