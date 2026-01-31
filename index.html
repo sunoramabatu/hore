@@ -728,7 +728,7 @@ function applyHariBacaFilter(){
     return;
   }
 
-  const hariAktif = hariBacaList[hariBacaIndex];
+  const hariAktif = daftarHariBaca[hariBacaIndex];
 
   markers.forEach(m => {
     if(m.type !== "DIJ") return;
@@ -864,22 +864,29 @@ document.getElementById("oneDayCheck").onchange = e => {
    TOMBOL NEXT / PREV
 ====================== */
 function nextHari(){
-  if(!filterHariBacaAktif) return;
+  if (!filterHariBacaAktif) return;
+  if (!daftarHariBaca.length) return;
 
-  hariBacaIndex++;
-  if(hariBacaIndex >= hariBacaList.length){
-    hariBacaIndex = 0;
+  indexHariBaca++;
+
+  if (indexHariBaca >= daftarHariBaca.length) {
+    indexHariBaca = 0;
   }
+
   applyHariBacaFilter();
 }
 
-function prevHari(){
-  if(!filterHariBacaAktif) return;
 
-  hariBacaIndex--;
-  if(hariBacaIndex < 0){
-    hariBacaIndex = hariBacaList.length - 1;
+function prevHari(){
+  if (!filterHariBacaAktif) return;
+  if (!daftarHariBaca.length) return;
+
+  indexHariBaca--;
+
+  if (indexHariBaca < 0) {
+    indexHariBaca = daftarHariBaca.length - 1;
   }
+
   applyHariBacaFilter();
 }
 
