@@ -981,6 +981,11 @@ updateHariBacaLabel();
   }); // ← TUTUP workingRows.forEach
 }     // ← TUTUP function buildMarkers
 
+markers.forEach(m => {
+  if (m.marker && m.marker.addTo) {
+    m.marker.addTo(map);
+  }
+});
 
 /* ======================
    HIGHLIGHT MARKER
