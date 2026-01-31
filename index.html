@@ -735,34 +735,41 @@ function zoomToAllMarkers() {
    FUNGSI FILTER MARKER HARI BACA
 ====================== */
 function applyHariBacaFilter() {
-  const showDIJ = document.getElementById("filterDIJ").checked;
-  const showTH  = document.getElementById("filterTH").checked;
+
+  const showDIJ = document.getElementById("lokasiDIJ")?.checked;
+  const showTH  = document.getElementById("tahunLalu")?.checked;
 
   markers.forEach(m => {
-    let tampil = true;
 
-    // filter jenis marker
-    if (m.type === "DIJ" && !showDIJ) tampil = false;
-    if (m.type === "TH"  && !showTH)  tampil = false;
+    let visible = true;
 
-    // filter hari baca
+    // ===== FILTER DIJ / TH =====
+    if (m.type === "DIJ" && !showDIJ) visible = false;
+    if (m.type === "TH"  && !showTH)  visible = false;
+
+    // ===== FILTER 1 HARI BACA =====
     if (filterHariBacaAktif) {
-      const hariAktif = daftarHariBaca[indexHariBaca];
-      const hariRow = (m.row["HARI BACA ACMT"] || "").toUpperCase();
-      if (hariRow !== hariAktif) tampil = false;
+      const hari = String(m.row["HARI BACA ACMT"] || "").trim();
+      if (hari !== hariBacaList[hariBacaIndex]) {
+        visible = false;
+      }
     }
 
-    if (tampil) {
-      addMarkerToMap(m.marker);
+    // ===== TAMPIL / SEMBUNYI MARKER =====
+    if (visible) {
+      if (!map.hasLayer(m.marker)) m.marker.addTo(map);
     } else {
-      if (map.hasLayer(m.marker)) {
-        map.removeLayer(m.marker);
-      }
+      if (map.hasLayer(m.marker)) map.removeLayer(m.marker);
     }
   });
 
-  updateHariBacaLabel();
+  // update label
+  document.getElementById("hariBacaLabel").textContent =
+    filterHariBacaAktif
+      ? `HARI: ${hariBacaList[hariBacaIndex]}`
+      : "HARI: ALL";
 }
+
 
 
 /* ======================
@@ -774,7 +781,10 @@ function saveState() {
 /* ======================
    TAMPILKAN marker dij/tahun lalu saja
 ====================== */
-function applyMarkerFilter() {}
+function applyMarkerFilter() {
+  applyHariBacaFilter();
+
+}
 
 function applyHariBacaFilter() {
   if (!filterHariBacaAktif) {
