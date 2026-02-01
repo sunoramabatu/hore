@@ -1190,11 +1190,25 @@ function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
 }
 
+/* ======================
+   minimize menu saat bandingkan
+====================== */
+
 function toggleCompare(checkbox) {
   const idpel = window.currentCompareIDPEL;
   if (!idpel) return;
 
   if (checkbox.checked) {
+
+    // ✅ AUTO MINIMIZE MENU
+    const uiBar = document.getElementById("uiBar");
+    const toggleBtn = document.getElementById("toggleBtn");
+
+    if (uiBar && !uiBar.classList.contains("minimized")) {
+      uiBar.classList.add("minimized");
+      if (toggleBtn) toggleBtn.innerText = "➕";
+    }
+
     const active = [];
 
     // 🔥 hide semua marker
@@ -1212,29 +1226,18 @@ function toggleCompare(checkbox) {
       }
     });
 
-    // zoom ke 2 marker
     if (active.length > 0) {
       const group = L.featureGroup(active);
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
     }
 
     showToast("🔍 Mode bandingkan aktif");
+
   } else {
-    // 🔥 KEMBALIKAN SESUAI CHECKBOX
     applyHariBacaFilter();
     showToast("📍 Semua marker ditampilkan kembali");
   }
 }
-
-/* ======================
-   minimize menu saat bandingkan
-====================== */
-
-document.getElementById("bandingkanCheck")?.addEventListener("change", (e) => {
-  if (e.target.checked) {
-    minimizeMenu();
-  }
-});
 
 function minimizeMenu() {
   const panel = document.getElementById("uiContent");
