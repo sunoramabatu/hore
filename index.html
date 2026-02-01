@@ -1031,7 +1031,7 @@ if (hasTHLocation) {
 
   // MARKER TAHUN LALU
   const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
-  markerDIJ._idpel = String(row.IDPEL);
+  markerTH._idpel = String(row.IDPEL);
 
   markerTH.bindTooltip(
     `<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`,
