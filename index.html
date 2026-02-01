@@ -514,7 +514,22 @@
       Finish & Download
     </button>
 
-    <button id="historyToggleBtn">📋 Riwayat</button>
+    <button id="historyToggleBtn"
+      style="
+        position: fixed;
+        bottom: 90px;
+        right: 16px;
+        z-index: 99999;
+        padding: 10px 14px;
+        border-radius: 14px;
+        border: none;
+        background: #111827;
+        color: white;
+        font-weight: bold;
+      ">
+      📋 Riwayat
+    </button>
+
 
   </div>
 </div>
@@ -1090,7 +1105,7 @@ searchBtn.onclick = () => {
   showLabel(found.marker);
   openDetail(found.row);
 
-  document.getElementById("uiBar").classList.add("minimized");
+  document.getElementById("uiBar").
   document.getElementById("toggleBtn").innerText = "➕";
 };
 
