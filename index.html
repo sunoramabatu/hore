@@ -116,6 +116,7 @@
       z-index: 9999;
       box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
+    
 
     .ui-bar.minimized {
       height: auto;
@@ -406,6 +407,9 @@
       background: #0f766e;
     }
 
+    #historyToggleBtn {
+      background: #374151;
+    }
     
     .close-history {
       position: absolute;
@@ -425,6 +429,8 @@
     .close-history:hover {
       background: rgba(0,0,0,0.85);
     }
+
+    
 
 
   </style>
@@ -501,28 +507,16 @@
       </div>
 
   <hr>
-   
-    <button id="downloadBtn" class="ui-btn small-btn">
-      Finish & Download
-    </button>
-
-    <button id="historyToggleBtn"
-      style="
-        position: fixed;
-        bottom: 90px;
-        right: 16px;
-        z-index: 99999;
-        padding: 10px 14px;
-        border-radius: 14px;
-        border: none;
-        background: #111827;
-        color: white;
-        font-weight: bold;
-      ">
+      <button id="historyToggleBtn"
+      class="ui-btn small-btn"
+      style="background:#111827;margin-top:8px;">
       📋 Riwayat
     </button>
 
-
+    <button id="downloadBtn" class="ui-btn small-btn">
+      Finish & Download
+    </button>
+    
   </div>
 </div>
 
@@ -592,6 +586,8 @@ let daftarHariBaca = [];
 let indexHariBaca = 0;
 let showDIJ = true;
 let showTH = true;
+let isFullMap = false;
+let hasSelectedCustomer = false;
 
 
 function renderMarker(m, map) {
@@ -1122,6 +1118,7 @@ zoomBtn.onclick = () => {
    DETAIL PANEL
 ====================== */
 function openDetail(r){
+  hasSelectedCustomer = true;
   const panel = document.getElementById("detailPanel");
   const left = document.getElementById("detailLeft");
   const right = document.getElementById("detailRight");
@@ -1174,7 +1171,38 @@ function openDetail(r){
 
 function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
+  hasSelectedCustomer = false;
 }
+
+function toggleFullMap() {
+  const uiBar = document.getElementById("uiBar");
+  const detailPanel = document.getElementById("detailPanel");
+  const btn = document.getElementById("fullMapBtn");
+
+  isFullMap = !isFullMap;
+
+  if (isFullMap) {
+    // 🔥 MASUK MODE FULL MAP
+    if (uiBar) uiBar.style.display = "none";
+    if (detailPanel) detailPanel.classList.remove("open");
+
+    btn.innerText = "📋 SHOW MENU";
+    showToast("🗺️ Mode peta penuh");
+
+  } else {
+    // 🔥 KELUAR DARI FULL MAP
+    if (uiBar) uiBar.style.display = "block";
+
+    // hanya tampilkan bottom bar jika ada pelanggan aktif
+    if (hasSelectedCustomer && detailPanel) {
+      detailPanel.classList.add("open");
+    }
+
+    btn.innerText = "🗺️ FULL MAP";
+    showToast("📍 Mode normal");
+  }
+}
+
 
 
 
@@ -1288,6 +1316,22 @@ function goTo(lat,lng){
 
   document.getElementById("cancelRouteBtn").style.display="block";
 }
+  <button id="fullMapBtn"
+    style="
+      position: fixed;
+      bottom: 160px;
+      right: 16px;
+      z-index: 10000;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: none;
+      background: #0f172a;
+      color: white;
+      font-weight: bold;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    ">
+    🗺️ FULL MAP
+  </button>
 
 function cancelRoute(){
   if(routingControl) map.removeControl(routingControl);
@@ -1541,6 +1585,8 @@ window.addEventListener("DOMContentLoaded", () => {
     uiBar.classList.toggle("minimized");
     toggleBtn.innerText = uiBar.classList.contains("minimized") ? "➕" : "➖";
   };
+
+  document.getElementById("fullMapBtn").onclick = toggleFullMap;
 });
 
 </script>
