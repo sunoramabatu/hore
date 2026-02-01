@@ -1162,7 +1162,61 @@ function toggleCompare(checkbox) {
   }
 }
 
+/* ======================
+   minimize menu saat bandingkan
+====================== */
 
+function toggleCompare(checkbox) {
+  const idpel = window.currentCompareIDPEL;
+  if (!idpel) return;
+
+  if (checkbox.checked) {
+
+    // ✅ AUTO MINIMIZE MENU
+    const uiBar = document.getElementById("uiBar");
+    const toggleBtn = document.getElementById("toggleBtn");
+
+    if (uiBar && !uiBar.classList.contains("minimized")) {
+      uiBar.classList.add("minimized");
+      if (toggleBtn) toggleBtn.innerText = "➕";
+    }
+
+    const active = [];
+
+    // 🔥 hide semua marker
+    markers.forEach(m => {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
+      }
+    });
+
+    // 🔥 tampilkan hanya marker pelanggan ini
+    markers.forEach(m => {
+      if (String(m.row.IDPEL) === String(idpel)) {
+        addMarkerToMap(m.marker);
+        active.push(m.marker);
+      }
+    });
+
+    if (active.length > 0) {
+      const group = L.featureGroup(active);
+      map.fitBounds(group.getBounds(), { padding: [60, 60] });
+    }
+
+    showToast("🔍 Mode bandingkan aktif");
+
+  } else {
+    applyHariBacaFilter();
+    showToast("📍 Semua marker ditampilkan kembali");
+  }
+}
+
+function minimizeMenu() {
+  const panel = document.getElementById("uiContent");
+  if (!panel) return;
+
+  panel.classList.add("minimized");
+}
     
 /* ======================
    ROUTING
