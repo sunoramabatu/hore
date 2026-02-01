@@ -24,17 +24,19 @@
       border: none;
     }
 
+        /* === UI BAR COMPACT === */
     .ui-bar {
-      position: sticky;
-      top: 0;
-      background: #fff;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,.2);
-      z-index: 999;
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 240px;          /* 🔥 lebih ramping */
+      background: #ffffffee;
+      backdrop-filter: blur(6px);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15);
     }
+
 
     .ui-input {
       padding: 14px;
@@ -42,6 +44,17 @@
       border-radius: 12px;
       border: 1px solid #ccc;
     }
+
+    .small-input {
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+
+    .small-btn {
+      padding: 6px 10px;
+      font-size: 13px;
+    }
+
 
     .ui-btn {
       padding: 14px;
@@ -438,10 +451,14 @@
   <!-- KONTEN (yang boleh di-hide) -->
   <div id="uiContent">
 
-    <input type="file" id="upload" accept=".xlsx,.xls" />
-    <div id="fileNameLabel" style="font-size:13px;color:#444;"></div>
-    <div id="statusText" class="status"></div>
+    <input type="file" id="upload" accept=".xlsx,.xls" style="display:none;" />
+    <button class="ui-btn small-btn" onclick="document.getElementById('upload').click()">
+      📂 Upload Excel
+    </button>
 
+    <div id="fileNameLabel" style="font-size:12px;color:#555;"></div>
+
+  
     <button id="zoomBtn" class="ui-btn ui-secondary small-btn" style="display:none;">
       🔍 Zoom Area Tagging
     </button>
@@ -466,32 +483,33 @@
       Ikuti kompas
     </label>
 
-    <!-- FILTER HARI BACA -->
-    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-      <input type="checkbox" id="oneDayCheck">
-      1 Hari Baca
-    </label>
+    <!-- FILTER DIJ & TH (SEJAJAR DI ATAS) -->
+      <div class="row filter-row">
+        <label class="chk">
+          <input type="checkbox" id="chkDIJ" checked onchange="applyHariBacaFilter()">
+          Lokasi DIJ
+        </label>
 
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-      <button onclick="prevHari()">◀</button>
-      <b id="hariBacaLabel">HARI: -</b>
-      <button onclick="nextHari()">▶</button>
-    </div>
+        <label class="chk">
+          <input type="checkbox" id="chkTH" checked onchange="applyHariBacaFilter()">
+          Tahun Lalu
+        </label>
+      </div>
 
-    <hr>
+      <!-- FILTER 1 HARI BACA -->
+      <label class="chk">
+        <input type="checkbox" id="oneDayCheck">
+        1 Hari Baca
+      </label>
 
-    <!-- FILTER JENIS MARKER -->
-    <label style="display:flex;align-items:center;gap:6px;">
-      <input type="checkbox" id="chkDIJ" checked>
-      Lokasi DIJ
-    </label>
+      <div class="hari-row">
+        <button onclick="prevHari()">◀</button>
+        <b id="hariBacaLabel">HARI: ALL</b>
+        <button onclick="nextHari()">▶</button>
+      </div>
 
-    <label style="display:flex;align-items:center;gap:6px;">
-      <input type="checkbox" id="chkTH" checked>
-      Tahun Lalu
-    </label>
-
-
+  <hr>
+   
     <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
     </button>
