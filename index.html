@@ -1306,8 +1306,10 @@ function cancelRoute(){
 ====================== */
 function markDone(idpel){
 
+  idpel = String(idpel);
+
   // 1️⃣ ambil data pelanggan
-  const found = workingRows.find(r => String(r.IDPEL) === String(idpel));
+  const found = workingRows.find(r => String(r.IDPEL) === idpel);
   if (!found) return;
 
   // 2️⃣ simpan ke history
@@ -1318,14 +1320,16 @@ function markDone(idpel){
   localStorage.setItem("oyon_history", JSON.stringify(history));
 
   // 3️⃣ hapus dari workingRows
-  workingRows = workingRows.filter(r => String(r.IDPEL) !== String(idpel));
+  workingRows = workingRows.filter(r => String(r.IDPEL) !== idpel);
   saveState();
 
-  // 4️⃣ HAPUS MARKER YANG IDPEL-NYA SAMA (DIJ + TH)
-  markers = markers.filter(m => {
-    if (String(m._idpel) === String(idpel)) {
-      if (map.hasLayer(m)) map.removeLayer(m);
-      return false;
+  // 4️⃣ HAPUS MARKER DIJ + TH DENGAN IDPEL YANG SAMA
+  markers = markers.filter(obj => {
+    if (String(obj.row.IDPEL) === idpel) {
+      if (map.hasLayer(obj.marker)) {
+        map.removeLayer(obj.marker);
+      }
+      return false; // buang dari array
     }
     return true;
   });
@@ -1336,7 +1340,6 @@ function markDone(idpel){
 
   showToast("✅ Pelanggan ditandai selesai");
 }
-
 
 /* ======================
    DONE + HISTORY
