@@ -834,7 +834,7 @@ function zoomToAllMarkers() {
    FUNGSI FILTER MARKER HARI BACA
 ====================== */
 function applyHariBacaFilter() {
-
+  const hariChecked = document.getElementById("filterHari1")?.checked;
   const showDIJ = document.getElementById("chkDIJ")?.checked ?? true;
   const showTH  = document.getElementById("chkTH")?.checked ?? true;
 
