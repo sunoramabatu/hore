@@ -795,31 +795,30 @@ hariBacaList = [...new Set(
 ====================== */
 window.addEventListener("load", () => {
 
-  // Restore filename
+  const fileLabel = document.getElementById("fileNameLabel");
+
+  // Restore filename (TANPA no file chosen)
   const savedFilename = localStorage.getItem("RBM_FILENAME");
-  if (savedFilename) {
-    document.getElementById("fileNameLabel").innerText = "📄 " + savedFilename;
+  if (savedFilename && fileLabel) {
+    fileLabel.innerText = "📄 " + savedFilename;
   }
 
   const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return;
 
-  if (saved) {
-    workingRows = JSON.parse(saved);
+  workingRows = JSON.parse(saved);
 
-    map.whenReady(() => {
-      buildMarkers();
-      renderHistory();
+  map.whenReady(() => {
+    buildMarkers();
+    renderHistory();
 
-      // Tampilkan tombol zoom
-      if (workingRows.length > 0) {
-        zoomBtn.style.display = "block";
-      }
-
-      // Auto zoom ke marker
+    if (workingRows.length > 0 && zoomBtn) {
+      zoomBtn.style.display = "block";
       zoomToAllMarkers();
-    });
-  }
+    }
+  });
 });
+
 
 function zoomToAllMarkers() {
   if (!markers.length) return;
@@ -938,21 +937,22 @@ function updateHariBacaLabel() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  const cb = document.getElementById("oneDayCheck");
-  if (!cb) return;
+  const upload = document.getElementById("fileInput");
+  const fileLabel = document.getElementById("fileNameLabel");
 
-  cb.onchange = e => {
-    filterHariBacaAktif = e.target.checked;
+  if (!upload) return;
 
-    if (filterHariBacaAktif && daftarHariBaca.length === 0) {
-      showToast("⚠️ Data hari baca kosong");
-      cb.checked = false;
-      filterHariBacaAktif = false;
-      return;
-    }
+  upload.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    applyHariBacaFilter();
+    // Simpan nama file
+    localStorage.setItem("RBM_FILENAME", file.name);
+
+    fileLabel.innerText = "📄 " + file.name;
+
   };
+  applyHariBacaFilter();
 });
 
 
