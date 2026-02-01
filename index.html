@@ -23,21 +23,7 @@
       font-size: 16px;
       border: none;
     }
-
-        /* === UI BAR COMPACT === */
-    .ui-bar {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      width: 240px;          /* 🔥 lebih ramping */
-      background: #ffffffee;
-      backdrop-filter: blur(6px);
-      border-radius: 14px;
-      padding: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.15);
-    }
-
-
+  
     .ui-input {
       padding: 14px;
       font-size: 17px;
@@ -81,15 +67,21 @@
       width: 100%;
     }
 
+       /* === UI BAR COMPACT === */
     .ui-bar {
       position: absolute;
-      top: 10px;
-      left: 10px;
-      width: 320px;
-      border-radius: 16px;
+      top: 8px;
+      left: 8px;
+      width: 240px;          /* 🔥 lebih ramping */
+      background: #ffffffee;
+      backdrop-filter: blur(6px);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,.15);
+      z-index: 9999;
     }
 
-        .status {
+      .status {
       font-weight: bold;
     }
 
@@ -1105,7 +1097,6 @@ searchBtn.onclick = () => {
   showLabel(found.marker);
   openDetail(found.row);
 
-  document.getElementById("uiBar").
   document.getElementById("toggleBtn").innerText = "➕";
 };
 
