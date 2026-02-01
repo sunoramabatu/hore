@@ -682,7 +682,6 @@ if (savedDate !== today) {
 /* ======================
    DOM
 ====================== */
-const upload = document.getElementById("upload");
 const statusText = document.getElementById("statusText");
 const searchBtn = document.getElementById("searchBtn");
 const searchInput = document.getElementById("searchInput");
@@ -744,33 +743,39 @@ function disableCompass() {
 /* ======================
    LOAD EXCEL
 ====================== */
-upload.onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
+window.addEventListener("DOMContentLoaded", () => {
+  const upload = document.getElementById("fileInput");
+  const fileLabel = document.getElementById("fileNameLabel");
 
-  // SIMPAN nama file
-  localStorage.setItem("RBM_FILENAME", file.name);
+  if (!upload) return;
 
-  const reader = new FileReader();
-  reader.onload = evt => {
-    const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    originalRows = XLSX.utils.sheet_to_json(sheet);
-    
-    workingRows = structuredClone(originalRows);
-    saveState();
+  upload.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
 
-    buildMarkers();
-    renderHistory();
+    localStorage.setItem("RBM_FILENAME", file.name);
+    fileLabel.innerText = "📄 " + file.name;
 
-    statusText.innerText = "✅ Peta berhasil dibuat";
-    zoomBtn.style.display = "block";
+    const reader = new FileReader();
+    reader.onload = evt => {
+      const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
 
-    // auto zoom setelah upload
-    zoomToAllMarkers();
+      originalRows = XLSX.utils.sheet_to_json(sheet);
+      workingRows = structuredClone(originalRows);
+      saveState();
+
+      buildMarkers();
+      renderHistory();
+      updateDataStatus();
+
+      zoomBtn.style.display = "block";
+      zoomToAllMarkers();
+    };
+
+    reader.readAsArrayBuffer(file);
   };
-  reader.readAsArrayBuffer(file);
-};
+});
 
 function updateDataStatus(){
   const el = document.getElementById("dataStatus");
