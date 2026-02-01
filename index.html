@@ -120,18 +120,34 @@
       display: none;
     }
 
-    #historyToggleBtn {
+    /* === FLOATING CONTROL GROUP (DI BAWAH MENU) === */
+    #floatingControls {
       position: fixed;
-      bottom: 90px;
-      right: 20px;
-      z-index: 9999;
-      padding: 10px 14px;
-      border-radius: 12px;
+      top: 140px;            /* ⬅️ tepat di bawah ui-bar */
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 10000;
+    }
+
+    /* === TOMBOL FLOATING UMUM === */
+    .float-btn {
+      padding: 12px 14px;
+      border-radius: 14px;
       border: none;
-      background: #111827;
+      background: #0f172a;
       color: white;
       font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
     }
+
+    .float-btn:hover {
+      opacity: 0.9;
+    }
+
 
       #historyPanel {
       position: fixed;
@@ -503,12 +519,7 @@
       </div>
 
   <hr>
-      <button id="historyToggleBtn"
-      class="ui-btn small-btn"
-      style="background:#111827;margin-top:8px;">
-      📋 Riwayat
-    </button>
-
+      
     <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
     </button>
@@ -522,22 +533,16 @@
   <div id="historyList"></div>
 </div>
 
-<button id="fullMapBtn"
-    style="
-      position: fixed;
-      bottom: 160px;
-      right: 16px;
-      z-index: 10000;
-      padding: 12px 14px;
-      border-radius: 14px;
-      border: none;
-      background: #0f172a;
-      color: white;
-      font-weight: bold;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-    ">
-    🗺️ FULL MAP
+<div id="floatingControls">
+  <button id="historyToggleBtn" class="float-btn">
+    📋 Riwayat
   </button>
+
+  <button id="fullMapBtn" class="float-btn">
+    🗺️ Full Map
+  </button>
+</div>
+
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
