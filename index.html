@@ -120,7 +120,7 @@
       display: none;
     }
 
-    #controlPanel.minimized {
+    #uiContent.minimized {
       transform: translateY(-85%);
       opacity: 0.9;
     }
@@ -1237,7 +1237,7 @@ document.getElementById("bandingkanCheck")?.addEventListener("change", (e) => {
 });
 
 function minimizeMenu() {
-  const panel = document.getElementById("controlPanel");
+  const panel = document.getElementById("uiContent");
   if (!panel) return;
 
   panel.classList.add("minimized");
