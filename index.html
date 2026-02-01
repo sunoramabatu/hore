@@ -120,6 +120,11 @@
       display: none;
     }
 
+    #controlPanel.minimized {
+      transform: translateY(-85%);
+      opacity: 0.9;
+    }
+
     #historyToggleBtn {
       position: fixed;
       bottom: 90px;
@@ -598,6 +603,35 @@ function addMarkerToMap(marker) {
   }
 }
 
+function addMarker(row) {
+  const marker = L.marker([row.LAT, row.LNG]).addTo(map);
+
+  marker._idpel = row.IDPEL; // 🔑 kunci identitas
+
+  marker.on("click", () => {
+    selesaiPelanggan(row, marker);
+  });
+
+  markers.push(marker);
+}
+
+function selesaiPelanggan(row, marker) {
+  // 1️⃣ simpan ke history
+  history.push({
+    row,
+    time: new Date().toLocaleTimeString("id-ID")
+  });
+  localStorage.setItem("oyon_history", JSON.stringify(history));
+
+  // 2️⃣ hapus marker INI SAJA
+  if (marker) {
+    map.removeLayer(marker);
+    markers = markers.filter(m => m !== marker);
+  }
+
+  // 3️⃣ hapus dari workingRows (opsional, tapi rapi)
+  workingRows = workingRows.filter(r => r.IDPEL !== row.IDPEL);
+}
 
 const STORAGE_KEY = "RBM_WORKING_STATE";
 
@@ -1190,6 +1224,23 @@ function toggleCompare(checkbox) {
     applyHariBacaFilter();
     showToast("📍 Semua marker ditampilkan kembali");
   }
+}
+
+/* ======================
+   minimize menu saat bandingkan
+====================== */
+
+document.getElementById("bandingkanCheck")?.addEventListener("change", (e) => {
+  if (e.target.checked) {
+    minimizeMenu();
+  }
+});
+
+function minimizeMenu() {
+  const panel = document.getElementById("controlPanel");
+  if (!panel) return;
+
+  panel.classList.add("minimized");
 }
 
 
