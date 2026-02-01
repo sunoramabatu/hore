@@ -941,25 +941,6 @@ function updateHariBacaLabel() {
     : "HARI: ALL";
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  const upload = document.getElementById("fileInput");
-  const fileLabel = document.getElementById("fileNameLabel");
-
-  if (!upload) return;
-
-  upload.onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    // Simpan nama file
-    localStorage.setItem("RBM_FILENAME", file.name);
-
-    fileLabel.innerText = "📄 " + file.name;
-
-  };
-  applyHariBacaFilter();
-});
-
 
 /* ======================
    TAMPILKAN NAMA FILE SAAT REFRESH
@@ -1081,9 +1062,10 @@ indexHariBaca = 0;
 updateHariBacaLabel();
 
   }); // ← TUTUP workingRows.forEach
+  applyHariBacaFilter();
 }     // ← TUTUP function buildMarkers
-applyHariBacaFilter();
-markers.forEach(m => m.marker.addTo(map));
+
+
 /* ======================
 markers.forEach(m => {
   if (m.marker && m.marker.addTo) {
