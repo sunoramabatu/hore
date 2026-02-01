@@ -980,6 +980,7 @@ markers.forEach(m => {
       });
 
       const markerDIJ = L.marker([lat, lng], { icon: iconDIJ });
+      markerDIJ._idpel = String(row.IDPEL);
 
       markerDIJ.bindTooltip(row.NAMA, {
         permanent: false,
@@ -1030,6 +1031,7 @@ if (hasTHLocation) {
 
   // MARKER TAHUN LALU
   const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
+  markerDIJ._idpel = String(row.IDPEL);
 
   markerTH.bindTooltip(
     `<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`,
@@ -1303,25 +1305,38 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
+
+  // 1️⃣ ambil data pelanggan
   const found = workingRows.find(r => String(r.IDPEL) === String(idpel));
   if (!found) return;
 
+  // 2️⃣ simpan ke history
   history.push({
     row: found,
-    time: new Date().toLocaleTimeString()
+    time: new Date().toLocaleTimeString("id-ID")
   });
-
   localStorage.setItem("oyon_history", JSON.stringify(history));
 
+  // 3️⃣ hapus dari workingRows
   workingRows = workingRows.filter(r => String(r.IDPEL) !== String(idpel));
-
   saveState();
-  buildMarkers();
+
+  // 4️⃣ HAPUS MARKER YANG IDPEL-NYA SAMA (DIJ + TH)
+  markers = markers.filter(m => {
+    if (String(m._idpel) === String(idpel)) {
+      if (map.hasLayer(m)) map.removeLayer(m);
+      return false;
+    }
+    return true;
+  });
+
+  // 5️⃣ update UI
   renderHistory();
   closeDetail();
 
-  showToast("✅ Ditandai selesai");
+  showToast("✅ Pelanggan ditandai selesai");
 }
+
 
 /* ======================
    DONE + HISTORY
