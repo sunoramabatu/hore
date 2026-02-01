@@ -120,34 +120,36 @@
       display: none;
     }
 
-    /* === FLOATING CONTROL GROUP (DI BAWAH MENU) === */
+   /* === FLOATING CONTROL GROUP (POJOK KANAN ATAS) === */
     #floatingControls {
       position: fixed;
-      top: 140px;            /* ⬅️ tepat di bawah ui-bar */
-      right: 16px;
+      top: env(safe-area-inset-top, 12px);
+      right: 12px;
       display: flex;
       flex-direction: column;
       gap: 10px;
       z-index: 10000;
     }
 
-    /* === TOMBOL FLOATING UMUM === */
+    /* Geser ke bawah supaya tidak nutup tombol cari */
+    @media (max-width: 768px) {
+      #floatingControls {
+        top: 72px;   /* ⬅️ aman dari search / menu mobile */
+      }
+    }
+
+    /* === TOMBOL FLOATING === */
     .float-btn {
-      padding: 12px 14px;
-      border-radius: 14px;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
       border: none;
       background: #0f172a;
       color: white;
-      font-weight: bold;
-      font-size: 14px;
+      font-size: 18px;
       cursor: pointer;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+      box-shadow: 0 6px 18px rgba(0,0,0,.35);
     }
-
-    .float-btn:hover {
-      opacity: 0.9;
-    }
-
 
       #historyPanel {
       position: fixed;
