@@ -487,9 +487,12 @@
   <!-- KONTEN (yang boleh di-hide) -->
   <div id="uiContent">
 
-    <input type="file" id="upload" accept=".xlsx,.xls" />
+    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    <button onclick="document.getElementById('fileInput').click()">
+      📂 Pilih File Excel
+    </button>
     <div id="fileNameLabel" style="font-size:12px;color:#555;"></div>
-    <div id="statusText" class="status"></div>
+    <div id="dataStatus" class="status"></div>
 
     <button id="zoomBtn" class="ui-btn ui-secondary small-btn" style="display:none;">
       🔍 Zoom Area
@@ -768,6 +771,16 @@ upload.onchange = e => {
   };
   reader.readAsArrayBuffer(file);
 };
+
+function updateDataStatus(){
+  const el = document.getElementById("dataStatus");
+  if (workingRows.length > 0) {
+    el.innerHTML = `📊 Data aktif: <b>${workingRows.length}</b> pelanggan`;
+  } else {
+    el.innerHTML = `⚠️ Belum ada data`;
+  }
+}
+
 /* ======================
    KUMPULKAN HARI BACA
 ====================== */
