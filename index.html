@@ -284,6 +284,27 @@
       display: none !important;
     }
 
+    /* === CARD TAHUN LALU (HITAM) === */
+    .card-th {
+      background: #111827;          /* hitam elegan */
+      color: #f9fafb;               /* teks terang */
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .card-th h3 {
+      color: #fff;
+    }
+
+    .card-th .btn-go {
+      background: #374151;          /* abu gelap */
+    }
+
+    .card-th .btn-done {
+      background: #dc2626;          /* merah tetap kontras */
+    }
+
+
     #sidebar {
     position: absolute;
     bottom: 0;
@@ -1149,21 +1170,26 @@ function openDetail(r){
   window.currentCompareIDPEL = r.IDPEL;
   
   const cardHTML = (label, lat, lon, isTH = false) => `
-  <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
-  <h3 style="margin:4px 0">${r.NAMA}</h3>
-  <div>📟 IDPEL: ${r.IDPEL}</div>
-  <div>⚡ DAYA: ${r.DAYA}</div>
-  <div>🔧 MERK: ${r["MERK METER"]}</div>
-  <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
-  <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
+  <div class="${isTH ? "card-th" : ""}">
+    <div style="font-size:13px;color:${isTH ? "#9ca3af" : "#666"};margin-bottom:4px">
+      ${label}
+    </div>
 
-  <div style="margin-top:10px;display:flex;gap:6px;">
-    ${
-      (!isTH || (lat && lon))
-      ? `<button class="btn-go" onclick="goTo(${lat},${lon})">🧭 Tampil Rute</button>`
-      : ``
-    }
-    <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
+    <h3 style="margin:4px 0">${r.NAMA}</h3>
+    <div>📟 IDPEL: ${r.IDPEL}</div>
+    <div>⚡ DAYA: ${r.DAYA}</div>
+    <div>🔧 MERK: ${r["MERK METER"]}</div>
+    <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
+    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
+
+    <div style="margin-top:10px;display:flex;gap:6px;">
+      ${
+        (!isTH || (lat && lon))
+          ? `<button class="btn-go" onclick="goTo(${lat},${lon})">🧭 Tampil Rute</button>`
+          : ``
+      }
+      <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
+    </div>
   </div>
 `;
 
