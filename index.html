@@ -127,7 +127,7 @@
       right: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 6px;
       z-index: 10000;
     }
 
@@ -139,16 +139,27 @@
     }
 
     /* === TOMBOL FLOATING === */
+    /* === TOMBOL FLOATING KOTAK LURUS === */
     .float-btn {
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
+      min-width: 110px;
+      height: 38px;
+
+      padding: 0 10px;
+      border-radius: 0;          /* ⬅️ TANPA SUDUT */
       border: none;
+
       background: #0f172a;
-      color: white;
-      font-size: 18px;
+      color: #fff;
+
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;       /* ⬅️ teks tidak turun */
+      overflow: hidden;          /* ⬅️ cegah keluar tombol */
+      text-overflow: ellipsis;
+
       cursor: pointer;
-      box-shadow: 0 6px 18px rgba(0,0,0,.35);
+      box-shadow: 0 4px 14px rgba(0,0,0,.3);
     }
 
       #historyPanel {
