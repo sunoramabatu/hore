@@ -120,11 +120,6 @@
       display: none;
     }
 
-    #uiContent.minimized {
-      transform: translateY(-85%);
-      opacity: 0.9;
-    }
-
     #historyToggleBtn {
       position: fixed;
       bottom: 90px;
@@ -284,27 +279,6 @@
       display: none !important;
     }
 
-    /* === CARD TAHUN LALU (HITAM) === */
-    .card-th {
-      background: #111827;          /* hitam elegan */
-      color: #f9fafb;               /* teks terang */
-      border-radius: 12px;
-      padding: 12px;
-    }
-
-    .card-th h3 {
-      color: #fff;
-    }
-
-    .card-th .btn-go {
-      background: #374151;          /* abu gelap */
-    }
-
-    .card-th .btn-done {
-      background: #dc2626;          /* merah tetap kontras */
-    }
-
-
     #sidebar {
     position: absolute;
     bottom: 0;
@@ -426,50 +400,6 @@
       background: rgba(0,0,0,0.85);
     }
 
-    /* === UI SIMPLIFIED === */
-
-    #uiBar {
-      width: 260px;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-
-    .row {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 6px;
-    }
-
-    .filter-row {
-      justify-content: space-between;
-    }
-
-    .chk {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 13px;
-    }
-
-    .hari-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 13px;
-      margin: 6px 0;
-    }
-
-    .ui-input.small-input {
-      flex: 1;
-    }
-
-    .ui-btn.dark {
-      background: #111827;
-    }
-
-    .status {
-      font-size: 12px;
-    }
 
   </style>
 </head>
@@ -487,57 +417,65 @@
   <!-- KONTEN (yang boleh di-hide) -->
   <div id="uiContent">
 
-    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
-    <button onclick="document.getElementById('fileInput').click()">
-      📂 Pilih File Excel
-    </button>
-    <div id="fileNameLabel" style="font-size:12px;color:#555;"></div>
-    <div id="dataStatus" class="status"></div>
+    <input type="file" id="upload" accept=".xlsx,.xls" />
+    <div id="fileNameLabel" style="font-size:13px;color:#444;"></div>
+    <div id="statusText" class="status"></div>
 
     <button id="zoomBtn" class="ui-btn ui-secondary small-btn" style="display:none;">
-      🔍 Zoom Area
+      🔍 Zoom Area Tagging
     </button>
 
-    <!-- SEARCH -->
-    <div class="row">
+        <div style="display:flex; gap:6px;">
       <input id="searchInput" class="ui-input small-input" placeholder="4 digit IDPEL / Meter" />
       <button id="searchBtn" class="ui-btn small-btn">Cari</button>
     </div>
 
-    <!-- FILTER DIJ & TH (SEJAJAR) -->
-    <div class="row filter-row">
-      <label class="chk">
-        <input type="checkbox" id="chkDIJ" checked>
-        DIJ
-      </label>
-
-      <label class="chk">
-        <input type="checkbox" id="chkTH" checked>
-        Tahun Lalu
-      </label>
-    </div>
-
-    <!-- FILTER LAIN -->
-    
-    <label class="chk">
-      <input type="checkbox" id="oneDayCheck">
-      1 Hari Baca
+    <!-- <label>
+      <input type="checkbox" id="filterDIJ" checked onchange="applyMarkerFilter()">
+      Marker DIJ
     </label>
 
-    <div class="hari-row">
-      <button onclick="prevHari()">◀</button>
-      <b id="hariBacaLabel">HARI: ALL</b>
-      <button onclick="nextHari()">▶</button>
-    </div>
+    <label>
+      <input type="checkbox" id="filterTH" checked onchange="applyMarkerFilter()">
+      Marker Tahun Lalu
+    </label> -->
 
-    <label class="chk">
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
       <input type="checkbox" onchange="toggleRoute(this)">
       Ikuti kompas
     </label>
 
-    <button id="downloadBtn" class="ui-btn small-btn dark">
+    <!-- FILTER HARI BACA -->
+    <label style="display:flex;align-items:center;gap:6px;margin-top:8px;">
+      <input type="checkbox" id="oneDayCheck">
+      1 Hari Baca
+    </label>
+
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <button onclick="prevHari()">◀</button>
+      <b id="hariBacaLabel">HARI: -</b>
+      <button onclick="nextHari()">▶</button>
+    </div>
+
+    <hr>
+
+    <!-- FILTER JENIS MARKER -->
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="chkDIJ" checked>
+      Lokasi DIJ
+    </label>
+
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="chkTH" checked>
+      Tahun Lalu
+    </label>
+
+
+    <button id="downloadBtn" class="ui-btn small-btn">
       Finish & Download
     </button>
+
+    <button id="historyToggleBtn">📋 Riwayat</button>
 
   </div>
 </div>
@@ -547,6 +485,8 @@
   <div style="font-weight:bold;margin-bottom:6px;">📋 Riwayat Dibaca</div>
   <div id="historyList"></div>
 </div>
+
+
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
@@ -578,6 +518,7 @@
     <div id="detailRight" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
   </div>
 </div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
@@ -627,35 +568,6 @@ function addMarkerToMap(marker) {
   }
 }
 
-function addMarker(row) {
-  const marker = L.marker([row.LAT, row.LNG]).addTo(map);
-
-  marker._idpel = row.IDPEL; // 🔑 kunci identitas
-
-  marker.on("click", () => {
-    selesaiPelanggan(row, marker);
-  });
-
-  markers.push(marker);
-}
-
-function selesaiPelanggan(row, marker) {
-  // 1️⃣ simpan ke history
-  history.push({
-    row,
-    time: new Date().toLocaleTimeString("id-ID")
-  });
-  localStorage.setItem("oyon_history", JSON.stringify(history));
-
-  // 2️⃣ hapus marker INI SAJA
-  if (marker) {
-    map.removeLayer(marker);
-    markers = markers.filter(m => m !== marker);
-  }
-
-  // 3️⃣ hapus dari workingRows (opsional, tapi rapi)
-  workingRows = workingRows.filter(r => r.IDPEL !== row.IDPEL);
-}
 
 const STORAGE_KEY = "RBM_WORKING_STATE";
 
@@ -682,6 +594,7 @@ if (savedDate !== today) {
 /* ======================
    DOM
 ====================== */
+const upload = document.getElementById("upload");
 const statusText = document.getElementById("statusText");
 const searchBtn = document.getElementById("searchBtn");
 const searchInput = document.getElementById("searchInput");
@@ -743,49 +656,33 @@ function disableCompass() {
 /* ======================
    LOAD EXCEL
 ====================== */
-window.addEventListener("DOMContentLoaded", () => {
-  const upload = document.getElementById("fileInput");
-  const fileLabel = document.getElementById("fileNameLabel");
+upload.onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-  if (!upload) return;
+  // SIMPAN nama file
+  localStorage.setItem("RBM_FILENAME", file.name);
 
-  upload.onchange = e => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    originalRows = XLSX.utils.sheet_to_json(sheet);
+    
+    workingRows = structuredClone(originalRows);
+    saveState();
 
-    localStorage.setItem("RBM_FILENAME", file.name);
-    fileLabel.innerText = "📄 " + file.name;
+    buildMarkers();
+    renderHistory();
 
-    const reader = new FileReader();
-    reader.onload = evt => {
-      const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
+    statusText.innerText = "✅ Peta berhasil dibuat";
+    zoomBtn.style.display = "block";
 
-      originalRows = XLSX.utils.sheet_to_json(sheet);
-      workingRows = structuredClone(originalRows);
-      saveState();
-
-      buildMarkers();
-      renderHistory();
-      updateDataStatus();
-
-      zoomBtn.style.display = "block";
-      zoomToAllMarkers();
-    };
-
-    reader.readAsArrayBuffer(file);
+    // auto zoom setelah upload
+    zoomToAllMarkers();
   };
-});
-
-function updateDataStatus(){
-  const el = document.getElementById("dataStatus");
-  if (workingRows.length > 0) {
-    el.innerHTML = `📊 Data aktif: <b>${workingRows.length}</b> pelanggan`;
-  } else {
-    el.innerHTML = `⚠️ Belum ada data`;
-  }
-}
-
+  reader.readAsArrayBuffer(file);
+};
 /* ======================
    KUMPULKAN HARI BACA
 ====================== */
@@ -800,30 +697,31 @@ hariBacaList = [...new Set(
 ====================== */
 window.addEventListener("load", () => {
 
-  const fileLabel = document.getElementById("fileNameLabel");
-
-  // Restore filename (TANPA no file chosen)
+  // Restore filename
   const savedFilename = localStorage.getItem("RBM_FILENAME");
-  if (savedFilename && fileLabel) {
-    fileLabel.innerText = "📄 " + savedFilename;
+  if (savedFilename) {
+    document.getElementById("fileNameLabel").innerText = "📄 " + savedFilename;
   }
 
   const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return;
 
-  workingRows = JSON.parse(saved);
+  if (saved) {
+    workingRows = JSON.parse(saved);
 
-  map.whenReady(() => {
-    buildMarkers();
-    renderHistory();
+    map.whenReady(() => {
+      buildMarkers();
+      renderHistory();
 
-    if (workingRows.length > 0 && zoomBtn) {
-      zoomBtn.style.display = "block";
+      // Tampilkan tombol zoom
+      if (workingRows.length > 0) {
+        zoomBtn.style.display = "block";
+      }
+
+      // Auto zoom ke marker
       zoomToAllMarkers();
-    }
-  });
+    });
+  }
 });
-
 
 function zoomToAllMarkers() {
   if (!markers.length) return;
@@ -834,7 +732,7 @@ function zoomToAllMarkers() {
    FUNGSI FILTER MARKER HARI BACA
 ====================== */
 function applyHariBacaFilter() {
-  const hariChecked = document.getElementById("filterHari1")?.checked;
+
   const showDIJ = document.getElementById("chkDIJ")?.checked ?? true;
   const showTH  = document.getElementById("chkTH")?.checked ?? true;
 
@@ -941,6 +839,24 @@ function updateHariBacaLabel() {
     : "HARI: ALL";
 }
 
+window.addEventListener("DOMContentLoaded", () => {
+  const cb = document.getElementById("oneDayCheck");
+  if (!cb) return;
+
+  cb.onchange = e => {
+    filterHariBacaAktif = e.target.checked;
+
+    if (filterHariBacaAktif && daftarHariBaca.length === 0) {
+      showToast("⚠️ Data hari baca kosong");
+      cb.checked = false;
+      filterHariBacaAktif = false;
+      return;
+    }
+
+    applyHariBacaFilter();
+  };
+});
+
 
 /* ======================
    TAMPILKAN NAMA FILE SAAT REFRESH
@@ -979,7 +895,6 @@ markers.forEach(m => {
       });
 
       const markerDIJ = L.marker([lat, lng], { icon: iconDIJ });
-      markerDIJ._idpel = String(row.IDPEL);
 
       markerDIJ.bindTooltip(row.NAMA, {
         permanent: false,
@@ -1030,7 +945,6 @@ if (hasTHLocation) {
 
   // MARKER TAHUN LALU
   const markerTH = L.marker([latTH, lonTH], { icon: iconTH });
-  markerTH._idpel = String(row.IDPEL);
 
   markerTH.bindTooltip(
     `<b>${row.NAMA}</b><br>IDPEL: ${row.IDPEL}`,
@@ -1062,10 +976,9 @@ indexHariBaca = 0;
 updateHariBacaLabel();
 
   }); // ← TUTUP workingRows.forEach
-  applyHariBacaFilter();
 }     // ← TUTUP function buildMarkers
-
-
+applyHariBacaFilter();
+markers.forEach(m => m.marker.addTo(map));
 /* ======================
 markers.forEach(m => {
   if (m.marker && m.marker.addTo) {
@@ -1172,26 +1085,21 @@ function openDetail(r){
   window.currentCompareIDPEL = r.IDPEL;
   
   const cardHTML = (label, lat, lon, isTH = false) => `
-  <div class="${isTH ? "card-th" : ""}">
-    <div style="font-size:13px;color:${isTH ? "#9ca3af" : "#666"};margin-bottom:4px">
-      ${label}
-    </div>
+  <div style="font-size:13px;color:#666;margin-bottom:4px">${label}</div>
+  <h3 style="margin:4px 0">${r.NAMA}</h3>
+  <div>📟 IDPEL: ${r.IDPEL}</div>
+  <div>⚡ DAYA: ${r.DAYA}</div>
+  <div>🔧 MERK: ${r["MERK METER"]}</div>
+  <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
+  <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
 
-    <h3 style="margin:4px 0">${r.NAMA}</h3>
-    <div>📟 IDPEL: ${r.IDPEL}</div>
-    <div>⚡ DAYA: ${r.DAYA}</div>
-    <div>🔧 MERK: ${r["MERK METER"]}</div>
-    <div>🔢 NOMOR: ${r["NOMOR METER"]}</div>
-    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
-
-    <div style="margin-top:10px;display:flex;gap:6px;">
-      ${
-        (!isTH || (lat && lon))
-          ? `<button class="btn-go" onclick="goTo(${lat},${lon})">🧭 Tampil Rute</button>`
-          : ``
-      }
-      <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
-    </div>
+  <div style="margin-top:10px;display:flex;gap:6px;">
+    ${
+      (!isTH || (lat && lon))
+      ? `<button class="btn-go" onclick="goTo(${lat},${lon})">🧭 Tampil Rute</button>`
+      : ``
+    }
+    <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
   </div>
 `;
 
@@ -1218,25 +1126,11 @@ function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
 }
 
-/* ======================
-   minimize menu saat bandingkan
-====================== */
-
 function toggleCompare(checkbox) {
   const idpel = window.currentCompareIDPEL;
   if (!idpel) return;
 
   if (checkbox.checked) {
-
-    // ✅ AUTO MINIMIZE MENU
-    const uiBar = document.getElementById("uiBar");
-    const toggleBtn = document.getElementById("toggleBtn");
-
-    if (uiBar && !uiBar.classList.contains("minimized")) {
-      uiBar.classList.add("minimized");
-      if (toggleBtn) toggleBtn.innerText = "➕";
-    }
-
     const active = [];
 
     // 🔥 hide semua marker
@@ -1254,24 +1148,18 @@ function toggleCompare(checkbox) {
       }
     });
 
+    // zoom ke 2 marker
     if (active.length > 0) {
       const group = L.featureGroup(active);
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
     }
 
     showToast("🔍 Mode bandingkan aktif");
-
   } else {
+    // 🔥 KEMBALIKAN SESUAI CHECKBOX
     applyHariBacaFilter();
     showToast("📍 Semua marker ditampilkan kembali");
   }
-}
-
-function minimizeMenu() {
-  const panel = document.getElementById("uiContent");
-  if (!panel) return;
-
-  panel.classList.add("minimized");
 }
 
 
@@ -1371,18 +1259,6 @@ function renderHistory() {
   `).join("");
 }
 
-function openHistory() {
-  const panel = document.getElementById("historyPanel");
-  if (!panel) return;
-  panel.style.display = "block";
-  renderHistory();
-}
-
-function closeHistory() {
-  const panel = document.getElementById("historyPanel");
-  if (!panel) return;
-  panel.style.display = "none";
-}
 
 function undoHistory(index){
   const item = history[index];
@@ -1531,32 +1407,23 @@ function getColor(v){
 }
 
 renderHistory();
-
 window.addEventListener("DOMContentLoaded", () => {
 
-  const btn = document.getElementById("historyToggleBtn");
+  function openHistory(){
   const panel = document.getElementById("historyPanel");
+  panel.style.display = "block";
+  renderHistory();
+}
 
-  if (!btn || !panel) return;
-
-  btn.onclick = () => {
-    const isOpen = panel.style.display === "block";
-
-    panel.style.display = isOpen ? "none" : "block";
-
-    if (!isOpen) {
-      renderHistory(); // 🔔 HANYA render saat dibuka
-    }
-  };
-
-});
-
-function closeHistory() {
+function closeHistory(){
   const panel = document.getElementById("historyPanel");
-  if (!panel) return;
   panel.style.display = "none";
 }
 
+document.getElementById("historyToggleBtn").onclick = openHistory;
+
+
+});
 /* ======================
    minimize btn
 ====================== */
@@ -1578,22 +1445,6 @@ window.addEventListener("DOMContentLoaded", () => {
 </button>
 
 <div id="toast" class="toast"></div>
-<button id="historyToggleBtn"
-  style="
-    position: fixed;
-    bottom: 90px;
-    right: 16px;
-    z-index: 9999;
-    padding: 10px 14px;
-    border-radius: 14px;
-    border: none;
-    background: #111827;
-    color: white;
-    font-weight: bold;
-  ">
-  📋 Riwayat
-</button>
-
 
 </body>
 </html>
