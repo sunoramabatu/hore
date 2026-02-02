@@ -1320,7 +1320,7 @@ function toggleCompare(checkbox) {
 
   if (checkbox.checked) {
 
-    // ✅ AUTO MINIMIZE MENU
+    // ✅ minimize UI
     const uiBar = document.getElementById("uiBar");
     const toggleBtn = document.getElementById("toggleBtn");
 
@@ -1329,16 +1329,16 @@ function toggleCompare(checkbox) {
       if (toggleBtn) toggleBtn.innerText = "➕";
     }
 
-    const active = [];
-
-    // 🔥 hide semua marker
+    // 🔥 bersihkan map TOTAL
     markers.forEach(m => {
       if (map.hasLayer(m.marker)) {
         map.removeLayer(m.marker);
       }
     });
 
-    // 🔥 tampilkan hanya marker pelanggan ini
+    // 🔥 tampilkan hanya marker IDPEL aktif
+    const active = [];
+
     markers.forEach(m => {
       if (String(m.row.IDPEL) === String(idpel)) {
         addMarkerToMap(m.marker);
@@ -1346,7 +1346,7 @@ function toggleCompare(checkbox) {
       }
     });
 
-    if (active.length > 0) {
+    if (active.length) {
       const group = L.featureGroup(active);
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
     }
@@ -1354,36 +1354,35 @@ function toggleCompare(checkbox) {
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
-      const idpel = window.currentCompareIDPEL;
 
-      // 1️⃣ Hapus marker pelanggan aktif
-      markers.forEach(m => {
-        if (String(m.row.IDPEL) === String(idpel)) {
-          if (map.hasLayer(m.marker)) {
-            map.removeLayer(m.marker);
-          }
-        }
-      });
+    // 🔥 KELUAR MODE BANDINGKAN (INI KUNCINYA)
 
-      // 2️⃣ Reset current compare
-      window.currentCompareIDPEL = null;
-
-      // 3️⃣ Tampilkan kembali semua marker sesuai filter (BELUM DIBACA)
-      applyHariBacaFilter();
-
-      // 4️⃣ (OPSIONAL) Kembalikan UI Bar
-      const uiBar = document.getElementById("uiBar");
-      const toggleBtn = document.getElementById("toggleBtn");
-
-      if (uiBar && uiBar.classList.contains("minimized")) {
-        uiBar.classList.remove("minimized");
-        if (toggleBtn) toggleBtn.innerText = "➖";
+    // 1️⃣ bersihkan map total
+    markers.forEach(m => {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
       }
+    });
 
-      showToast("📍 Semua marker belum dibaca ditampilkan kembali");
+    // 2️⃣ reset state
+    window.currentCompareIDPEL = null;
+
+    // 3️⃣ render ulang SEMUA marker sesuai filter
+    applyHariBacaFilter();
+
+    // 4️⃣ restore UI
+    const uiBar = document.getElementById("uiBar");
+    const toggleBtn = document.getElementById("toggleBtn");
+
+    if (uiBar && uiBar.classList.contains("minimized")) {
+      uiBar.classList.remove("minimized");
+      if (toggleBtn) toggleBtn.innerText = "➖";
     }
 
+    showToast("📍 Semua marker belum dibaca ditampilkan kembali");
+  }
 }
+
 
 function minimizeMenu() {
   const panel = document.getElementById("uiContent");
