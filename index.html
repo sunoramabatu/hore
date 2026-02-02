@@ -623,6 +623,8 @@
 </div>
 
 
+
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -1515,21 +1517,6 @@ function restoreMapView() {
    reset history 23.00
 ====================== */
 
-document.addEventListener("click", function (e) {
-  const panel = document.getElementById("historyPanel");
-
-  if (!panel || panel.style.display === "none") return;
-
-  // jika klik DI DALAM panel → abaikan
-  if (panel.contains(e.target)) return;
-
-  // jika klik tombol pembuka history → abaikan
-  if (e.target.id === "historyToggleBtn") return;
-
-  closeHistory();
-});
-
-
 
 /* ======================
    TOAST
@@ -1654,6 +1641,21 @@ window.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("fullMapBtn").onclick = toggleFullMap;
 });
+
+document.addEventListener("click", function (e) {
+  const panel = document.getElementById("historyPanel");
+
+  if (!panel || panel.style.display === "none") return;
+
+  // jika klik DI DALAM panel → abaikan
+  if (panel.contains(e.target)) return;
+
+  // jika klik tombol pembuka history → abaikan
+  if (e.target.id === "historyToggleBtn") return;
+
+  closeHistory();
+});
+
 
 </script>
 
