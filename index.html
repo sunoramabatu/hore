@@ -496,7 +496,7 @@
 </head>
 
 <body>
-
+<div id="map"></div>
 <div class="ui-bar" id="uiBar">
 
   <!-- HEADER (tidak pernah hilang) -->
@@ -1656,6 +1656,16 @@ document.addEventListener("click", function (e) {
   closeHistory();
 });
 
+function closeHistory() {
+  document.getElementById("historyPanel").style.display = "none";
+
+  // 🗺️ paksa map render ulang
+  setTimeout(() => {
+    if (map) {
+      map.invalidateSize();
+    }
+  }, 200);
+}
 
 </script>
 
