@@ -1324,6 +1324,9 @@ function toggleCompare(checkbox) {
 ====================== */
 
 function toggleCompare(checkbox) {
+  const idpel = String(window.currentCompareIDPEL || "");
+  if (!idpel) return;
+
   const uiBar = document.getElementById("uiBar");
   const toggleBtn = document.getElementById("toggleBtn");
 
@@ -1339,32 +1342,32 @@ function toggleCompare(checkbox) {
       if (toggleBtn) toggleBtn.innerText = "➕";
     }
 
-    // sembunyikan SEMUA marker
+    // sembunyikan semua marker
     markers.forEach(m => {
       if (map.hasLayer(m.marker)) {
         map.removeLayer(m.marker);
       }
     });
 
-    // tampilkan hanya marker yang dibandingkan
-    window.compareMarkers.forEach(m => {
-      addMarkerToMap(m.marker);
+    // ambil 2 marker milik IDPEL aktif
+    const activeMarkers = markers.filter(
+      m => String(m.row.IDPEL) === idpel
+    );
+
+    // tampilkan hanya marker tsb
+    activeMarkers.forEach(m => {
+      m.marker.addTo(map);
     });
 
-    // fit bounds ke 2 marker
-    if (window.compareMarkers.length) {
-      const group = L.featureGroup(
-        window.compareMarkers.map(m => m.marker)
-      );
+    // zoom ke 2 marker
+    if (activeMarkers.length) {
+      const group = L.featureGroup(activeMarkers.map(m => m.marker));
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
     }
 
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
-    // =========================
-    // MODE BANDINGKAN OFF
-    // =========================
     exitCompareMode();
   }
 }
@@ -1378,7 +1381,7 @@ function exitCompareMode() {
     }
   });
 
-  // tampilkan marker normal seperti semula
+  // tampilkan kembali marker SESUAI FILTER
   applyHariBacaFilter();
 
   // restore menu
@@ -1392,6 +1395,7 @@ function exitCompareMode() {
 
   showToast("📍 Mode bandingkan selesai");
 }
+
 
 function onFinishCompare() {
   const checkbox = document.getElementById("compareCheckbox");
@@ -1438,6 +1442,13 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
+  
+  if (window.isCompareMode) {
+  const cb = document.querySelector('#detailPanel input[type="checkbox"]');
+  if (cb) cb.checked = false;
+  exitCompareMode();
+}
+
 
   idpel = String(idpel);
 
