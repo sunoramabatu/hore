@@ -1535,25 +1535,17 @@ function renderHistory() {
 
 
 function undoHistory(index) {
-  const item = history[index];   // ⬅️ WAJIB ADA & DI ATAS
+  const item = history[index];
   if (!item) return;
 
-  // keluar dari mode bandingkan jika aktif
+  // keluar dari compare mode
   if (window.isCompareMode) {
     const cb = document.getElementById("compareCheckbox");
     if (cb) cb.checked = false;
     exitCompareMode();
   }
 
-  // 🔁 sinkronkan filter hari baca dengan data yang di-undo
-  const hariUndo = (item.row["HARI BACA ACMT"] || "").toUpperCase();
-  const idx = daftarHariBaca.indexOf(hariUndo);
-  if (idx !== -1) {
-    filterHariBacaAktif = true;
-    indexHariBaca = idx;
-  }
-
-  // kembalikan data ke peta
+  // kembalikan data
   workingRows.push(item.row);
   saveState();
 
@@ -1561,16 +1553,24 @@ function undoHistory(index) {
   history.splice(index, 1);
   localStorage.setItem("oyon_history", JSON.stringify(history));
 
-  // rebuild & tampilkan marker
+  // 🔥 REBUILD DULU (INI KUNCI)
   buildMarkers();
+
+  // 🔁 BARU SET FILTER HARI BACA
+  const hariUndo = (item.row["HARI BACA ACMT"] || "").toUpperCase();
+  const idx = daftarHariBaca.indexOf(hariUndo);
+
+  if (idx !== -1) {
+    filterHariBacaAktif = true;
+    indexHariBaca = idx;
+  }
+
+  // 🔥 APPLY SETELAH STATE SIAP
   applyHariBacaFilter();
 
   renderHistory();
   showToast(`↩️ Dikembalikan ke HARI BACA ${hariUndo}`);
 }
-
-
-
 
 /* ======================
    TAMPILAN KEMBALI KE AREA TAGGING
