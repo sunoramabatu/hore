@@ -652,6 +652,8 @@ let isFullMap = false;
 let hasSelectedCustomer = false;
 let historyVisible = false;
 let hiddenMarkers = [];
+window.isCompareMode = false;
+window.compareIDPEL = null;
 
 
 function renderMarker(m, map) {
@@ -1179,6 +1181,28 @@ zoomBtn.onclick = () => {
   map.fitBounds(group.getBounds(), { padding: [40,40] });
 };
 
+function renderMarkers() {
+  // bersihkan map dulu
+  markers.forEach(m => {
+    if (map.hasLayer(m.marker)) {
+      map.removeLayer(m.marker);
+    }
+  });
+
+  // MODE BANDINGKAN
+  if (window.isCompareMode && window.compareIDPEL) {
+    markers.forEach(m => {
+      if (String(m.row.IDPEL) === String(window.compareIDPEL)) {
+        addMarkerToMap(m.marker);
+      }
+    });
+    return;
+  }
+
+  // MODE NORMAL
+  applyHariBacaFilter();
+}
+
 /* ======================
    DETAIL PANEL
 ====================== */
@@ -1315,71 +1339,19 @@ function toggleCompare(checkbox) {
 ====================== */
 
 function toggleCompare(checkbox) {
-  const idpel = window.currentCompareIDPEL;
-  if (!idpel) return;
-
   if (checkbox.checked) {
+    window.isCompareMode = true;
+    window.compareIDPEL = window.currentCompareIDPEL;
 
-    // ✅ minimize UI
-    const uiBar = document.getElementById("uiBar");
-    const toggleBtn = document.getElementById("toggleBtn");
-
-    if (uiBar && !uiBar.classList.contains("minimized")) {
-      uiBar.classList.add("minimized");
-      if (toggleBtn) toggleBtn.innerText = "➕";
-    }
-
-    // 🔥 bersihkan map TOTAL
-    markers.forEach(m => {
-      if (map.hasLayer(m.marker)) {
-        map.removeLayer(m.marker);
-      }
-    });
-
-    // 🔥 tampilkan hanya marker IDPEL aktif
-    const active = [];
-
-    markers.forEach(m => {
-      if (String(m.row.IDPEL) === String(idpel)) {
-        addMarkerToMap(m.marker);
-        active.push(m.marker);
-      }
-    });
-
-    if (active.length) {
-      const group = L.featureGroup(active);
-      map.fitBounds(group.getBounds(), { padding: [60, 60] });
-    }
-
+    renderMarkers();
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
+    window.isCompareMode = false;
+    window.compareIDPEL = null;
 
-    // 🔥 KELUAR MODE BANDINGKAN (INI KUNCINYA)
-
-    // 1️⃣ bersihkan map total
-    markers.forEach(m => {
-      if (map.hasLayer(m.marker)) {
-        map.removeLayer(m.marker);
-      }
-    });
-
-    // 2️⃣ reset state
-    window.currentCompareIDPEL = null;
-
-    // 3️⃣ render ulang SEMUA marker sesuai filter
-    applyHariBacaFilter();
-
-    // 4️⃣ restore UI
-    const uiBar = document.getElementById("uiBar");
-    const toggleBtn = document.getElementById("toggleBtn");
-
-    if (uiBar && uiBar.classList.contains("minimized")) {
-      uiBar.classList.remove("minimized");
-      if (toggleBtn) toggleBtn.innerText = "➖";
-    }
-
-    showToast("📍 Semua marker belum dibaca ditampilkan kembali");
+    renderMarkers();
+    showToast("📍 Mode bandingkan selesai");
   }
 }
 
@@ -1390,7 +1362,24 @@ function minimizeMenu() {
 
   panel.classList.add("minimized");
 }
-    
+
+function onSelesaiClick() {
+  // 1️⃣ matikan mode bandingkan
+  window.isCompareMode = false;
+  window.compareIDPEL = null;
+
+  const checkbox = document.getElementById("compareCheckbox");
+  if (checkbox) checkbox.checked = false;
+
+  // 2️⃣ render ulang semua marker
+  renderMarkers();
+
+  // 3️⃣ logic selesai pelanggan (punyamu)
+  closeBottomBar();
+
+  showToast("✅ Selesai, semua marker ditampilkan kembali");
+}
+
 /* ======================
    ROUTING
 ====================== */
