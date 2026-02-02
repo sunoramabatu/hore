@@ -594,9 +594,8 @@
   </button>
 </div>
 
-<div id="historyPanel" style="display:none;" onclick="event.stopPropagation();">
+<div id="historyPanel"></div>
 
-<div id="map"></div>
 <div id="detailPanel" class="detail-panel">
   <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
 
@@ -682,10 +681,16 @@ const savedDate = localStorage.getItem("oyon_history_date");
 
 function closeHistory() {
   const panel = document.getElementById("historyPanel");
-  if (panel) {
-    panel.style.display = "none";
-  }
+  const backdrop = document.getElementById("historyBackdrop");
+
+  if (panel) panel.style.display = "none";
+  if (backdrop) backdrop.style.display = "none";
+
+  setTimeout(() => {
+    if (map) map.invalidateSize();
+  }, 150);
 }
+
 
 if (savedDate !== today) {
   history = [];
@@ -987,6 +992,7 @@ markers.forEach(m => {
     map.removeLayer(m.marker);
     }
   });
+  
 
   markers = [];
   searchIndex = [];
@@ -1088,11 +1094,15 @@ daftarHariBaca = [...new Set(
 
 indexHariBaca = 0;
 updateHariBacaLabel();
+ applyHariBacaFilter();
 
-  }); // ← TUTUP workingRows.forEach
+  markers.forEach(m => {
+    if (!map.hasLayer(m.marker)) {
+      m.marker.addTo(map);
+
+   // ← TUTUP workingRows.forEach
 }     // ← TUTUP function buildMarkers
-applyHariBacaFilter();
-markers.forEach(m => m.marker.addTo(map));
+
 /* ======================
 markers.forEach(m => {
   if (m.marker && m.marker.addTo) {
@@ -1623,15 +1633,6 @@ window.addEventListener("DOMContentLoaded", () => {
   renderHistory();
 }
 
-function closeHistory() {
-  document.getElementById("historyPanel").style.display = "none";
-  document.getElementById("historyBackdrop").style.display = "none";
-
-  setTimeout(() => {
-    if (map) map.invalidateSize();
-  }, 150);
-}
-
 
 document.getElementById("historyToggleBtn").onclick = openHistory;
 
@@ -1653,16 +1654,6 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 
-function closeHistory() {
-  document.getElementById("historyPanel").style.display = "none";
-
-  // 🗺️ paksa map render ulang
-  setTimeout(() => {
-    if (map) {
-      map.invalidateSize();
-    }
-  }, 200);
-}
 
 </script>
 
