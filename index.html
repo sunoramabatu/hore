@@ -247,7 +247,6 @@
         position: relative;
       }
 
-
       .custom-marker::after {
       content: "";
       width: 30%;
@@ -259,9 +258,21 @@
       left: 35%;
     }
 
-
     .custom-marker.black {
       background: #000;
+    }
+
+        /* === Marker Highlight / Active === */
+    .custom-marker.active {
+      transform: rotate(-45deg) scale(1.8);
+      z-index: 1000;
+      box-shadow: 0 4px 10px rgba(0,0,0,.45);
+    }
+
+    /* marker tahun lalu sedikit lebih kalem */
+    .custom-marker.th-active {
+      transform: rotate(-45deg) scale(1.5);
+      opacity: 0.85;
     }
 
     .popup-card {
@@ -1144,6 +1155,20 @@ function showLabel(marker) {
   }, 4000); // nama tampil 4 detik lalu hilang otomatis
 }
 
+function setMarkerActive(marker, isTH = false) {
+  const el = marker.getElement();
+  if (!el) return;
+
+  el.classList.add(isTH ? "th-active" : "active");
+}
+
+function clearAllMarkerActive() {
+  markers.forEach(m => {
+    const el = m.marker.getElement();
+    if (!el) return;
+    el.classList.remove("active", "th-active");
+  });
+}
 
 function toggleRoute(cb) {
   if (cb.checked) {
@@ -1216,6 +1241,14 @@ function openDetail(r){
   const panel = document.getElementById("detailPanel");
   const left = document.getElementById("detailLeft");
   const right = document.getElementById("detailRight");
+
+    clearAllMarkerActive();
+
+  markers.forEach(m => {
+    if (String(m.row.IDPEL) === String(r.IDPEL)) {
+      setMarkerActive(m.marker, m.type === "TH");
+    }
+  });
 
   // simpan IDPEL yang sedang dibuka (global state kecil)
   window.currentCompareIDPEL = r.IDPEL;
@@ -1385,6 +1418,12 @@ function toggleCompare(checkbox) {
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
     }
 
+        // 🔍 besarkan marker yang dibandingkan
+    clearAllMarkerActive();
+    activeMarkers.forEach(m => {
+      setMarkerActive(m.marker, m.type === "TH");
+    });
+
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
@@ -1413,6 +1452,7 @@ function exitCompareMode() {
     if (toggleBtn) toggleBtn.innerText = "➖";
   }
 
+  clearAllMarkerActive();
   showToast("📍 Mode bandingkan selesai");
 }
 
