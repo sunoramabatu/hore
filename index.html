@@ -182,7 +182,7 @@
       background: #fff;
       border-radius: 14px;
       box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-      z-index: 15000;
+      z-index: 9999;
     }
 
     @media (max-width: 768px) {
@@ -489,19 +489,14 @@
       background: rgba(0,0,0,0.85);
     }
 
-    #historyBackdrop {
-      position: fixed;
-      inset: 0;
-      background: transparent;     /* klik catcher */
-      z-index: 14000;
-      display: none;
-    }
+    
+
 
   </style>
 </head>
 
 <body>
-<div id="map"></div>
+
 <div class="ui-bar" id="uiBar">
 
   <!-- HEADER (tidak pernah hilang) -->
@@ -594,8 +589,8 @@
   </button>
 </div>
 
-<div id="historyPanel"></div>
 
+<div id="map"></div>
 <div id="detailPanel" class="detail-panel">
   <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
 
@@ -625,8 +620,6 @@
     <div id="detailRight" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
   </div>
 </div>
-
-
 
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -681,16 +674,10 @@ const savedDate = localStorage.getItem("oyon_history_date");
 
 function closeHistory() {
   const panel = document.getElementById("historyPanel");
-  const backdrop = document.getElementById("historyBackdrop");
-
-  if (panel) panel.style.display = "none";
-  if (backdrop) backdrop.style.display = "none";
-
-  setTimeout(() => {
-    if (map) map.invalidateSize();
-  }, 150);
+  if (panel) {
+    panel.style.display = "none";
+  }
 }
-
 
 if (savedDate !== today) {
   history = [];
@@ -992,7 +979,6 @@ markers.forEach(m => {
     map.removeLayer(m.marker);
     }
   });
-  
 
   markers = [];
   searchIndex = [];
@@ -1094,15 +1080,11 @@ daftarHariBaca = [...new Set(
 
 indexHariBaca = 0;
 updateHariBacaLabel();
- applyHariBacaFilter();
 
-  markers.forEach(m => {
-    if (!map.hasLayer(m.marker)) {
-      m.marker.addTo(map);
-
-   // ← TUTUP workingRows.forEach
+  }); // ← TUTUP workingRows.forEach
 }     // ← TUTUP function buildMarkers
-
+applyHariBacaFilter();
+markers.forEach(m => m.marker.addTo(map));
 /* ======================
 markers.forEach(m => {
   if (m.marker && m.marker.addTo) {
@@ -1533,6 +1515,8 @@ function restoreMapView() {
 ====================== */
 
 
+
+
 /* ======================
    TOAST
 ====================== */
@@ -1628,11 +1612,15 @@ renderHistory();
 window.addEventListener("DOMContentLoaded", () => {
 
   function openHistory(){
-  document.getElementById("historyPanel").style.display = "block";
-  document.getElementById("historyBackdrop").style.display = "block";
+  const panel = document.getElementById("historyPanel");
+  panel.style.display = "block";
   renderHistory();
 }
 
+function closeHistory(){
+  const panel = document.getElementById("historyPanel");
+  panel.style.display = "none";
+}
 
 document.getElementById("historyToggleBtn").onclick = openHistory;
 
@@ -1653,8 +1641,6 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("fullMapBtn").onclick = toggleFullMap;
 });
 
-
-
 </script>
 
 
@@ -1663,8 +1649,6 @@ window.addEventListener("DOMContentLoaded", () => {
 </button>
 
 <div id="toast" class="toast"></div>
-<div id="historyBackdrop" onclick="closeHistory()"></div>
-
 
 </body>
 </html>
