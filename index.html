@@ -680,6 +680,12 @@ const STORAGE_KEY = "RBM_WORKING_STATE";
 const today = new Date().toDateString();
 const savedDate = localStorage.getItem("oyon_history_date");
 
+function closeHistory() {
+  const panel = document.getElementById("historyPanel");
+  if (panel) {
+    panel.style.display = "none";
+  }
+}
 
 if (savedDate !== today) {
   history = [];
@@ -1646,6 +1652,17 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("fullMapBtn").onclick = toggleFullMap;
 });
 
+
+function closeHistory() {
+  document.getElementById("historyPanel").style.display = "none";
+
+  // 🗺️ paksa map render ulang
+  setTimeout(() => {
+    if (map) {
+      map.invalidateSize();
+    }
+  }, 200);
+}
 
 </script>
 
