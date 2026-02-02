@@ -238,42 +238,29 @@
 
         /* === Modern Marker Teardrop === */
       .custom-marker {
-        width: 100%;
-        height: 100%;
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        border: 1px solid #fff;
-        box-shadow: 0 1px 3px rgba(0,0,0,.35);
-        position: relative;
-      }
+      width: 22px;
+      height: 22px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 1.5px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,.35);
+      position: relative;
+    }
 
-      .custom-marker::after {
+    .custom-marker::after {
       content: "";
-      width: 30%;
-      height: 30%;
+      width: 6px;
+      height: 6px;
       background: white;
       border-radius: 50%;
       position: absolute;
-      top: 35%;
-      left: 35%;
+      top: 7px;
+      left: 7px;
     }
 
     .custom-marker.black {
       background: #000;
     }
-
-      /* === SCALE MARKER LEAFLET (BENAR) === */
-    .leaflet-marker-icon.marker-active {
-      transform: scale(1.8) !important;
-      z-index: 1000 !important;
-    }
-
-    .leaflet-marker-icon.marker-th-active {
-      transform: scale(1.5) !important;
-      opacity: 0.85;
-      z-index: 900 !important;
-    }
-
 
     .popup-card {
       font-size: 14px;
@@ -1030,8 +1017,8 @@ markers.forEach(m => {
 
       const iconDIJ = L.divIcon({
         html: `<div class="custom-marker" style="background:${color}"></div>`,
-        iconSize: [10,10],
-        iconAnchor: [5,10],
+        iconSize: [16,16],
+        iconAnchor: [8,16],
         className: ""
       });
 
@@ -1079,8 +1066,8 @@ if (hasTHLocation) {
   // ICON TAHUN LALU (WAJIB DULU)
   const iconTH = L.divIcon({
     html: `<div class="custom-marker" style="background:#000"></div>`,
-    iconSize: [8,8],
-    iconAnchor: [4,8],
+    iconSize: [12, 12],
+    iconAnchor: [6, 12],
     className: ""
   });
 
@@ -1155,20 +1142,6 @@ function showLabel(marker) {
   }, 4000); // nama tampil 4 detik lalu hilang otomatis
 }
 
-function setMarkerActive(marker, isTH = false) {
-  const el = marker.getElement();
-  if (!el) return;
-
-  el.classList.add(isTH ? "marker-th-active" : "marker-active");
-}
-
-function clearAllMarkerActive() {
-  markers.forEach(m => {
-    const el = m.marker.getElement();
-    if (!el) return;
-  el.classList.remove("marker-active", "marker-th-active");
-  });
-}
 
 function toggleRoute(cb) {
   if (cb.checked) {
@@ -1241,14 +1214,6 @@ function openDetail(r){
   const panel = document.getElementById("detailPanel");
   const left = document.getElementById("detailLeft");
   const right = document.getElementById("detailRight");
-
-    clearAllMarkerActive();
-
-  markers.forEach(m => {
-    if (String(m.row.IDPEL) === String(r.IDPEL)) {
-      setMarkerActive(m.marker, m.type === "TH");
-    }
-  });
 
   // simpan IDPEL yang sedang dibuka (global state kecil)
   window.currentCompareIDPEL = r.IDPEL;
@@ -1418,12 +1383,6 @@ function toggleCompare(checkbox) {
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
     }
 
-        // 🔍 besarkan marker yang dibandingkan
-    clearAllMarkerActive();
-    activeMarkers.forEach(m => {
-      setMarkerActive(m.marker, m.type === "TH");
-    });
-
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
@@ -1452,7 +1411,6 @@ function exitCompareMode() {
     if (toggleBtn) toggleBtn.innerText = "➖";
   }
 
-  clearAllMarkerActive();
   showToast("📍 Mode bandingkan selesai");
 }
 
@@ -1613,6 +1571,10 @@ function undoHistory(index) {
   renderHistory();
   showToast(`↩️ Dikembalikan ke HARI BACA ${hariUndo}`);
 }
+
+
+
+
 
 /* ======================
    TAMPILAN KEMBALI KE AREA TAGGING
