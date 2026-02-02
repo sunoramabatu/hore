@@ -262,18 +262,18 @@
       background: #000;
     }
 
-        /* === Marker Highlight / Active === */
-    .custom-marker.active {
-      transform: rotate(-45deg) scale(1.8);
-      z-index: 1000;
-      box-shadow: 0 4px 10px rgba(0,0,0,.45);
+      /* === SCALE MARKER LEAFLET (BENAR) === */
+    .leaflet-marker-icon.marker-active {
+      transform: scale(1.8) !important;
+      z-index: 1000 !important;
     }
 
-    /* marker tahun lalu sedikit lebih kalem */
-    .custom-marker.th-active {
-      transform: rotate(-45deg) scale(1.5);
+    .leaflet-marker-icon.marker-th-active {
+      transform: scale(1.5) !important;
       opacity: 0.85;
+      z-index: 900 !important;
     }
+
 
     .popup-card {
       font-size: 14px;
@@ -719,7 +719,7 @@ const downloadBtn = document.getElementById("downloadBtn");
    INIT MAP
 ====================== */
 const map = L.map("map", {
-  preferCanvas: true,
+  preferCanvas: false,
   rotate: true,
   zoomControl: false,
   touchRotate: true,
@@ -1030,8 +1030,8 @@ markers.forEach(m => {
 
       const iconDIJ = L.divIcon({
         html: `<div class="custom-marker" style="background:${color}"></div>`,
-        iconSize: [10,10],
-        iconAnchor: [5,10],
+        iconSize: [18,18],
+        iconAnchor: [9,18],
         className: ""
       });
 
@@ -1079,8 +1079,8 @@ if (hasTHLocation) {
   // ICON TAHUN LALU (WAJIB DULU)
   const iconTH = L.divIcon({
     html: `<div class="custom-marker" style="background:#000"></div>`,
-    iconSize: [8,8],
-    iconAnchor: [4,8],
+    iconSize: [14,14],
+    iconAnchor: [7,14],
     className: ""
   });
 
@@ -1159,14 +1159,14 @@ function setMarkerActive(marker, isTH = false) {
   const el = marker.getElement();
   if (!el) return;
 
-  el.classList.add(isTH ? "th-active" : "active");
+  el.classList.add(isTH ? "marker-th-active" : "marker-active");
 }
 
 function clearAllMarkerActive() {
   markers.forEach(m => {
     const el = m.marker.getElement();
     if (!el) return;
-    el.classList.remove("active", "th-active");
+    el.classList.remove("marker-active", "marker-th-active");
   });
 }
 
