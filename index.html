@@ -54,7 +54,7 @@
 
       font-size: 14px;
       font-weight: 600;
-      text-align: left;
+      text-align: center;
       cursor: pointer;
     }
 
@@ -216,6 +216,19 @@
       opacity: 1;
       transform: translateX(-50%) translateY(0);
     }
+
+    #searchBtn {
+        width: 64px;        /* ⬅️ kunci lebar */
+        padding: 6px 0;
+        flex-shrink: 0;
+        text-align: center;
+      }
+
+      #searchInput {
+        flex: 1;
+        min-width: 0;
+      }
+
         /* === Modern Marker Teardrop === */
       .custom-marker {
       width: 22px;
@@ -630,6 +643,7 @@ let showDIJ = true;
 let showTH = true;
 let isFullMap = false;
 let hasSelectedCustomer = false;
+let historyVisible = false;
 
 
 function renderMarker(m, map) {
