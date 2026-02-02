@@ -991,7 +991,14 @@ window.addEventListener("DOMContentLoaded", () => {
    TAMPILKAN NAMA FILE SAAT REFRESH
 ====================== */
 
+// 🔁 sinkronkan filter hari baca dengan data yang di-undo
+const hariUndo = (item.row["HARI BACA ACMT"] || "").toUpperCase();
 
+const idx = daftarHariBaca.indexOf(hariUndo);
+if (idx !== -1) {
+  filterHariBacaAktif = true;
+  indexHariBaca = idx;
+}
 /* ======================
    BUILD MARKERS
 ====================== */
@@ -1540,21 +1547,28 @@ function undoHistory(index) {
     exitCompareMode();
   }
 
-  // kembalikan data ke peta
+  // 🔁 set filter hari baca sesuai pelanggan
+  const hariUndo = (item.row["HARI BACA ACMT"] || "").toUpperCase();
+  const idx = daftarHariBaca.indexOf(hariUndo);
+  if (idx !== -1) {
+    filterHariBacaAktif = true;
+    indexHariBaca = idx;
+  }
+
+  // kembalikan data
   workingRows.push(item.row);
   saveState();
 
-  // hapus dari history
   history.splice(index, 1);
   localStorage.setItem("oyon_history", JSON.stringify(history));
 
-  // rebuild marker & tampilkan
   buildMarkers();
   applyHariBacaFilter();
 
   renderHistory();
-  showToast("↩️ Data dikembalikan ke peta");
+  showToast(`↩️ Dikembalikan ke HARI BACA ${hariUndo}`);
 }
+
 
 
 /* ======================
