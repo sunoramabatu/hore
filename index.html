@@ -357,6 +357,14 @@
       background: rgba(255,255,255,0.95);
     }
 
+    #searchInput {
+      flex: 1;
+      min-width: 0;              /* ⬅️ FIX FLEX OVERFLOW HP */
+    }
+
+    #searchBtn {
+      flex-shrink: 0;
+    }
 
     .highlight-marker {
     animation: pulse 1s infinite;
@@ -492,7 +500,7 @@
       🔍 Zoom Area Tagging
     </button>
 
-        <div style="display:flex; gap:6px;">
+    <div style="display:flex; gap:6px; width:100%;">
       <input id="searchInput" class="ui-input small-input" placeholder="4 digit IDPEL / Meter" />
       <button id="searchBtn" class="ui-btn small-btn">Cari</button>
     </div>
@@ -555,7 +563,7 @@
   <div id="historyList"></div>
 </div>
 
-<div id="floatingControls"></div>
+<div id="floatingControls">
   <button id="fullMapBtn" class="float-btn">
     🗺️ Full Map
   </button>
