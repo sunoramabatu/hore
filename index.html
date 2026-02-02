@@ -182,7 +182,7 @@
       background: #fff;
       border-radius: 14px;
       box-shadow: 0 12px 30px rgba(0,0,0,0.25);
-      z-index: 9999;
+      z-index: 15000;
     }
 
     @media (max-width: 768px) {
@@ -489,8 +489,13 @@
       background: rgba(0,0,0,0.85);
     }
 
-    
-
+    #historyBackdrop {
+      position: fixed;
+      inset: 0;
+      background: transparent;     /* klik catcher */
+      z-index: 14000;
+      display: none;
+    }
 
   </style>
 </head>
@@ -675,12 +680,6 @@ const STORAGE_KEY = "RBM_WORKING_STATE";
 const today = new Date().toDateString();
 const savedDate = localStorage.getItem("oyon_history_date");
 
-function closeHistory() {
-  const panel = document.getElementById("historyPanel");
-  if (panel) {
-    panel.style.display = "none";
-  }
-}
 
 if (savedDate !== today) {
   history = [];
@@ -1613,15 +1612,20 @@ renderHistory();
 window.addEventListener("DOMContentLoaded", () => {
 
   function openHistory(){
-  const panel = document.getElementById("historyPanel");
-  panel.style.display = "block";
+  document.getElementById("historyPanel").style.display = "block";
+  document.getElementById("historyBackdrop").style.display = "block";
   renderHistory();
 }
 
-function closeHistory(){
-  const panel = document.getElementById("historyPanel");
-  panel.style.display = "none";
+function closeHistory() {
+  document.getElementById("historyPanel").style.display = "none";
+  document.getElementById("historyBackdrop").style.display = "none";
+
+  setTimeout(() => {
+    if (map) map.invalidateSize();
+  }, 150);
 }
+
 
 document.getElementById("historyToggleBtn").onclick = openHistory;
 
@@ -1642,30 +1646,6 @@ window.addEventListener("DOMContentLoaded", () => {
   document.getElementById("fullMapBtn").onclick = toggleFullMap;
 });
 
-document.addEventListener("click", function (e) {
-  const panel = document.getElementById("historyPanel");
-
-  if (!panel || panel.style.display === "none") return;
-
-  // jika klik DI DALAM panel → abaikan
-  if (panel.contains(e.target)) return;
-
-  // jika klik tombol pembuka history → abaikan
-  if (e.target.id === "historyToggleBtn") return;
-
-  closeHistory();
-});
-
-function closeHistory() {
-  document.getElementById("historyPanel").style.display = "none";
-
-  // 🗺️ paksa map render ulang
-  setTimeout(() => {
-    if (map) {
-      map.invalidateSize();
-    }
-  }, 200);
-}
 
 </script>
 
@@ -1675,6 +1655,8 @@ function closeHistory() {
 </button>
 
 <div id="toast" class="toast"></div>
+<div id="historyBackdrop" onclick="closeHistory()"></div>
+
 
 </body>
 </html>
