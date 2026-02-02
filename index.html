@@ -1529,28 +1529,33 @@ function renderHistory() {
 }
 
 
-function undoHistory(index){
+function undoHistory(index) {
   const item = history[index];
   if (!item) return;
 
+  // keluar dari mode bandingkan jika aktif
+  if (window.isCompareMode) {
+    const cb = document.getElementById("compareCheckbox");
+    if (cb) cb.checked = false;
+    exitCompareMode();
+  }
+
   // kembalikan data ke peta
   workingRows.push(item.row);
-saveState();
-
+  saveState();
 
   // hapus dari history
   history.splice(index, 1);
-
-  // simpan ulang
   localStorage.setItem("oyon_history", JSON.stringify(history));
 
-  // rebuild map
+  // rebuild marker & tampilkan
   buildMarkers();
   applyHariBacaFilter();
-  renderHistory();
 
+  renderHistory();
   showToast("↩️ Data dikembalikan ke peta");
 }
+
 
 /* ======================
    TAMPILAN KEMBALI KE AREA TAGGING
