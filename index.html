@@ -140,7 +140,7 @@
     /* Geser ke bawah supaya tidak nutup tombol cari */
     @media (max-width: 768px) {
       #floatingControls {
-        top: 72px;   /* ⬅️ aman dari search / menu mobile */
+        top: 35px;   /* ⬅️ aman dari search / menu mobile */
       }
     }
 
@@ -170,7 +170,7 @@
 
       #historyPanel {
       position: fixed;
-      top: 70px;              /* jangan 0, biar tidak nutup header */
+      top: 120px;              /* jangan 0, biar tidak nutup header */
       left: 50%;
       transform: translateX(-50%);
       width: 92%;
@@ -184,6 +184,13 @@
       box-shadow: 0 12px 30px rgba(0,0,0,0.25);
       z-index: 9999;
     }
+
+    @media (max-width: 768px) {
+      #historyPanel {
+        top: 140px;           /* ⬅️ aman di HP kecil */
+      }
+    }
+
 
       #map {
         position: fixed;
@@ -554,7 +561,7 @@
 
       <div class="hari-row">
         <button onclick="prevHari()">◀</button>
-        <b id="hariBacaLabel">HARI: ALL</b>
+        <b id="hariBacaLabel">HARI: SEMUA</b>
         <button onclick="nextHari()">▶</button>
       </div>
 
