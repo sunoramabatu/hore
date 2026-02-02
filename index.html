@@ -1537,7 +1537,7 @@ function renderHistory() {
 
 
 function undoHistory(index) {
-  const item = history[index];
+  const item = history[index];   // ⬅️ WAJIB ADA & DI ATAS
   if (!item) return;
 
   // keluar dari mode bandingkan jika aktif
@@ -1547,7 +1547,7 @@ function undoHistory(index) {
     exitCompareMode();
   }
 
-  // 🔁 set filter hari baca sesuai pelanggan
+  // 🔁 sinkronkan filter hari baca dengan data yang di-undo
   const hariUndo = (item.row["HARI BACA ACMT"] || "").toUpperCase();
   const idx = daftarHariBaca.indexOf(hariUndo);
   if (idx !== -1) {
@@ -1555,19 +1555,22 @@ function undoHistory(index) {
     indexHariBaca = idx;
   }
 
-  // kembalikan data
+  // kembalikan data ke peta
   workingRows.push(item.row);
   saveState();
 
+  // hapus dari history
   history.splice(index, 1);
   localStorage.setItem("oyon_history", JSON.stringify(history));
 
+  // rebuild & tampilkan marker
   buildMarkers();
   applyHariBacaFilter();
 
   renderHistory();
   showToast(`↩️ Dikembalikan ke HARI BACA ${hariUndo}`);
 }
+
 
 
 
