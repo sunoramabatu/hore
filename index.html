@@ -651,6 +651,7 @@ let showTH = true;
 let isFullMap = false;
 let hasSelectedCustomer = false;
 let historyVisible = false;
+let hiddenMarkers = [];
 
 
 function renderMarker(m, map) {
@@ -1353,9 +1354,35 @@ function toggleCompare(checkbox) {
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
-    applyHariBacaFilter();
-    showToast("📍 Semua marker ditampilkan kembali");
-  }
+      const idpel = window.currentCompareIDPEL;
+
+      // 1️⃣ Hapus marker pelanggan aktif
+      markers.forEach(m => {
+        if (String(m.row.IDPEL) === String(idpel)) {
+          if (map.hasLayer(m.marker)) {
+            map.removeLayer(m.marker);
+          }
+        }
+      });
+
+      // 2️⃣ Reset current compare
+      window.currentCompareIDPEL = null;
+
+      // 3️⃣ Tampilkan kembali semua marker sesuai filter (BELUM DIBACA)
+      applyHariBacaFilter();
+
+      // 4️⃣ (OPSIONAL) Kembalikan UI Bar
+      const uiBar = document.getElementById("uiBar");
+      const toggleBtn = document.getElementById("toggleBtn");
+
+      if (uiBar && uiBar.classList.contains("minimized")) {
+        uiBar.classList.remove("minimized");
+        if (toggleBtn) toggleBtn.innerText = "➖";
+      }
+
+      showToast("📍 Semua marker belum dibaca ditampilkan kembali");
+    }
+
 }
 
 function minimizeMenu() {
