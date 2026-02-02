@@ -991,14 +991,6 @@ window.addEventListener("DOMContentLoaded", () => {
    TAMPILKAN NAMA FILE SAAT REFRESH
 ====================== */
 
-// 🔁 sinkronkan filter hari baca dengan data yang di-undo
-const hariUndo = (item.row["HARI BACA ACMT"] || "").toUpperCase();
-
-const idx = daftarHariBaca.indexOf(hariUndo);
-if (idx !== -1) {
-  filterHariBacaAktif = true;
-  indexHariBaca = idx;
-}
 /* ======================
    BUILD MARKERS
 ====================== */
