@@ -589,6 +589,7 @@
   </button>
 </div>
 
+<div id="historyPanel" style="display:none;" onclick="event.stopPropagation();">
 
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
@@ -1514,6 +1515,19 @@ function restoreMapView() {
    reset history 23.00
 ====================== */
 
+document.addEventListener("click", function (e) {
+  const panel = document.getElementById("historyPanel");
+
+  if (!panel || panel.style.display === "none") return;
+
+  // jika klik DI DALAM panel → abaikan
+  if (panel.contains(e.target)) return;
+
+  // jika klik tombol pembuka history → abaikan
+  if (e.target.id === "historyToggleBtn") return;
+
+  closeHistory();
+});
 
 
 
