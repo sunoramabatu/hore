@@ -1093,17 +1093,23 @@ if (hasTHLocation) {
     type: "TH"
   });
 }
-// ===== KUMPULKAN HARI BACA UNIK =====
+
+  }); // ← TUTUP workingRows.forEach
+
+  // ===== KUMPULKAN HARI BACA UNIK (SETELAH BUILD MARKER) =====
 daftarHariBaca = [...new Set(
   workingRows
     .map(r => (r["HARI BACA ACMT"] || "").toUpperCase())
     .filter(v => v)
 )].sort();
 
-indexHariBaca = 0;
+// ⛔ JANGAN reset index kalau filter sudah aktif
+if (!filterHariBacaAktif) {
+  indexHariBaca = 0;
+}
+
 updateHariBacaLabel();
 
-  }); // ← TUTUP workingRows.forEach
 }     // ← TUTUP function buildMarkers
 applyHariBacaFilter();
 markers.forEach(m => m.marker.addTo(map));
