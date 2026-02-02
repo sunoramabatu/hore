@@ -515,6 +515,8 @@
 
     <div id="fileNameLabel" style="font-size:12px;color:#555;"></div>
 
+    <div id="statusText"></div>
+
   
     <button id="zoomBtn" class="ui-btn ui-secondary small-btn" style="display:none;">
       🔍 Zoom Area Tagging
@@ -784,14 +786,25 @@ upload.onchange = e => {
     buildMarkers();
     renderHistory();
 
-    statusText.innerText = "✅ Peta berhasil dibuat";
+    
+
+    if (statusText) {
+      statusText.innerText = "✅ Peta berhasil dibuat";
+    }
     zoomBtn.style.display = "block";
 
     // auto zoom setelah upload
     zoomToAllMarkers();
   };
   reader.readAsArrayBuffer(file);
+
+  document.addEventListener("DOMContentLoaded", () => {
+  const statusText = document.getElementById("statusText");
+});
+
 };
+
+
 /* ======================
    KUMPULKAN HARI BACA
 ====================== */
@@ -1442,7 +1455,7 @@ function cancelRoute(){
    DONE + HISTORY
 ====================== */
 function markDone(idpel){
-  
+
   if (window.isCompareMode) {
   const cb = document.querySelector('#detailPanel input[type="checkbox"]');
   if (cb) cb.checked = false;
