@@ -653,7 +653,7 @@ let hasSelectedCustomer = false;
 let historyVisible = false;
 let hiddenMarkers = [];
 window.isCompareMode = false;
-window.compareIDPEL = null;
+window.compareMarkers = [];
 
 
 function renderMarker(m, map) {
@@ -874,6 +874,13 @@ function applyHariBacaFilter() {
       : "HARI: ALL";
 }
 
+function showNormalMarkers() {
+  markers.forEach(m => {
+    if (!map.hasLayer(m.marker)) {
+      addMarkerToMap(m.marker);
+    }
+  });
+}
 
 
 
@@ -1181,28 +1188,6 @@ zoomBtn.onclick = () => {
   map.fitBounds(group.getBounds(), { padding: [40,40] });
 };
 
-function renderMarkers() {
-  // bersihkan map dulu
-  markers.forEach(m => {
-    if (map.hasLayer(m.marker)) {
-      map.removeLayer(m.marker);
-    }
-  });
-
-  // MODE BANDINGKAN
-  if (window.isCompareMode && window.compareIDPEL) {
-    markers.forEach(m => {
-      if (String(m.row.IDPEL) === String(window.compareIDPEL)) {
-        addMarkerToMap(m.marker);
-      }
-    });
-    return;
-  }
-
-  // MODE NORMAL
-  applyHariBacaFilter();
-}
-
 /* ======================
    DETAIL PANEL
 ====================== */
@@ -1339,20 +1324,80 @@ function toggleCompare(checkbox) {
 ====================== */
 
 function toggleCompare(checkbox) {
-  if (checkbox.checked) {
-    window.isCompareMode = true;
-    window.compareIDPEL = window.currentCompareIDPEL;
+  const uiBar = document.getElementById("uiBar");
+  const toggleBtn = document.getElementById("toggleBtn");
 
-    renderMarkers();
+  if (checkbox.checked) {
+    // =========================
+    // MODE BANDINGKAN ON
+    // =========================
+    window.isCompareMode = true;
+
+    // auto minimize menu
+    if (uiBar && !uiBar.classList.contains("minimized")) {
+      uiBar.classList.add("minimized");
+      if (toggleBtn) toggleBtn.innerText = "➕";
+    }
+
+    // sembunyikan SEMUA marker
+    markers.forEach(m => {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
+      }
+    });
+
+    // tampilkan hanya marker yang dibandingkan
+    window.compareMarkers.forEach(m => {
+      addMarkerToMap(m.marker);
+    });
+
+    // fit bounds ke 2 marker
+    if (window.compareMarkers.length) {
+      const group = L.featureGroup(
+        window.compareMarkers.map(m => m.marker)
+      );
+      map.fitBounds(group.getBounds(), { padding: [60, 60] });
+    }
+
     showToast("🔍 Mode bandingkan aktif");
 
   } else {
-    window.isCompareMode = false;
-    window.compareIDPEL = null;
-
-    renderMarkers();
-    showToast("📍 Mode bandingkan selesai");
+    // =========================
+    // MODE BANDINGKAN OFF
+    // =========================
+    exitCompareMode();
   }
+}
+function exitCompareMode() {
+  window.isCompareMode = false;
+
+  // bersihkan map
+  markers.forEach(m => {
+    if (map.hasLayer(m.marker)) {
+      map.removeLayer(m.marker);
+    }
+  });
+
+  // tampilkan marker normal seperti semula
+  applyHariBacaFilter();
+
+  // restore menu
+  const uiBar = document.getElementById("uiBar");
+  const toggleBtn = document.getElementById("toggleBtn");
+
+  if (uiBar && uiBar.classList.contains("minimized")) {
+    uiBar.classList.remove("minimized");
+    if (toggleBtn) toggleBtn.innerText = "➖";
+  }
+
+  showToast("📍 Mode bandingkan selesai");
+}
+
+function onFinishCompare() {
+  const checkbox = document.getElementById("compareCheckbox");
+  if (checkbox) checkbox.checked = false;
+
+  exitCompareMode();
 }
 
 
@@ -1362,24 +1407,7 @@ function minimizeMenu() {
 
   panel.classList.add("minimized");
 }
-
-function onSelesaiClick() {
-  // 1️⃣ matikan mode bandingkan
-  window.isCompareMode = false;
-  window.compareIDPEL = null;
-
-  const checkbox = document.getElementById("compareCheckbox");
-  if (checkbox) checkbox.checked = false;
-
-  // 2️⃣ render ulang semua marker
-  renderMarkers();
-
-  // 3️⃣ logic selesai pelanggan (punyamu)
-  closeBottomBar();
-
-  showToast("✅ Selesai, semua marker ditampilkan kembali");
-}
-
+    
 /* ======================
    ROUTING
 ====================== */
