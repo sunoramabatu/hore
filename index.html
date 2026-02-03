@@ -238,7 +238,7 @@
 
         /* === Modern Marker Teardrop === */
       .custom-marker {
-      width: 13px;
+      width: 13x;
       height: 13px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
@@ -654,7 +654,6 @@ let isFullMap = false;
 let hasSelectedCustomer = false;
 let historyVisible = false;
 let hiddenMarkers = [];
-let visibleMarkersBeforeCompare = [];
 window.isCompareMode = false;
 window.compareMarkers = [];
 
@@ -826,21 +825,24 @@ window.addEventListener("load", () => {
     document.getElementById("fileNameLabel").innerText = "📄 " + savedFilename;
   }
 
-    const saved = localStorage.getItem(STORAGE_KEY);
+  const saved = localStorage.getItem(STORAGE_KEY);
 
-    if (saved && originalRows.length) {
-      const state = JSON.parse(saved);
+  if (saved) {
+    workingRows = JSON.parse(saved);
 
-      workingRows = originalRows.filter(r =>
-        state.ids.includes(r.IDPEL)
-      );
-
-      filterHariBacaAktif = state.filterHariBacaAktif;
-      indexHariBaca = state.indexHariBaca || 0;
-
+    map.whenReady(() => {
       buildMarkers();
-      applyHariBacaFilter();
-    } 
+      renderHistory();
+
+      // Tampilkan tombol zoom
+      if (workingRows.length > 0) {
+        zoomBtn.style.display = "block";
+      }
+
+      // Auto zoom ke marker
+      zoomToAllMarkers();
+    });
+  }
 });
 
 function zoomToAllMarkers() {
@@ -899,21 +901,7 @@ function showNormalMarkers() {
    SIMPAN STATE
 ====================== */
 function saveState() {
-  function saveState() {
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        ids: workingRows.map(r => r.IDPEL),
-        filterHariBacaAktif,
-        indexHariBaca
-      })
-    );
-  } catch (e) {
-    console.warn("Storage penuh, state tidak disimpan");
-  }
-}
-
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
 }
 /* ======================
    TAMPILKAN marker dij/tahun lalu saja
@@ -1007,17 +995,12 @@ window.addEventListener("DOMContentLoaded", () => {
    BUILD MARKERS
 ====================== */
 function buildMarkers(){
-  
-    // 🔐 simpan marker yang sedang tampil
-    visibleMarkersBeforeCompare = markers.filter(m =>
-      map.hasLayer(m.marker)
-    );
-
-    // 🔥 sembunyikan semua marker
-    visibleMarkersBeforeCompare.forEach(m => {
-      map.removeLayer(m.marker);
-    });
-
+  // 🔥 HAPUS SEMUA MARKER LAMA DARI MAP
+markers.forEach(m => {
+  if (map.hasLayer(m.marker)) {
+    map.removeLayer(m.marker);
+    }
+  });
 
   markers = [];
   searchIndex = [];
@@ -1372,23 +1355,20 @@ function toggleCompare(checkbox) {
     // =========================
     window.isCompareMode = true;
 
-    // 🔁 SIMPAN MARKER YANG SEDANG TAMPIL
-    visibleMarkersBeforeCompare = markers.filter(m =>
-      map.hasLayer(m.marker)
-    );
-
     // auto minimize menu
     if (uiBar && !uiBar.classList.contains("minimized")) {
       uiBar.classList.add("minimized");
       if (toggleBtn) toggleBtn.innerText = "➕";
     }
 
-    // 🔥 sembunyikan SEMUA marker aktif
-    visibleMarkersBeforeCompare.forEach(m => {
-      map.removeLayer(m.marker);
+    // sembunyikan semua marker
+    markers.forEach(m => {
+      if (map.hasLayer(m.marker)) {
+        map.removeLayer(m.marker);
+      }
     });
 
-    // 🔍 ambil marker IDPEL aktif (DIJ + TH)
+    // ambil 2 marker milik IDPEL aktif
     const activeMarkers = markers.filter(
       m => String(m.row.IDPEL) === idpel
     );
@@ -1398,7 +1378,7 @@ function toggleCompare(checkbox) {
       m.marker.addTo(map);
     });
 
-    // zoom ke marker
+    // zoom ke 2 marker
     if (activeMarkers.length) {
       const group = L.featureGroup(activeMarkers.map(m => m.marker));
       map.fitBounds(group.getBounds(), { padding: [60, 60] });
@@ -1410,23 +1390,18 @@ function toggleCompare(checkbox) {
     exitCompareMode();
   }
 }
-
 function exitCompareMode() {
   window.isCompareMode = false;
 
-  // 🔥 bersihkan map total
+  // bersihkan map
   markers.forEach(m => {
     if (map.hasLayer(m.marker)) {
       map.removeLayer(m.marker);
     }
   });
 
-  // 🔄 kembalikan marker seperti sebelum bandingkan
-  visibleMarkersBeforeCompare.forEach(m => {
-    m.marker.addTo(map);
-  });
-
-  visibleMarkersBeforeCompare = [];
+  // tampilkan kembali marker SESUAI FILTER
+  applyHariBacaFilter();
 
   // restore menu
   const uiBar = document.getElementById("uiBar");
@@ -1439,7 +1414,6 @@ function exitCompareMode() {
 
   showToast("📍 Mode bandingkan selesai");
 }
-
 
 
 function onFinishCompare() {
