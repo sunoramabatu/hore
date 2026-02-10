@@ -657,6 +657,17 @@ let hiddenMarkers = [];
 window.isCompareMode = false;
 window.compareMarkers = [];
 
+/* ======================
+   UTIL — HARI BACA DARI KDDK ACMT
+====================== */
+function getHariBaca(row) {
+  const kddk = row["KDDK ACMT"];
+  if (!kddk || typeof kddk !== "string") return "";
+
+  // ambil huruf ke-6 dari belakang
+  return kddk.slice(-6, -5).toUpperCase();
+}
+
 
 function renderMarker(m, map) {
   if (!m || !m.marker) return;
@@ -868,7 +879,7 @@ function applyHariBacaFilter() {
 
     // filter 1 hari baca
     if (filterHariBacaAktif) {
-      const hari = (m.row["HARI BACA ACMT"] || "").toUpperCase();
+      const hari = getHariBaca(m.row);
       if (hari !== daftarHariBaca[indexHariBaca]) {
         visible = false;
       }
@@ -1013,7 +1024,9 @@ markers.forEach(m => {
     const lng = parseFloat(row.LON);
 
     if(lat && lng){
-      const color = getColor(row["HARI BACA ACMT"]);
+      const hariBaca = getHariBaca(row);
+      const color = getColor(hariBaca);
+
 
       const iconDIJ = L.divIcon({
         html: `<div class="custom-marker" style="background:${color}"></div>`,
