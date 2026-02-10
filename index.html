@@ -1112,7 +1112,7 @@ if (hasTHLocation) {
   // ===== KUMPULKAN HARI BACA UNIK (SETELAH BUILD MARKER) =====
 daftarHariBaca = [...new Set(
   workingRows
-    .map(r => (r["HARI BACA ACMT"] || "").toUpperCase())
+    .map(r => getHariBaca(r))
     .filter(v => v)
 )].sort();
 
@@ -1242,7 +1242,7 @@ function openDetail(r){
     <div>⚡ DAYA: ${r.DAYA}</div>
     <div>🔧 MERK: ${r["MERK METER"]}</div>
     <div>📟 IDPEL: ${r.IDPEL}</div>
-    <div>📅 HARI BACA: ${r["HARI BACA ACMT"]}</div>
+    <div>📅 HARI BACA: ${getHariBaca(r)}</div>
     <div>🧭 ALAMAT: ${r["ALAMAT"]}</div>
 
     <div style="margin-top:10px;display:flex;gap:6px;">
