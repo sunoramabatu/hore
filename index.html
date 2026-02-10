@@ -1705,15 +1705,45 @@ navigator.geolocation?.watchPosition(pos => {
 /* ======================
    COLOR MAP
 ====================== */
+/* ======================
+   COLOR MAP — A–Z UNIK
+====================== */
 function getColor(v){
-  const map={
-    A:"#22c55e",B:"#f97316",C:"#3b82f6",D:"#ef4444",
-    E:"#a855f7",F:"#14b8a6",G:"#eab308",H:"#ec4899",
-    I:"#6366f1",J:"#84cc16",K:"#06b6d4",L:"#f43f5e",
-    M:"#7c3aed",N:"#f59e0b",O:"#0ea5e9",P:"#10b981"
-  };
-  return map[(v||"").toUpperCase()] || "#64748b";
+  const colors = [
+    "#22c55e", // A
+    "#f97316", // B
+    "#3b82f6", // C
+    "#ef4444", // D
+    "#a855f7", // E
+    "#14b8a6", // F
+    "#eab308", // G
+    "#ec4899", // H
+    "#6366f1", // I
+    "#84cc16", // J
+    "#06b6d4", // K
+    "#f43f5e", // L
+    "#7c3aed", // M
+    "#f59e0b", // N
+    "#0ea5e9", // O
+    "#10b981", // P
+    "#db2777", // Q
+    "#65a30d", // R
+    "#0284c7", // S
+    "#dc2626", // T
+    "#9333ea", // U
+    "#059669", // V
+    "#ca8a04", // W
+    "#be123c", // X
+    "#2563eb", // Y
+    "#0891b2"  // Z
+  ];
+
+  if (!v) return "#64748b";
+
+  const code = v.toUpperCase().charCodeAt(0) - 65;
+  return colors[code] || "#64748b";
 }
+
 
 renderHistory();
 window.addEventListener("DOMContentLoaded", () => {
