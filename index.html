@@ -238,7 +238,7 @@
 
         /* === Modern Marker Teardrop === */
       .custom-marker {
-      width: 13x;
+      width: 13px;
       height: 13px;
       border-radius: 50% 50% 50% 0;
       transform: rotate(-45deg);
@@ -1170,9 +1170,15 @@ function toggleRoute(cb) {
    SEARCH
 ====================== */
 searchBtn.onclick = () => {
+
   const key = searchInput.value.trim();
   if(key.length < 4) {
     showToast("Masukkan minimal 4 digit");
+    return;
+  }
+
+  if (searchIndex.length === 0) {
+    showToast("Data belum siap, upload dulu");
     return;
   }
 
@@ -1185,21 +1191,23 @@ searchBtn.onclick = () => {
     return;
   }
 
-  if (searchIndex.length === 0) {
-  showToast("Data belum siap, upload dulu");
-  return;
-  }
-
   addMarkerToMap(found.marker);
-
   map.setView(found.marker.getLatLng(), 19, { animate: true });
 
   highlightMarker(found.marker);
   showLabel(found.marker);
   openDetail(found.row);
 
-  document.getElementById("toggleBtn").innerText = "➕";
+  // 🔥 AUTO MINIMIZE MENU
+  const uiBar = document.getElementById("uiBar");
+  const toggleBtn = document.getElementById("toggleBtn");
+
+  if (uiBar && !uiBar.classList.contains("minimized")) {
+    uiBar.classList.add("minimized");
+    if (toggleBtn) toggleBtn.innerText = "➕";
+  }
 };
+
 
 
 /* ======================
@@ -1238,7 +1246,14 @@ function openDetail(r){
     </div>
 
     <h3 style="margin:4px 0">${r.NAMA}</h3>
-    <div>🔢 NOMET: ${r["NOMOR METER"]}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span>🔢 NOMET: ${r["NOMOR METER"]}</span>
+      <button 
+        style="background:#2563eb;color:white;border:none;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer;"
+        onclick="copyNomet('${r["NOMOR METER"]}')">
+        Copy
+      </button>
+    </div>
     <div>⚡ DAYA: ${r.DAYA}</div>
     <div>🔧 MERK: ${r["MERK METER"]}</div>
     <div>📟 IDPEL: ${r.IDPEL}</div>
@@ -1536,7 +1551,7 @@ function renderHistory() {
     <div style="border-bottom:1px solid #eee;padding:8px;display:flex;justify-content:space-between;align-items:center;">
       <div>
         <strong>${item.row.NAMA}</strong><br>
-        IDPEL: ${item.row.IDPEL}<br>
+        NOMET: ${item.row["NOMOR METER"]}<br>
         <small>${item.time}</small>
       </div>
       <button onclick="undoHistory(${index})"
@@ -1623,6 +1638,13 @@ function restoreMapView() {
 
 
 
+function copyNomet(nomet){
+  if (!nomet) return;
+
+  navigator.clipboard.writeText(nomet)
+    .then(() => showToast("📋 Nomor meter disalin"))
+    .catch(() => showToast("❌ Gagal menyalin"));
+}
 
 /* ======================
    TOAST
