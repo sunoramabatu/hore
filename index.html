@@ -1279,12 +1279,24 @@ function openDetail(r){
     false
   );
 
-  right.innerHTML = cardHTML(
-    "📍 Lokasi TAGGING TAHUN LALU",
-    r.LATTH,
-    r.LONTH,
-    true
-  );
+  // =========================
+  // CEK DATA TAHUN LALU
+  // =========================
+  const hasOldLocation =
+    r.LATTH && r.LONTH &&
+    r.LATTH !== "" && r.LONTH !== "";
+
+  if (hasOldLocation) {
+    right.innerHTML = cardHTML(
+      "📍 Lokasi TAGGING TAHUN LALU",
+      r.LATTH,
+      r.LONTH,
+      true
+    );
+  } else {
+    right.innerHTML = ""; // 🔥 HILANGKAN PANEL KANAN
+  }
+
 
     panel.classList.add("open");
   }
