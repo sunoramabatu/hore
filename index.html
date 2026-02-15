@@ -1659,34 +1659,79 @@ function showToast(msg){
    FINISH DAN SIMPAN RBM UPDATE
 ====================== */
 downloadBtn.onclick = () => {
+
   if (workingRows.length === 0) {
     showToast("⚠️ Tidak ada data untuk diunduh");
     return;
   }
 
-  // Ambil KODE PETUGAS dari baris pertama
-  const kodePetugas = (workingRows[0]["KODE PETUGAS"] || "UNKNOWN")
-    .toString()
-    .replace(/\s+/g, "_");
+  /* ======================
+     1️⃣ AMBIL NAMA PETUGAS
+  ====================== */
+  let namaPetugas = "UNKNOWN";
 
-  // Buat timestamp
+  const rawUser = workingRows[0]["USER PETUGAS"];
+
+  if (rawUser) {
+    const str = rawUser.toString();
+
+    // ambil bagian setelah titik
+    if (str.includes(".")) {
+      namaPetugas = str.split(".")[1];
+    } else {
+      namaPetugas = str;
+    }
+
+    namaPetugas = namaPetugas.trim().replace(/\s+/g, "_");
+  }
+
+  /* ======================
+     2️⃣ TAMBAH KOLOM LONTH LATTH JIKA BELUM ADA
+  ====================== */
+
+  const hasLONTH = Object.keys(workingRows[0]).includes("LONTH");
+  const hasLATTH = Object.keys(workingRows[0]).includes("LATTH");
+
+  if (!hasLONTH || !hasLATTH) {
+    workingRows = workingRows.map(row => {
+      const newRow = { ...row };
+
+      if (!hasLONTH) newRow["LONTH"] = "";
+      if (!hasLATTH) newRow["LATTH"] = "";
+
+      return newRow;
+    });
+  }
+
+  /* ======================
+     3️⃣ TIMESTAMP
+  ====================== */
+
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const hh = String(now.getHours()).padStart(2, "0");
   const min = String(now.getMinutes()).padStart(2, "0");
 
-  const filename = `RBM_${kodePetugas}_${dd}-${mm}_${hh}-${min}.xlsx`;
+  const filename = `RBM_${namaPetugas}_${dd}-${mm}_${hh}-${min}.xlsx`;
 
-  // Generate Excel
+  /* ======================
+     4️⃣ GENERATE EXCEL
+  ====================== */
+
   const ws = XLSX.utils.json_to_sheet(workingRows);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
 
   XLSX.writeFile(wb, filename);
 
-  showToast(`✅ RBM berhasil diunduh<br><b>${filename}</b><br>Selamat beristirahat, wahai pejuang nafkah.<br>Semoga setiap lelahmu bernilai ibadah.`);
+  showToast(
+    `✅ RBM berhasil diunduh<br><b>${filename}</b><br>
+     Selamat beristirahat, wahai pejuang nafkah.<br>
+     Semoga setiap lelahmu bernilai ibadah.`
+  );
 };
+
 
 
 /* ======================
