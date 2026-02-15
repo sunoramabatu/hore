@@ -1414,6 +1414,22 @@ function toggleCompare(checkbox) {
 
     showToast("🔍 Mode bandingkan aktif");
 
+    // =========================
+    // CEK DATA TAHUN LALU
+    // =========================
+    const hasOldLocation = activeMarkers.some(m => {
+      const latOld = m.row.LATTH;
+      const lonOld = m.row.LONTH;
+      return latOld && lonOld && latOld !== "" && lonOld !== "";
+    });
+
+    if (!hasOldLocation) {
+      setTimeout(() => {
+        showToast("⚠️ Tidak tersedia rute dan lokasi tahun lalu");
+      }, 900);
+    }
+
+
   } else {
     exitCompareMode();
   }
