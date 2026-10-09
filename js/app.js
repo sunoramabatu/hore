@@ -35,8 +35,8 @@ const COLUMN_MAPPING_FIELDS = {
   "ALAMAT": ["ALAMAT", "ALAMAT PELANGGAN", "ADDRESS"],
   "LAT DIJ": ["LAT DIJ", "LAT", "LATITUDE", "LATITUDE DIJ"],
   "LON DIJ": ["LON DIJ", "LON", "LONGITUDE", "LONGITUDE DIJ"],
-  "LAT DIL": ["LAT PEMBANDING", "LAT DIL", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING"],
-  "LON DIL": ["LON PEMBANDING", "LON PETUGAS", "LON DIL", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS"]
+  "LAT DIL": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LON DIL": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"]
 };
 function normalizeHeader(value) { return String(value ?? "").trim().toUpperCase().replace(/[\s_\-]+/g, ""); }
 function getMappedValue(row, canonical) {
@@ -50,6 +50,27 @@ function getMappedValue(row, canonical) {
   return "";
 }
 const COLUMN_LABELS = { "LAT DIL": "LAT PEMBANDING", "LON DIL": "LON PEMBANDING" };
+// Kompatibilitas: LAT/LON PETUGAS juga dapat menjadi koordinat Lokasi Cadangan.
+// Jangan hapus mapping lama karena beberapa RBM memakai nama kolom tersebut.
+function parseCoordinate(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return NaN;
+  let s = String(value).trim().replace(/\s/g, "");
+  // Dukung format desimal koma jika tidak ada titik desimal.
+  if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+function firstCoordinateByHeaders(row, headers) {
+  const keys = Object.keys(row || {});
+  for (const name of headers) {
+    const key = keys.find(k => normalizeHeader(k) === normalizeHeader(name));
+    if (key && String(row[key] ?? "").trim() !== "") return parseCoordinate(row[key]);
+  }
+  return NaN;
+}
+function validCoordinatePair(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
 function renderColumnMappingOptions() {
   const host = document.getElementById("columnMappingFields");
   if (!host) return;
@@ -93,19 +114,49 @@ window.compareMarkers = [];
 ====================== */
 
 function getDIJLat(row) {
-  return parseFloat(getMappedValue(row, "LAT DIJ") || row[" LAT DIJ"] || row["LAT DIJ"] || row["LAT"] || 0);
+  const direct = firstCoordinateByHeaders(row, ["LAT DIJ", "LATITUDE DIJ", "LATITUDE", "LAT"]);
+  if (Number.isFinite(direct)) return direct;
+  return parseCoordinate(getMappedValue(row, "LAT DIJ"));
 }
-
 function getDIJLon(row) {
-  return parseFloat(getMappedValue(row, "LON DIJ") || row["LON DIJ"] || row["LON"] || 0);
+  const direct = firstCoordinateByHeaders(row, ["LON DIJ", "LONGITUDE DIJ", "LONGITUDE", "LON"]);
+  if (Number.isFinite(direct)) return direct;
+  return parseCoordinate(getMappedValue(row, "LON DIJ"));
 }
+function getDILCoordinatePair(row) {
+  // Data RBM bisa memakai beberapa nama untuk titik kedua.
+  // Beberapa file memiliki nilai LAT/LON PEMBANDING tertukar:
+  // LAT PEMBANDING berisi longitude (mis. 112.x) dan LON PEMBANDING
+  // berisi latitude (mis. -7.x). Deteksi berdasarkan rentang koordinat,
+  // lalu betulkan untuk tampilan peta dan ekspor tanpa mengubah koordinat DIJ.
+  const latAliases = [
+    "LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN",
+    "LATTH", "LATDIL", "LATITUDE PEMBANDING", "LATITUDE DIL",
+    "LATITUDE PETUGAS", "LATITUDE CADANGAN"
+  ];
+  const lonAliases = [
+    "LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN",
+    "LONTH", "LONDIL", "LONGITUDE PEMBANDING", "LONGITUDE DIL",
+    "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"
+  ];
 
+  let lat = firstCoordinateByHeaders(row, latAliases);
+  let lon = firstCoordinateByHeaders(row, lonAliases);
+
+  if (!Number.isFinite(lat)) lat = parseCoordinate(getMappedValue(row, "LAT DIL"));
+  if (!Number.isFinite(lon)) lon = parseCoordinate(getMappedValue(row, "LON DIL"));
+
+  // Jika pasangan tidak valid tetapi valid saat ditukar, label/nilai di Excel tertukar.
+  if (!validCoordinatePair(lat, lon) && validCoordinatePair(lon, lat)) {
+    return { lat: lon, lon: lat, swapped: true };
+  }
+  return { lat, lon, swapped: false };
+}
 function getDILLat(row) {
-  return parseFloat(getMappedValue(row, "LAT DIL") || row["LAT DIL"] || row["LATTH"] || row["LATDIL"] || 0);
+  return getDILCoordinatePair(row).lat;
 }
-
 function getDILLon(row) {
-  return parseFloat(getMappedValue(row, "LON DIL") || row["LON DIL"] || row["LONTH"] || row["LONDIL"] || 0);
+  return getDILCoordinatePair(row).lon;
 }
 /* ======================
    UTIL — HARI BACA DARI KDDK ACMT
@@ -131,18 +182,29 @@ function getHariBaca(row) {
 ====================== */
 
 function getUrutanBaca(row) {
-  const kddk = String(getMappedValue(row, "KDDK ACMT") || row["KDDK ACMT"] || row.KDDK || row.KODEDK || "").trim();
+  // 1) Jika Excel sudah memiliki kolom URUTAN BACA, gunakan nilai itu dahulu.
+  //    Ini mencegah mapping KDDK lama (misalnya tersimpan sebagai "KDDK")
+  //    membuat nomor urut hilang.
+  const directOrder = firstCoordinateByHeaders(row, ["URUTAN BACA", "URUTAN_BACA", "URUTAN", "NO URUTAN"]);
+  if (Number.isFinite(directOrder) && directOrder >= 0) return Math.trunc(directOrder);
 
-  if (!kddk) return null;
+  // 2) Ambil KDDK ACMT yang benar dari kolom aslinya sebelum memakai mapping lama.
+  const exactKddk = String(
+    row["KDDK ACMT"] ?? row["KDDK_ACMT"] ?? row.KDDK_ACMT ?? ""
+  ).trim();
+  const mappedKddk = String(getMappedValue(row, "KDDK ACMT") || row.KDDK || row.KODEDK || "").trim();
+  const candidates = [exactKddk, mappedKddk, String(row.LANGKAH ?? "").trim()];
 
-  // Contoh CMAWHNQ07800 → 078 → 78
-  const match = kddk.match(/[A-Z](\d{3})\d{2}$/i);
-
-  if (!match) return null;
-
-  const urutan = Number(match[1]);
-
-  return Number.isFinite(urutan) ? urutan : null;
+  // Pola umum: CMAWHPL00100 → 001 → 1. LANGKAH 00100 juga didukung.
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const match = candidate.match(/(\d{3})\d{2}$/);
+    if (match) {
+      const order = Number(match[1]);
+      if (Number.isFinite(order)) return order;
+    }
+  }
+  return null;
 }
 
 function getNoMeter(row){
@@ -685,7 +747,7 @@ originalHeaders = rawExcel.length > 0
   : [];
 // Simpan format angka koordinat dari file sumber agar jumlah desimal GPS tetap terjaga saat diekspor.
 gpsNumberFormats = {};
-const gpsHeaderNames = new Set(["LAT DIJ", "LON DIJ", "LAT DIL", "LON DIL", "LAT PEMBANDING", "LON PEMBANDING", "LATTH", "LONTH", "LATDIL", "LONDIL"]);
+const gpsHeaderNames = new Set(["LATDIJ", "LONDIJ", "LATDIL", "LONDIL", "LATPEMBANDING", "LONPEMBANDING", "LATPETUGAS", "LONPETUGAS", "LATCADANGAN", "LONCADANGAN", "LATTH", "LONTH", "LATITUDEDIL", "LONGITUDEDIL", "LATITUDEPEMBANDING", "LONGITUDEPEMBANDING", "LATITUDEPETUGAS", "LONGITUDEPETUGAS", "LATITUDECADANGAN", "LONGITUDECADANGAN"]);
 originalHeaders.forEach((header, colIndex) => {
   if (!gpsHeaderNames.has(normalizeHeader(header))) return;
   gpsNumberFormats[header] = [];
@@ -1094,7 +1156,7 @@ searchIndex = [];
     const lat = getDIJLat(row);
     const lng = getDIJLon(row);
 
-    if(lat && lng){
+    if(validCoordinatePair(lat, lng)){
       const hariBaca = getHariBaca(row);
       const color = getColor(hariBaca);
 
@@ -1153,23 +1215,20 @@ searchIndex = [];
 const latDIL = getDILLat(row);
 const lonDIL = getDILLon(row);
 
-const hasDILLocation =
-  latDIL && lonDIL &&
-  !isNaN(latDIL) &&
-  !isNaN(lonDIL);
+const hasDILLocation = validCoordinatePair(latDIL, lonDIL);
 
 if (hasDILLocation) {
 
   // ICON Lokasi Cadangan (WAJIB DULU)
   const iconDIL = L.divIcon({
-    html: `<div class="custom-marker" style="background:#000"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 12],
+    html: `<div class="custom-marker" style="background:#111827;border:2px solid #fff;box-shadow:0 0 0 2px #111827;width:13px;height:13px;border-radius:50%;box-sizing:border-box"></div>`,
+    iconSize: [17, 17],
+    iconAnchor: [8, 8],
     className: ""
   });
 
   // MARKER Lokasi Cadangan
-  const markerDIL = L.marker([latDIL, lonDIL], { icon: iconDIL, pane: "customerMarkerPane", zIndexOffset: 900, riseOnHover: true });
+  const markerDIL = L.marker([latDIL, lonDIL], { icon: iconDIL, pane: "customerMarkerPane", zIndexOffset: 1800, riseOnHover: true });
 
   markerDIL.bindTooltip(
     `<b>${getMappedValue(row, "NAMA") || row.NAMA || "Pelanggan"}</b><br>IDPEL: ${getMappedValue(row, "IDPEL") || row.IDPEL || "-"}`,
@@ -1468,7 +1527,7 @@ function openDetail(r){
   /* FORCE SHOW MARKERS FOR COMPARE */
 
     // simpan IDPEL yang sedang dibuka (global state kecil)
-  window.currentCompareIDPEL = r.IDPEL;
+  window.currentCompareIDPEL = String(getMappedValue(r, "IDPEL") || r.IDPEL || "");
 
   const cardHTML = (label, lat, lon, isDIL = false) => `
   <div class="${isDIL ? "card-DIL" : ""}">
@@ -1669,7 +1728,7 @@ function openDetail(r){
   const dilLat = getDILLat(r);
         const dilLon = getDILLon(r);
 
-        if (dilLat && dilLon) {
+        if (validCoordinatePair(dilLat, dilLon)) {
 
         right.innerHTML = cardHTML(
             "📍 Lokasi Cadangan",
@@ -1803,7 +1862,7 @@ function toggleCompare(checkbox) {
 
     // ambil 2 marker milik IDPEL aktif
     const activeMarkers = markers.filter(
-      m => String(m.row.IDPEL) === idpel
+      m => String(getMappedValue(m.row, "IDPEL") || m.row.IDPEL || "") === idpel
     );
 
     // tampilkan hanya marker tsb
@@ -1819,6 +1878,7 @@ function toggleCompare(checkbox) {
       const group = L.featureGroup(activeMarkers.map(m => m.marker));
       map.flyToBounds(group.getBounds(), {
         padding: [80, 80],
+        maxZoom: 19,
         duration: 0.5
       });
     }
@@ -2204,9 +2264,12 @@ if (!Array.isArray(originalHeaders) || originalHeaders.length === 0) {
   originalHeaders = [...headerSet];
 }
 const exportHeaders = [...originalHeaders];
-const normalizedExportHeaders = exportHeaders.map(normalizeHeader);
-if (!normalizedExportHeaders.includes("LATPEMBANDING")) exportHeaders.push("LAT PEMBANDING");
-if (!normalizedExportHeaders.includes("LONPEMBANDING")) exportHeaders.push("LON PEMBANDING");
+const existingHeaderNorms = new Set(exportHeaders.map(normalizeHeader));
+const hasAnyHeader = (aliases) => aliases.some(alias => existingHeaderNorms.has(normalizeHeader(alias)));
+const LAT_COMPARE_ALIASES = ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"];
+const LON_COMPARE_ALIASES = ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"];
+if (!hasAnyHeader(LAT_COMPARE_ALIASES)) { exportHeaders.push("LAT PEMBANDING"); existingHeaderNorms.add("LATPEMBANDING"); }
+if (!hasAnyHeader(LON_COMPARE_ALIASES)) { exportHeaders.push("LON PEMBANDING"); existingHeaderNorms.add("LONPEMBANDING"); }
 
 const getCoordinateForExport = (row, canonical, newHeader) => {
   // Prioritaskan kolom target yang sudah ada; jika tidak ada, gunakan pemetaan kolom cadangan lama.
@@ -2216,8 +2279,8 @@ const getCoordinateForExport = (row, canonical, newHeader) => {
   return value === "" || value == null ? "" : value;
 };
 const exportData = workingRows.map(row => exportHeaders.map(header => {
-  if (normalizeHeader(header) === "LATPEMBANDING") return getCoordinateForExport(row, "LAT DIL", "LAT PEMBANDING");
-  if (normalizeHeader(header) === "LONPEMBANDING") return getCoordinateForExport(row, "LON DIL", "LON PEMBANDING");
+  if (normalizeHeader(header) === "LATPEMBANDING") { const v = getDILLat(row); return Number.isFinite(v) ? v : ""; }
+  if (normalizeHeader(header) === "LONPEMBANDING") { const v = getDILLon(row); return Number.isFinite(v) ? v : ""; }
   return row[header] ?? "";
 }));
 const worksheetData = [exportHeaders, ...exportData];
@@ -2227,8 +2290,24 @@ const ws = XLSX.utils.aoa_to_sheet(worksheetData);
 const coordinateAliases = {
   "LATDIJ": ["LAT DIJ", "LAT", "LATITUDE", "LATITUDE DIJ"],
   "LONDIJ": ["LON DIJ", "LON", "LONGITUDE", "LONGITUDE DIJ"],
-  "LATPEMBANDING": ["LAT PEMBANDING", "LAT DIL", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING"],
-  "LONPEMBANDING": ["LON PEMBANDING", "LON PETUGAS", "LON DIL", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS"]
+  "LATPEMBANDING": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATDIL": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATTH": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATITUDEDIL": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATITUDEPEMBANDING": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATPETUGAS": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATCADANGAN": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATITUDEPETUGAS": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LATITUDECADANGAN": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LONPEMBANDING": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONDIL": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONTH": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONGITUDEDIL": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONGITUDEPEMBANDING": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONPETUGAS": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONCADANGAN": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONGITUDEPETUGAS": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"],
+  "LONGITUDECADANGAN": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"]
 };
 for (let c = 0; c < exportHeaders.length; c++) {
   const outNorm = normalizeHeader(exportHeaders[c]);
@@ -2253,7 +2332,7 @@ const wb = XLSX.utils.book_new();
 wb.Props = { Title: "OYONID MAP EXPORT" };
 XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
 XLSX.writeFile(wb, filename, { compression: true });
-showToast("✅ Excel update berhasil diunduh. Koordinat dan kolom pembanding disertakan.");
+showToast("✅ Excel update berhasil diunduh. Kolom pembanding hanya ditambahkan jika belum tersedia.");
 };
 
 /* ======================
