@@ -600,3 +600,22 @@
 
 .chk { display:flex; align-items:center; gap:6px; margin:4px 0; font-size:12px; line-height:1.3; cursor:pointer; }
 .chk input[type="checkbox"] { width:15px; height:15px; margin:0; flex:0 0 auto; accent-color:#2563eb; }
+
+
+/* V10: popup pilihan pelanggan yang nyaman di HP */
+#searchPopup {
+  position: fixed; inset: 0; z-index: 100000; background: rgba(15,23,42,.62);
+  display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;
+}
+#searchPopup .searchPopupCard {
+  width:min(94vw,480px); max-height:78vh; overflow:auto; background:#fffdf1;
+  border-radius:16px; box-shadow:0 16px 48px rgba(0,0,0,.32); padding:14px;
+}
+#searchPopup .searchPopupTitle { font-weight:800; font-size:18px; margin:2px 0 4px; }
+#searchPopup .searchPopupSub { color:#64748b; font-size:12px; margin-bottom:10px; }
+#searchPopup .searchResultItem {
+  background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin:8px 0;
+  cursor:pointer; line-height:1.55; box-shadow:0 2px 5px rgba(0,0,0,.05);
+}
+#searchPopup .searchResultItem:active, #searchPopup .searchResultItem:hover { background:#eff6ff; border-color:#60a5fa; }
+#searchPopup .searchPopupClose { width:100%; padding:11px; border:0; border-radius:10px; background:#1f2937; color:white; font-weight:700; margin-top:6px; }
