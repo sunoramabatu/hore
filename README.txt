@@ -20,3 +20,11 @@ Catatan penting:
 - Jika GPS tidak bisa diambil saat klik Selesai, aplikasi meminta konfirmasi sebelum menyimpan pekerjaan tanpa GPS aktual.
 - Zoom/fokus/flash tergantung dukungan kamera HP dan browser. ZXing dimuat dari internet; jika CDN tidak tersedia, aplikasi mencoba BarcodeDetector bawaan browser.
 - Versi ini perlu diuji dengan RBM kerja sebelum dipakai operasional.
+
+
+V11 PATCH (berdasarkan V10)
+- Tombol zoom +/- di scanner dihapus agar tampilan HP lebih ringkas.
+- Tombol flash selalu terlihat; bila kamera/browser tidak mendukung, tombol akan dinonaktifkan dan diberi keterangan.
+- Tombol fokus mengirim permintaan fokus ke kamera jika browser menyediakan kontrol yang sesuai. Browser tidak bisa memaksa lensa fisik bergerak pada semua HP.
+- Sheet Realisasi Selesai menambahkan JARAK DIJ KE REALISASI (M), dihitung dari koordinat DIJ ke koordinat GPS realisasi dengan rumus jarak geografis. AKURASI GPS HP tetap dicatat terpisah sebagai estimasi akurasi dari perangkat.
+- Ikon mengambang pada screenshot kemungkinan Vercel Toolbar pada Preview, bukan bukti ada orang meretas. Periksa URL: jika deployment Preview, Toolbar bisa muncul untuk anggota proyek yang login.

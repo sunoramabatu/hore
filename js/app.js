@@ -344,20 +344,14 @@ function createBarcodeScannerUI() {
       </div>
       <div id="barcodeScannerStatus" role="status" style="color:white;text-align:center;margin-top:12px;font-size:14px;max-width:460px;">Membuka kamera…</div>
       <div style="width:min(92vw,460px);display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:12px;color:white;">
-        <button id="barcodeZoomOut" type="button" style="padding:9px 13px;border:0;border-radius:9px;font-weight:700;">− Zoom</button>
-        <input id="barcodeZoomRange" aria-label="Zoom kamera" type="range" min="1" max="1" step="0.1" value="1" style="width:min(36vw,150px);accent-color:#22c55e;" disabled>
-        <button id="barcodeZoomIn" type="button" style="padding:9px 13px;border:0;border-radius:9px;font-weight:700;">+ Zoom</button>
-        <button id="barcodeFocusBtn" type="button" style="padding:9px 12px;border:0;border-radius:9px;font-weight:700;">🎯 Fokus</button>
-        <button id="barcodeTorchBtn" type="button" style="padding:9px 12px;border:0;border-radius:9px;font-weight:700;display:none;">🔦 Lampu</button>
+        <button id="barcodeFocusBtn" type="button" style="padding:12px 16px;border:0;border-radius:10px;font-weight:700;">🎯 Fokus ulang</button>
+        <button id="barcodeTorchBtn" type="button" style="padding:12px 16px;border:0;border-radius:10px;font-weight:700;">🔦 Nyalakan flash</button>
       </div>
       <div style="width:min(92vw,460px);color:#ddd;text-align:center;font-size:12px;margin-top:8px;">Zoom, fokus, dan flash hanya tersedia jika didukung kamera HP. Dekatkan kamera perlahan sampai garis barcode tajam.</div>
       <button id="barcodeCloseBtn" type="button" style="margin-top:16px;width:min(92vw,460px);height:48px;border:0;border-radius:12px;background:#ef4444;color:white;font-size:17px;font-weight:700;">✕ Tutup Scanner</button>
     </div>`;
   document.body.appendChild(modal);
   document.getElementById("barcodeCloseBtn").onclick = closeBarcodeScanner;
-  document.getElementById("barcodeZoomRange").oninput = e => setBarcodeZoom(Number(e.target.value));
-  document.getElementById("barcodeZoomOut").onclick = () => changeBarcodeZoom(-0.5);
-  document.getElementById("barcodeZoomIn").onclick = () => changeBarcodeZoom(0.5);
   document.getElementById("barcodeFocusBtn").onclick = refocusBarcodeCamera;
   document.getElementById("barcodeTorchBtn").onclick = toggleBarcodeTorch;
   return modal;
@@ -434,26 +428,19 @@ function configureBarcodeCameraControls() {
   if (!barcodeTrack) return;
   let caps = {};
   try { caps = barcodeTrack.getCapabilities?.() || {}; } catch (e) {}
-  const zoomRange = document.getElementById("barcodeZoomRange");
-  const zoomOut = document.getElementById("barcodeZoomOut");
-  const zoomIn = document.getElementById("barcodeZoomIn");
-  if (caps.zoom && zoomRange) {
-    zoomRange.min = String(caps.zoom.min ?? 1);
-    zoomRange.max = String(caps.zoom.max ?? 1);
-    zoomRange.step = String(caps.zoom.step ?? 0.1);
-    const current = barcodeTrack.getSettings?.().zoom ?? caps.zoom.min ?? 1;
-    zoomRange.value = String(current);
-    zoomRange.disabled = Number(zoomRange.max) <= Number(zoomRange.min);
-    barcodeZoomValue = Number(current);
-    zoomOut.disabled = zoomIn.disabled = zoomRange.disabled;
-  } else {
-    zoomRange.disabled = zoomOut.disabled = zoomIn.disabled = true;
-    zoomRange.title = "Zoom hardware tidak didukung; gunakan zoom kamera HP jika tersedia.";
-  }
   const torchBtn = document.getElementById("barcodeTorchBtn");
-  if (torchBtn && caps.torch) torchBtn.style.display = "inline-block";
+  if (torchBtn) {
+    torchBtn.style.display = "inline-block";
+    const supported = !!caps.torch;
+    torchBtn.disabled = !supported;
+    torchBtn.title = supported ? "Nyalakan atau matikan lampu kamera" : "Flash tidak didukung atau tidak dilaporkan oleh kamera/browser ini";
+    if (!supported) torchBtn.textContent = "🔦 Flash tidak tersedia";
+  }
   const focusBtn = document.getElementById("barcodeFocusBtn");
-  if (focusBtn && !caps.focusMode && !caps.focusDistance) focusBtn.title = "Fokus manual tidak didukung kamera; tombol mencoba fokus otomatis.";
+  if (focusBtn) {
+    focusBtn.style.display = "inline-block";
+    focusBtn.title = (caps.focusMode || caps.focusDistance) ? "Minta kamera fokus ulang" : "Browser tidak menyediakan kontrol fokus manual untuk kamera ini";
+  }
 }
 
 async function setBarcodeZoom(value) {
@@ -476,22 +463,32 @@ function changeBarcodeZoom(delta) {
 }
 async function refocusBarcodeCamera() {
   if (!barcodeTrack) return;
+  const btn = document.getElementById("barcodeFocusBtn");
   try {
     const caps = barcodeTrack.getCapabilities?.() || {};
+    let applied = false;
     if (Array.isArray(caps.focusMode) && caps.focusMode.includes("single-shot")) {
       await barcodeTrack.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
-      if (caps.focusMode.includes("continuous")) {
-        setTimeout(() => barcodeTrack?.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(()=>{}), 700);
-      }
-      showToast("🎯 Fokus kamera diperbarui");
+      applied = true;
     } else if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
       await barcodeTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
-      showToast("🎯 Fokus otomatis diaktifkan");
-    } else {
-      showToast("Fokus manual tidak didukung kamera ini. Jauhkan kamera sedikit lalu dekatkan perlahan.");
+      applied = true;
     }
-  } catch (e) { showToast("Kamera tidak mengizinkan perubahan fokus manual."); }
+    if (caps.focusDistance && Number.isFinite(caps.focusDistance.min) && Number.isFinite(caps.focusDistance.max)) {
+      const current = barcodeTrack.getSettings?.().focusDistance;
+      const near = Math.min(caps.focusDistance.max, Math.max(caps.focusDistance.min, current ?? caps.focusDistance.min));
+      await barcodeTrack.applyConstraints({ advanced: [{ focusDistance: near }] });
+      applied = true;
+    }
+    if (applied) {
+      if (btn) { btn.textContent = "🎯 Fokus diminta"; setTimeout(() => { if (btn && barcodeScannerOpen) btn.textContent = "🎯 Fokus ulang"; }, 1200); }
+      showToast("🎯 Perintah fokus dikirim ke kamera. Hasilnya tergantung dukungan HP/browser.");
+    } else {
+      showToast("Kamera HP/browser tidak menyediakan kontrol fokus manual. Gerakkan HP perlahan sampai barcode tajam.");
+    }
+  } catch (e) { showToast("Kamera menolak kontrol fokus. Coba gerakkan HP perlahan mendekat/menjauh."); }
 }
+
 async function toggleBarcodeTorch() {
   if (!barcodeTrack) return;
   try {
@@ -2278,7 +2275,7 @@ downloadBtn.onclick = () => {
   const remainingSheet = XLSX.utils.aoa_to_sheet(buildSheetRows(workingRows));
 
   // Sheet realisasi memakai kolom RBM + titik GPS aktual + waktu selesai.
-  const completedExtraHeaders = ["LAT REALISASI", "LON REALISASI", "AKURASI GPS (M)", "TANGGAL SELESAI", "JAM SELESAI", "WAKTU SELESAI ISO", "STATUS REALISASI", "CATATAN GPS"];
+  const completedExtraHeaders = ["LAT REALISASI", "LON REALISASI", "JARAK DIJ KE REALISASI (M)", "AKURASI GPS HP (M)", "TANGGAL SELESAI", "JAM SELESAI", "WAKTU SELESAI ISO", "STATUS REALISASI", "CATATAN GPS"];
   const completedHeaders = [...exportHeaders];
   completedExtraHeaders.forEach(h => { if (!completedHeaders.some(x => normalizeHeader(x) === normalizeHeader(h))) completedHeaders.push(h); });
   const completedRows = completedRecords.map(item => {
@@ -2287,7 +2284,16 @@ downloadBtn.onclick = () => {
       const n = normalizeHeader(header);
       if (n === "LATREALISASI") return item.actualLat === "" || item.actualLat == null ? "" : Number(item.actualLat);
       if (n === "LONREALISASI") return item.actualLon === "" || item.actualLon == null ? "" : Number(item.actualLon);
-      if (n === "AKURASIGPSM") return item.gpsAccuracy === "" || item.gpsAccuracy == null ? "" : Number(item.gpsAccuracy);
+      if (n === "JARAKDIJ KEREALISASI(M)".replace(/\s/g, "")) {
+        const lat1 = parseCoordinate(getDIJLat(row)), lon1 = parseCoordinate(getDIJLon(row));
+        const lat2 = parseCoordinate(item.actualLat), lon2 = parseCoordinate(item.actualLon);
+        if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return "";
+        const rad = v => v * Math.PI / 180;
+        const dLat = rad(lat2-lat1), dLon = rad(lon2-lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+        return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
+      }
+      if (n === "AKURASIGPSHP(M)") return item.gpsAccuracy === "" || item.gpsAccuracy == null ? "" : Number(item.gpsAccuracy);
       if (n === "TANGGALSELESAI") return item.date || "";
       if (n === "JAMSELESAI") return item.time || "";
       if (n === "WAKTUSELESAIISO") return item.completedAt || "";
