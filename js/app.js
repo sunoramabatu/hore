@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.5-STABILIZATION";
+window.OYONID_BUILD = "V13.1.6-REALISASI-PHOTO-VIDEO";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -703,6 +703,236 @@ function welcomeFieldOfficer(rows, options = {}) {
   hideAfterVoice();
 }
 
+let realizationMediaRecorder = null;
+let realizationMediaStream = null;
+let realizationMediaChunks = [];
+let realizationVideoMime = "";
+let realizationCaptureTimer = null;
+let realizationCaptureCanvas = null;
+
+function setRealizationVideoUI(recording) {
+  const start = document.getElementById("quickVideoStartBtn");
+  const stop = document.getElementById("quickVideoStopBtn");
+  if (start) start.disabled = !!recording;
+  if (stop) stop.disabled = !recording;
+}
+function chooseRealizationVideoMime() {
+  if (typeof MediaRecorder === "undefined") return "";
+  return ["video/mp4;codecs=avc1.42E01E", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"]
+    .find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+function finishRealizationVideoDownload() {
+  if (!realizationMediaChunks.length) {
+    showToast("Tidak ada data video yang berhasil direkam.");
+    return;
+  }
+  const mime = realizationMediaRecorder?.mimeType || realizationVideoMime || "video/webm";
+  const isMp4 = mime.toLowerCase().includes("mp4");
+  const blob = new Blob(realizationMediaChunks, { type: mime });
+  if (!blob.size) { showToast("File video kosong. Coba rekam ulang."); return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `OYONID_Realisasi_${localDateTimeParts().dayKey}.${isMp4 ? "mp4" : "webm"}`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
+  showToast(isMp4 ? "Video MP4 berhasil dibuat dan diunduh." : "Video berhasil diunduh sebagai WebM. Browser HP ini belum mendukung ekspor MP4 langsung.");
+}
+async function startMapCanvasRecording() {
+  if (typeof html2canvas !== "function") {
+    throw new Error("Perekam layar browser tidak tersedia dan modul perekam peta belum termuat.");
+  }
+  const mapElement = document.getElementById("map");
+  if (!mapElement || !mapElement.clientWidth || !mapElement.clientHeight) throw new Error("Area peta belum siap direkam.");
+  realizationCaptureCanvas = document.createElement("canvas");
+  realizationCaptureCanvas.width = Math.min(1280, mapElement.clientWidth * 2);
+  realizationCaptureCanvas.height = Math.min(1280, mapElement.clientHeight * 2);
+  const ctx = realizationCaptureCanvas.getContext("2d");
+  const stream = realizationCaptureCanvas.captureStream(12);
+  realizationMediaStream = stream;
+  const drawFrame = async () => {
+    if (!realizationMediaRecorder || realizationMediaRecorder.state !== "recording") return;
+    try {
+      const shot = await html2canvas(mapElement, { backgroundColor: "#e5e7eb", useCORS: true, scale: 1, logging: false });
+      ctx.clearRect(0, 0, realizationCaptureCanvas.width, realizationCaptureCanvas.height);
+      ctx.drawImage(shot, 0, 0, realizationCaptureCanvas.width, realizationCaptureCanvas.height);
+    } catch (e) { console.warn("[OYONID] Map frame capture failed", e); }
+  };
+  await drawFrame();
+  realizationCaptureTimer = setInterval(drawFrame, 800);
+}
+async function startRealizationScreenRecording() {
+  if (typeof MediaRecorder === "undefined") {
+    showToast("Browser ini tidak menyediakan pembuat video. Gunakan Chrome terbaru atau perekam layar Android.");
+    return;
+  }
+  try {
+    realizationVideoMime = chooseRealizationVideoMime();
+    realizationMediaChunks = [];
+    // Desktop/browser yang mendukung screen-share merekam layar secara langsung.
+    if (navigator.mediaDevices?.getDisplayMedia) {
+      try {
+        realizationMediaStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 24 }, audio: false });
+      } catch (screenError) {
+        // Android sering menolak/ tidak menyediakan getDisplayMedia; lanjutkan dengan rekaman area peta.
+        console.info("[OYONID] Screen capture unavailable; using map canvas fallback.", screenError);
+        await startMapCanvasRecording();
+      }
+    } else {
+      await startMapCanvasRecording();
+    }
+    if (!realizationMediaStream) throw new Error("Stream video tidak berhasil dibuat.");
+    realizationMediaRecorder = new MediaRecorder(realizationMediaStream, realizationVideoMime ? { mimeType: realizationVideoMime } : undefined);
+    realizationMediaRecorder.ondataavailable = event => {
+      if (event.data?.size) realizationMediaChunks.push(event.data);
+    };
+    realizationMediaRecorder.onerror = event => {
+      console.error("[OYONID] Video recorder error", event);
+      stopRealizationScreenRecording(false);
+      showToast("Perekaman video gagal. Coba ulangi.");
+    };
+    realizationMediaRecorder.onstop = () => {
+      if (realizationCaptureTimer) clearInterval(realizationCaptureTimer);
+      realizationCaptureTimer = null;
+      finishRealizationVideoDownload();
+      realizationMediaStream?.getTracks().forEach(track => track.stop());
+      realizationMediaStream = null;
+      realizationMediaRecorder = null;
+      realizationMediaChunks = [];
+      realizationCaptureCanvas = null;
+      setRealizationVideoUI(false);
+    };
+    realizationMediaRecorder.start(800);
+    setRealizationVideoUI(true);
+    showToast("Perekaman dimulai. Tekan Simpan video untuk mengakhiri dan mengunduh.");
+    realizationMediaStream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      if (realizationMediaRecorder?.state === "recording") realizationMediaRecorder.stop();
+    }, { once: true });
+  } catch (err) {
+    console.error("[OYONID] Start video failed", err);
+    if (realizationCaptureTimer) clearInterval(realizationCaptureTimer);
+    realizationCaptureTimer = null;
+    realizationMediaStream?.getTracks().forEach(track => track.stop());
+    realizationMediaStream = null;
+    realizationMediaRecorder = null;
+    setRealizationVideoUI(false);
+    showToast("Video tidak bisa dimulai: " + (err?.message || "izin kamera/layar ditolak."));
+  }
+}
+function stopRealizationScreenRecording(showMessage = true) {
+  if (realizationMediaRecorder && realizationMediaRecorder.state !== "inactive") {
+    realizationMediaRecorder.stop();
+    if (showMessage) showToast("Menyiapkan video… file akan diunduh setelah selesai.");
+  } else {
+    if (realizationCaptureTimer) clearInterval(realizationCaptureTimer);
+    realizationCaptureTimer = null;
+    realizationMediaStream?.getTracks().forEach(track => track.stop());
+    realizationMediaStream = null;
+    setRealizationVideoUI(false);
+  }
+}
+
+
+// Foto lokasi: metadata di localStorage, file foto di IndexedDB agar tidak cepat memenuhi kuota.
+const OYON_PHOTO_META_KEY = "oyon_route_photos_v1";
+const OYON_PHOTO_DB = "oyon_route_photo_db_v1";
+let v13ShownPhotoIds = new Set();
+function v13OpenPhotoDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(OYON_PHOTO_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("photos");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function v13SavePhotoBlob(id, blob) {
+  const db = await v13OpenPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("photos", "readwrite");
+    tx.objectStore("photos").put(blob, id);
+    tx.oncomplete = () => { db.close(); resolve(true); };
+    tx.onerror = () => { db.close(); reject(tx.error); };
+  });
+}
+async function v13GetPhotoBlob(id) {
+  const db = await v13OpenPhotoDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("photos", "readonly");
+    const req = tx.objectStore("photos").get(id);
+    req.onsuccess = () => { const value = req.result; db.close(); resolve(value || null); };
+    req.onerror = () => { db.close(); reject(req.error); };
+  });
+}
+function v13PhotoMetadata() {
+  try { return JSON.parse(localStorage.getItem(OYON_PHOTO_META_KEY) || "[]"); }
+  catch (e) { return []; }
+}
+function v13GetCurrentGPS() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error("GPS tidak didukung perangkat."));
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy || "" }),
+      err => reject(err), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
+async function v13HandleLocationPhoto(file) {
+  if (!file || !file.type.startsWith("image/")) return;
+  try {
+    const gps = await v13GetCurrentGPS();
+    const image = new Image();
+    const tempUrl = URL.createObjectURL(file);
+    await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = tempUrl; });
+    const maxSide = 1280, scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    URL.revokeObjectURL(tempUrl);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    if (!blob) throw new Error("Foto gagal dikompres.");
+    const id = "photo_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+    await v13SavePhotoBlob(id, blob);
+    const now = new Date();
+    const meta = v13PhotoMetadata();
+    meta.push({ id, lat: gps.lat, lon: gps.lon, accuracy: gps.accuracy, at: now.toISOString(), dayKey: localDateTimeParts(now).dayKey, name: file.name || "Foto lokasi" });
+    localStorage.setItem(OYON_PHOTO_META_KEY, JSON.stringify(meta));
+    showToast("📸 Foto lokasi tersimpan bersama koordinat GPS.");
+  } catch (err) {
+    console.error("[OYONID] Save location photo failed", err);
+    showToast("Foto belum tersimpan: " + (err?.message || "GPS/foto tidak tersedia."));
+  }
+}
+async function v13ShowPhotosAtPlayback(entry) {
+  if (!entry?.point?.at || !v13PlaybackLayer) return;
+  const playbackTime = new Date(entry.point.at).getTime();
+  if (!Number.isFinite(playbackTime)) return;
+  const photos = v13PhotoMetadata().filter(photo =>
+    photo.dayKey === v13SelectedDate() &&
+    new Date(photo.at).getTime() <= playbackTime &&
+    !v13ShownPhotoIds.has(photo.id)
+  );
+  for (const photo of photos) {
+    v13ShownPhotoIds.add(photo.id);
+    try {
+      const blob = await v13GetPhotoBlob(photo.id);
+      if (!blob) continue;
+      const url = URL.createObjectURL(blob);
+      const marker = L.marker([photo.lat, photo.lon], {
+        icon: L.divIcon({
+          className: "oyon-photo-marker",
+          html: '<span>📷</span>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        }),
+        zIndexOffset: 1500
+      }).addTo(v13PlaybackLayer);
+      marker.bindPopup(`<div class="oyon-photo-popup"><img src="${url}" alt="Foto lokasi" /><small>${new Date(photo.at).toLocaleString("id-ID")}</small></div>`);
+    } catch (e) { console.warn("[OYONID] Playback photo could not be loaded", e); }
+  }
+}
+
+
 /* ======================
    LOAD EXCEL
 ====================== */
@@ -753,14 +983,55 @@ localStorage.setItem(
   JSON.stringify(originalHeaders)
 );
 
-// Baca data seperti sebelumnya
-originalRows = XLSX.utils.sheet_to_json(sheet, {
-  defval: ""
-});
+// Sheet 1 = daftar pelanggan aktif/tersisa.
+originalRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-// Salin data untuk proses kerja aplikasi, lalu keluarkan pelanggan yang sudah pernah selesai.
-    // Riwayat realisasi bersifat kumulatif lintas hari dan tidak bergantung pada unduhan Excel.
-    workingRows = filterAlreadyCompletedRows(structuredClone(originalRows));
+// Sheet 2 = daftar realisasi yang sudah selesai. Jangan hanya membaca sheet pertama.
+const completedSheetName = wb.SheetNames.find(name =>
+  normalizeHeader(name) === normalizeHeader("Realisasi Selesai")
+);
+const importedCompletedRows = completedSheetName
+  ? XLSX.utils.sheet_to_json(wb.Sheets[completedSheetName], { defval: "" })
+      .filter(row => Object.values(row || {}).some(value => String(value ?? "").trim() !== ""))
+  : [];
+if (importedCompletedRows.length) {
+  const importedAt = new Date();
+  importedCompletedRows.forEach((row, index) => {
+    const identity = completionIdentity(row);
+    if (!identity || identity === "|") return;
+    const iso = row["WAKTU SELESAI ISO"] || row["WAKTU REALISASI ISO"] || row.completedAt || "";
+    let parsed = iso ? new Date(iso) : null;
+    const dateText = row["TANGGAL SELESAI"] || row["TANGGAL REALISASI"] || "";
+    if ((!parsed || Number.isNaN(parsed.getTime())) && dateText) {
+      const dateStr = String(dateText).trim();
+      let parts = dateStr.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+      if (parts) parsed = new Date(Number(parts[3]), Number(parts[2]) - 1, Number(parts[1]));
+      else if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) parsed = new Date(`${dateStr}T12:00:00`);
+      else if (typeof dateText === "number" && dateText > 20000 && dateText < 80000) parsed = new Date(Date.UTC(1899, 11, 30) + dateText * 86400000);
+    }
+    const dayKey = parsed && !Number.isNaN(parsed.getTime())
+      ? localDateTimeParts(parsed).dayKey
+      : localDateTimeParts(importedAt).dayKey;
+    const completionId = String(row.completionId || `sheet2_${identity}_${dayKey}`);
+    const exists = completedRecords.some(item =>
+      item.completionId === completionId || (item.identity === identity && item.dayKey === dayKey)
+    );
+    if (exists) return;
+    completedRecords.push({
+      completionId, identity, dayKey, row: structuredClone(row),
+      completedAt: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : "",
+      date: String(dateText || ""), time: String(row["JAM SELESAI"] || row["JAM REALISASI"] || ""),
+      actualLat: row["LAT REALISASI"] ?? row.actualLat ?? "",
+      actualLon: row["LON REALISASI"] ?? row.actualLon ?? "",
+      gpsAccuracy: row["AKURASI GPS HP (M)"] ?? row.gpsAccuracy ?? "",
+      gpsError: row["CATATAN GPS"] || "", status: "Selesai"
+    });
+  });
+  persistCompletedRecords();
+}
+
+// Salin daftar aktif dan singkirkan yang sudah tercatat selesai di sheet 2 atau penyimpanan HP.
+workingRows = filterAlreadyCompletedRows(structuredClone(originalRows));
     saveState();
 
     buildMarkers();
@@ -768,13 +1039,15 @@ originalRows = XLSX.utils.sheet_to_json(sheet, {
     welcomeFieldOfficer(workingRows, { force: true });
 
     const diag = window.OYONID_MARKER_DIAGNOSTIC || { totalRows: workingRows.length, dijCreated: 0, dijInvalid: workingRows.length, backupCreated: 0 };
-    const alreadyDoneCount = Math.max(0, originalRows.length - workingRows.length);
+    const localMatchedDoneCount = Math.max(0, originalRows.length - workingRows.length);
+    const alreadyDoneCount = Math.max(importedCompletedRows.length, localMatchedDoneCount);
     if (statusText) {
-      statusText.innerText = workingRows.length === 0 && originalRows.length > 0
-        ? `✅ ${originalRows.length} pelanggan dibaca • semua sudah selesai • 0 pelanggan tersisa`
-        : diag.dijCreated > 0
-          ? `✅ ${originalRows.length} dibaca • ${alreadyDoneCount} sudah selesai • ${workingRows.length} tersisa • ${diag.dijCreated} marker DIJ • ${diag.backupCreated} cadangan • ${diag.dijInvalid} koordinat DIJ tidak valid`
-          : `⚠️ ${originalRows.length} dibaca • ${alreadyDoneCount} sudah selesai • ${workingRows.length} tersisa, tetapi 0 marker DIJ dibuat. Periksa LAT/LON dan format koordinat.`;
+      const sheet2Info = completedSheetName
+        ? `${alreadyDoneCount} sudah selesai (termasuk Sheet 2)`
+        : `${alreadyDoneCount} sudah selesai (riwayat HP)`;
+      statusText.innerText = diag.dijCreated > 0
+        ? `✅ ${originalRows.length} dibaca • ${sheet2Info} • ${workingRows.length} tersisa • ${diag.dijCreated} marker DIJ • ${diag.backupCreated} cadangan • ${diag.dijInvalid} koordinat DIJ tidak valid`
+        : `⚠️ ${originalRows.length} dibaca • ${sheet2Info} • ${workingRows.length} tersisa, tetapi 0 marker DIJ dibuat. Periksa LAT/LON dan format koordinat.`;
     }
     zoomBtn.style.display = diag.dijCreated > 0 ? "block" : "none";
 
@@ -783,97 +1056,7 @@ originalRows = XLSX.utils.sheet_to_json(sheet, {
   };
   reader.readAsArrayBuffer(file);
 
-  let realizationMediaRecorder = null;
-let realizationMediaStream = null;
-let realizationMediaChunks = [];
-let realizationVideoMime = "";
 
-function setRealizationVideoUI(recording) {
-  const start = document.getElementById("quickVideoStartBtn");
-  const stop = document.getElementById("quickVideoStopBtn");
-  if (start) start.disabled = !!recording;
-  if (stop) stop.disabled = !recording;
-}
-async function startRealizationScreenRecording() {
-  if (!navigator.mediaDevices?.getDisplayMedia || typeof MediaRecorder === "undefined") {
-    showToast("Perekaman layar tidak didukung browser ini. Gunakan fitur Rekam Layar bawaan Android.");
-    return;
-  }
-  try {
-    realizationMediaStream = await navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: 30 },
-      audio: false
-    });
-    const candidates = [
-      "video/mp4;codecs=avc1.42E01E",
-      "video/mp4",
-      "video/webm;codecs=vp9",
-      "video/webm;codecs=vp8",
-      "video/webm"
-    ];
-    realizationVideoMime = candidates.find(type => MediaRecorder.isTypeSupported(type)) || "";
-    realizationMediaChunks = [];
-    realizationMediaRecorder = new MediaRecorder(
-      realizationMediaStream,
-      realizationVideoMime ? { mimeType: realizationVideoMime } : undefined
-    );
-    realizationMediaRecorder.ondataavailable = event => {
-      if (event.data && event.data.size) realizationMediaChunks.push(event.data);
-    };
-    realizationMediaRecorder.onerror = event => {
-      console.error("[OYONID] Screen recording error", event);
-      showToast("Perekaman layar gagal. Coba browser/perangkat lain.");
-      stopRealizationScreenRecording(false);
-    };
-    realizationMediaRecorder.onstop = () => {
-      const mime = realizationMediaRecorder?.mimeType || realizationVideoMime || "video/webm";
-      const isMp4 = mime.toLowerCase().includes("mp4");
-      const blob = new Blob(realizationMediaChunks, { type: mime });
-      if (blob.size) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `OYONID_Realisasi_${localDateTimeParts().dayKey}.${isMp4 ? "mp4" : "webm"}`;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
-        showToast(isMp4 ? "Video MP4 berhasil disimpan." : "Browser tidak mendukung MP4; video disimpan dalam format WebM.");
-      }
-      if (realizationMediaStream) realizationMediaStream.getTracks().forEach(track => track.stop());
-      realizationMediaStream = null;
-      realizationMediaRecorder = null;
-      realizationMediaChunks = [];
-      setRealizationVideoUI(false);
-    };
-    realizationMediaRecorder.start(1000);
-    setRealizationVideoUI(true);
-    showToast(realizationVideoMime.includes("mp4")
-      ? "Rekam layar dimulai. Pilih tab OYONID Map jika diminta."
-      : "Rekam layar dimulai. Browser akan menyimpan WebM jika MP4 tidak didukung.");
-    realizationMediaStream.getVideoTracks()[0]?.addEventListener("ended", () => {
-      if (realizationMediaRecorder?.state === "recording") realizationMediaRecorder.stop();
-    }, { once: true });
-  } catch (err) {
-    console.warn("[OYONID] Screen recording was cancelled/failed", err);
-    if (realizationMediaStream) realizationMediaStream.getTracks().forEach(track => track.stop());
-    realizationMediaStream = null;
-    setRealizationVideoUI(false);
-    showToast("Perekaman dibatalkan atau tidak tersedia pada browser ini.");
-  }
-}
-function stopRealizationScreenRecording(showMessage = true) {
-  if (realizationMediaRecorder && realizationMediaRecorder.state !== "inactive") {
-    realizationMediaRecorder.stop();
-    if (showMessage) showToast("Mengakhiri rekaman layar… video akan diunduh.");
-  } else {
-    if (realizationMediaStream) realizationMediaStream.getTracks().forEach(track => track.stop());
-    realizationMediaStream = null;
-    setRealizationVideoUI(false);
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  const statusText = document.getElementById("statusText");
-});
 
 };
 
@@ -2510,7 +2693,7 @@ downloadBtn.onclick = () => {
     return;
   }
   XLSX.writeFile(wb, filename, { compression: true });
-  showToast(`✅ Excel V13.1.4: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
+  showToast(`✅ Excel V13.1.6: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
 };
 
 /* ======================
@@ -2802,6 +2985,7 @@ function v13PlaybackUpdateControls() {
 }
 function v13PlaybackClearDrawing() {
   if (v13PlaybackLayer && map) map.removeLayer(v13PlaybackLayer);
+  v13ShownPhotoIds = new Set();
   v13PlaybackLayer = L.layerGroup().addTo(map);
   v13PlaybackMarker = null;
   v13PlaybackLines = [];
@@ -2822,6 +3006,7 @@ function v13PlaybackDrawEntry(entry, pan = true) {
     v13PlaybackMarker = L.circleMarker(ll, { radius: 10, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(v13PlaybackLayer);
   } else v13PlaybackMarker.setLatLng(ll);
   if (pan) map.panTo(ll, { animate: true, duration: .2 });
+  v13ShowPhotosAtPlayback(entry);
 }
 function v13PlaybackRenderTo(targetIndex, pan = true) {
   v13PlaybackClearDrawing();
@@ -2882,7 +3067,7 @@ function seekRoutePlayback(value) {
 }
 function downloadRouteBackup() {
   const payload = {
-    app: "OYONID Map", version: "V13.1.4", exportedAt: new Date().toISOString(),
+    app: "OYONID Map", version: "V13.1.6", exportedAt: new Date().toISOString(),
     sessions: v13RouteSessions || [], activeSession: v13ActiveRoute || null
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -2925,8 +3110,15 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
   document.getElementById("quickVideoStartBtn")?.addEventListener("click", startRealizationScreenRecording);
   document.getElementById("quickVideoStopBtn")?.addEventListener("click", () => stopRealizationScreenRecording(true));
+  const photoInput = document.getElementById("locationPhotoInput");
+  document.getElementById("locationPhotoBtn")?.addEventListener("click", () => photoInput?.click());
+  photoInput?.addEventListener("change", async event => {
+    const file = event.target.files?.[0];
+    if (file) await v13HandleLocationPhoto(file);
+    event.target.value = "";
+  });
 
-  console.info("[OYONID] V13.1.5 handlers attached");
+  console.info("[OYONID] V13.1.6 handlers attached");
 });
 // Expose functions for compatibility with any older inline buttons.
 Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback});
