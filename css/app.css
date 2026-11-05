@@ -661,3 +661,86 @@
 @media (max-width:600px) {
   #realizationQuickBar { bottom:22px; max-height:38vh; }
 }
+
+
+/* V13.1.6: peta tetap dominan ketika mode realisasi aktif */
+.v13-panel {
+  top: 10px !important;
+  left: 10px !important;
+  right: auto !important;
+  width: min(320px, calc(100vw - 20px)) !important;
+  max-height: 25vh !important;
+  z-index: 8500 !important;
+  opacity: .97;
+}
+.v13-panel-body {
+  max-height: calc(25vh - 48px) !important;
+  padding: 8px !important;
+  gap: 6px !important;
+}
+.v13-panel-body .v13-play-controls,
+.v13-panel-body label[for="routePlaybackSpeed"],
+.v13-panel-body #routePlaybackSpeed,
+.v13-panel-body label[for="routePlaybackProgress"],
+.v13-panel-body #routePlaybackProgress,
+.v13-panel-body #routeBackupBtn {
+  display: none !important;
+}
+#realizationQuickBar {
+  left: 10px !important;
+  right: 10px !important;
+  bottom: 10px !important;
+  width: auto !important;
+  max-width: 460px !important;
+  max-height: 116px !important;
+  padding: 7px !important;
+  gap: 5px !important;
+  z-index: 9000 !important;
+  background: rgba(255,255,255,.94) !important;
+}
+#realizationQuickBar #quickRealizationCloseBtn {
+  min-height: 30px !important;
+  padding: 5px 8px !important;
+}
+#realizationQuickBar .quick-play-row button,
+#realizationQuickBar .quick-video-row button {
+  min-height: 32px !important;
+  padding: 5px !important;
+  font-size: 12px !important;
+}
+#realizationQuickBar label,
+#realizationQuickBar small {
+  display: none !important;
+}
+#realizationQuickBar input[type="range"] {
+  height: 14px !important;
+  margin: 0 !important;
+}
+#locationPhotoBtn {
+  position: fixed;
+  right: 14px;
+  bottom: 138px;
+  z-index: 7000;
+  width: 48px;
+  height: 48px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 23px;
+  box-shadow: 0 3px 12px rgba(0,0,0,.28);
+}
+#locationPhotoBtn:active { transform: scale(.96); }
+.oyon-photo-marker span {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  background: #fff; border: 2px solid #2563eb; border-radius: 50%;
+  box-shadow: 0 2px 8px #0004; font-size: 19px;
+}
+.oyon-photo-popup img { display:block; width:min(230px,65vw); max-height:220px; object-fit:contain; border-radius:8px; }
+.oyon-photo-popup small { display:block; margin-top:5px; color:#475569; }
+@media(max-width:600px) {
+  .v13-panel { top: 8px !important; left: 8px !important; width: min(290px, calc(100vw - 16px)) !important; max-height: 23vh !important; }
+  .v13-panel-body { max-height: calc(23vh - 46px) !important; }
+  #realizationQuickBar { bottom: 8px !important; max-height: 108px !important; }
+  #locationPhotoBtn { bottom: 126px; right: 12px; }
+}
