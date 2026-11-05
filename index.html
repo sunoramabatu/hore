@@ -156,6 +156,23 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 </div>
 
 
+<div id="realizationQuickBar" aria-label="Kontrol realisasi dan animasi rute" style="display:none">
+  <button id="quickRealizationCloseBtn" type="button" title="Kembali ke pelanggan tersisa">✕ Kembali</button>
+  <div class="quick-play-row">
+    <button id="quickRoutePlayBtn" type="button">▶ Putar</button>
+    <button id="quickRoutePauseBtn" type="button">Ⅱ Jeda</button>
+    <button id="quickRouteResetBtn" type="button">↺ Ulang</button>
+  </div>
+  <label for="quickRouteProgress">Posisi perjalanan</label>
+  <input id="quickRouteProgress" type="range" min="0" max="0" value="0" disabled />
+  <label for="quickRouteSpeed">Kecepatan <span id="quickSpeedLabel">2×</span></label>
+  <input id="quickRouteSpeed" type="range" min="1" max="5" value="2" />
+  <div class="quick-video-row">
+    <button id="quickVideoStartBtn" type="button">🎥 Rekam layar</button>
+    <button id="quickVideoStopBtn" type="button" disabled>■ Simpan video</button>
+  </div>
+  <small id="quickVideoNote">MP4 jika didukung browser; selain itu WebM. Android dapat memakai Rekam Layar bawaan.</small>
+</div>
 <div id="map"></div>
 <div id="detailPanel" class="detail-panel">
   <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
@@ -202,6 +219,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.4"></script>
+<script src="./js/app.js?v=13.1.5"></script>
 </body>
 </html>
