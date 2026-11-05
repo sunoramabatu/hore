@@ -112,9 +112,9 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       Download Excel Update
     </button>
     <div class="v13-tools">
-      <button class="ui-btn small-btn" onclick="openRealizationPanel()">📍 Lihat Realisasi</button>
-      <button class="ui-btn small-btn" id="routeStartBtn" onclick="startRouteRecording()">▶ Mulai Rekam Rute</button>
-      <button class="ui-btn small-btn" id="routeStopBtn" onclick="stopRouteRecording()" disabled>■ Akhiri Rekam Rute</button>
+      <button class="ui-btn small-btn" id="realizationOpenBtn" type="button">📍 Lihat Realisasi</button>
+      <button class="ui-btn small-btn" id="routeStartBtn" type="button">▶ Mulai Rekam Rute</button>
+      <button class="ui-btn small-btn" id="routeStopBtn" type="button" disabled>■ Akhiri Rekam Rute</button>
       <div id="routeRecordStatus" class="route-record-status">Rute belum direkam</div>
     </div>
     
@@ -127,18 +127,18 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 </div>
 
 <div id="realizationPanel" class="v13-panel" style="display:none">
-  <div class="v13-panel-head"><strong>📍 Mode Realisasi & Rute</strong><button onclick="closeRealizationPanel()" aria-label="Tutup Realisasi">✕ Tutup Realisasi</button></div>
+  <div class="v13-panel-head"><strong>📍 Mode Realisasi & Rute</strong><button id="realizationCloseBtn" type="button" aria-label="Tutup Realisasi">✕ Tutup Realisasi</button></div>
   <div class="v13-panel-body">
     <label class="v13-label">Tanggal realisasi</label>
     <input id="realizationDate" type="date" />
     <div id="realizationSummary" class="v13-summary">Pilih tanggal untuk melihat titik realisasi.</div>
-    <button class="ui-btn" onclick="showRealizationOnMap()">Tampilkan Ulang Pelanggan Selesai</button>
+    <button class="ui-btn" id="realizationRefreshBtn" type="button">Tampilkan Ulang Pelanggan Selesai</button>
     <hr>
     <strong>Playback rute petugas</strong>
     <div class="v13-play-controls">
-      <button onclick="playRouteHistory()">▶ Putar</button>
-      <button onclick="pauseRouteHistory()">Ⅱ Jeda</button>
-      <button onclick="resetRoutePlayback()">↺ Ulang</button>
+      <button id="routePlayBtn" type="button">▶ Putar</button>
+      <button id="routePauseBtn" type="button">Ⅱ Jeda</button>
+      <button id="routeResetBtn" type="button">↺ Ulang</button>
     </div>
     <input id="routePlaybackSpeed" type="range" min="1" max="5" value="2" />
     <div id="routePlaybackStatus" class="v13-summary">Rute hanya tersedia jika perekaman manual pernah dijalankan.</div>
@@ -198,6 +198,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.1"></script>
+<script src="./js/app.js?v=13.1.2"></script>
 </body>
 </html>
