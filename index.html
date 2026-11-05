@@ -174,6 +174,8 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   <small id="quickVideoNote">MP4 jika didukung browser; selain itu WebM. Android dapat memakai Rekam Layar bawaan.</small>
 </div>
 <div id="map"></div>
+<button id="locationPhotoBtn" type="button" aria-label="Tambah foto lokasi" title="Tambah foto lokasi">📷</button>
+<input id="locationPhotoInput" type="file" accept="image/*" capture="environment" hidden />
 <div id="detailPanel" class="detail-panel">
   <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
 
@@ -208,7 +210,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
@@ -219,6 +221,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.5"></script>
+<script src="./js/app.js?v=13.1.6"></script>
 </body>
 </html>
