@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.2-STABILIZATION";
+window.OYONID_BUILD = "V13.1.3-STABILIZATION";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -746,10 +746,13 @@ workingRows = structuredClone(originalRows);
     renderHistory();
     welcomeFieldOfficer(workingRows, { force: true });
 
+    const diag = window.OYONID_MARKER_DIAGNOSTIC || { totalRows: workingRows.length, dijCreated: 0, dijInvalid: workingRows.length, backupCreated: 0 };
     if (statusText) {
-      statusText.innerText = "✅ Peta berhasil dibuat";
+      statusText.innerText = diag.dijCreated > 0
+        ? `✅ ${diag.totalRows} pelanggan dibaca • ${diag.dijCreated} marker DIJ • ${diag.backupCreated} marker cadangan • ${diag.dijInvalid} koordinat DIJ tidak valid`
+        : `⚠️ ${diag.totalRows} pelanggan dibaca, tetapi 0 marker DIJ dibuat. Periksa kolom LAT/LON dan format koordinat.`;
     }
-    zoomBtn.style.display = "block";
+    zoomBtn.style.display = diag.dijCreated > 0 ? "block" : "none";
 
     // auto zoom setelah upload
     zoomToAllMarkers();
@@ -870,65 +873,28 @@ function showNormalMarkers() {
 ====================== */
 
 function renderVisibleMarkers() {
+  // V13.1.3: viewport is managed by Leaflet.markercluster.
+  // Do NOT remove off-screen customer markers here: doing so before fitBounds
+  // makes them disappear permanently until another rebuild.
   if (window.isCompareMode) return;
 
-  const bounds = map.getBounds();
+  const showDIJ = document.getElementById("chkDIJ")?.checked ?? true;
+  const showDIL = document.getElementById("chkDIL")?.checked ?? true;
 
-  markers.forEach(m => {
-
+  markers.forEach(item => {
     let visible = true;
-
-    // FILTER DIJ / DIL
-    const showDIJ =
-      document.getElementById("chkDIJ")?.checked ?? true;
-
-    const showDIL =
-      document.getElementById("chkDIL")?.checked ?? true;
-
-    if (m.type === "DIJ" && !showDIJ) {
+    if (item.type === "DIJ" && !showDIJ) visible = false;
+    if (item.type === "DIL" && !showDIL) visible = false;
+    if (filterHariBacaAktif && getHariBaca(item.row) !== daftarHariBaca[indexHariBaca]) {
       visible = false;
     }
 
-    if (m.type === "DIL" && !showDIL) {
-      visible = false;
+    if (visible) {
+      if (!clusterGroup.hasLayer(item.marker)) clusterGroup.addLayer(item.marker);
+    } else if (clusterGroup.hasLayer(item.marker)) {
+      clusterGroup.removeLayer(item.marker);
     }
-
-    // FILTER HARI BACA
-    if (filterHariBacaAktif) {
-
-      const hari = getHariBaca(m.row);
-
-      if (hari !== daftarHariBaca[indexHariBaca]) {
-        visible = false;
-      }
-    }
-
-    // VIEWPORT CHECK
-    const latlng = m.marker.getLatLng();
-
-    const insideViewport =
-      bounds.contains(latlng);
-
-    // ===== SHOW =====
-    if (visible && insideViewport) {
-
-      if (!clusterGroup.hasLayer(m.marker)) {
-        clusterGroup.addLayer(m.marker);
-      }
-
-    }
-
-    // ===== HIDE =====
-    else {
-
-      if (clusterGroup.hasLayer(m.marker)) {
-        clusterGroup.removeLayer(m.marker);
-      }
-
-    }
-
   });
-
 }
 
 /* ======================
@@ -1122,6 +1088,10 @@ clusterGroup.clearLayers();
 markers = [];
 searchIndex = [];
 
+  let v1313DijCreated = 0;
+  let v1313DijInvalid = 0;
+  let v1313BackupCreated = 0;
+
   workingRows.forEach(row => {
     // ==========================
     // MARKER 1 — LOKASI DIJ
@@ -1162,8 +1132,9 @@ searchIndex = [];
         row: row,
         type: "DIJ"
       });
+      v1313DijCreated++;
 
-            searchIndex.push({
+      searchIndex.push({
 
           idpel: String(
             row.IDPEL || ""
@@ -1221,6 +1192,7 @@ if (hasDILLocation) {
     row,
     type: "DIL"
   });
+  v1313BackupCreated++;
 }
 
   }); // ← TUTUP workingRows.forEach
@@ -1956,9 +1928,16 @@ async function markDone(idpel) {
       const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
         enableHighAccuracy: true, timeout: 10000, maximumAge: 0
       }));
-      actualLat = pos.coords.latitude;
-      actualLon = pos.coords.longitude;
-      gpsAccuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : "";
+      const candidateAccuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : "";
+      if (candidateAccuracy !== "" && candidateAccuracy > 60) {
+        gpsError = `Akurasi GPS terlalu rendah (${Math.round(candidateAccuracy)} m)`;
+        const proceedWithoutGps = window.confirm(`Akurasi GPS saat ini ±${Math.round(candidateAccuracy)} meter.\n\nSimpan pekerjaan selesai TANPA koordinat realisasi? Pilih Batal untuk mencoba GPS lagi.`);
+        if (!proceedWithoutGps) { showToast("Pekerjaan belum ditandai selesai. Coba lagi di area terbuka."); return; }
+      } else {
+        actualLat = pos.coords.latitude;
+        actualLon = pos.coords.longitude;
+        gpsAccuracy = candidateAccuracy;
+      }
     } catch (err) {
       gpsError = err?.message || "GPS tidak tersedia";
       const proceed = window.confirm("GPS realisasi belum berhasil diambil. Tetap tandai selesai tanpa koordinat GPS aktual?\n\nPilih Batal untuk mencoba lagi.");
@@ -2622,7 +2601,9 @@ function closeRealizationPanel(){
   pauseRouteHistory();
   if(v13RealizationLayer&&map){map.removeLayer(v13RealizationLayer);v13RealizationLayer=null;}
   if(v13RealizationModeActive&&map&&clusterGroup&&!map.hasLayer(clusterGroup))map.addLayer(clusterGroup);
-  v13RealizationModeActive=false;showToast("Kembali ke peta pelanggan yang belum selesai.");
+  v13RealizationModeActive=false;
+  if (typeof applyHariBacaFilter === "function") applyHariBacaFilter();
+  showToast("Kembali ke peta pelanggan yang belum selesai.");
 }
 function v13SelectedDate(){return document.getElementById("realizationDate")?.value||localDateTimeParts().dayKey;}
 function v13ValidActual(item){
