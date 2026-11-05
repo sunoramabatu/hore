@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.3-STABILIZATION";
+window.OYONID_BUILD = "V13.1.4-STABILIZATION";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -1216,6 +1216,15 @@ renderVisibleMarkers();
 setTimeout(() => {
   renderVisibleMarkers();
 }, 200);
+  const dijCount = markers.filter(item => item && item.type === "DIJ" && item.marker).length;
+  const backupCount = markers.filter(item => item && item.type === "DIL" && item.marker).length;
+  window.OYONID_MARKER_DIAGNOSTIC = {
+    totalRows: workingRows.length,
+    dijCreated: dijCount,
+    dijInvalid: Math.max(0, workingRows.length - dijCount),
+    backupCreated: backupCount
+  };
+  console.info("[OYONID] Marker diagnostic", window.OYONID_MARKER_DIAGNOSTIC);
 }     // ← TUTUP function buildMarkers
 
 /* ======================
@@ -1982,7 +1991,7 @@ async function markDone(idpel) {
   }
 
   history.push({ row: structuredClone(found), time: dt.time, date: dt.date, completionId,
-    actualLat, actualLon, gpsAccuracy, gpsError, dayKey });
+    completedAt: now.toISOString(), actualLat, actualLon, gpsAccuracy, gpsError, dayKey });
   localStorage.setItem("oyon_history", JSON.stringify(history));
   // Hapus hanya baris yang dipilih, bukan semua pelanggan yang kebetulan punya IDPEL sama.
   workingRows = workingRows.filter(r => r !== found);
@@ -2006,59 +2015,35 @@ async function markDone(idpel) {
 /* ======================
    DONE + HISTORY
 ====================== */
+function historySortTimestamp(item) {
+  const iso = Date.parse(item?.completedAt || "");
+  if (Number.isFinite(iso)) return iso;
+  const idMatch = String(item?.completionId || "").match(/^done_(\\d+)/);
+  if (idMatch) return Number(idMatch[1]);
+  const parsed = Date.parse(`${String(item?.dayKey || "")}T${String(item?.time || "").replace(/\\./g, ":")}`);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 function renderHistory() {
   const el = document.getElementById("historyList");
   if (!el) return;
-
   if (!history || history.length === 0) {
-    el.innerHTML = `
-      <div style="padding:10px;color:#666;text-align:center">
-        📭 Belum ada pelanggan selesai hari ini
-      </div>`;
+    el.innerHTML = `<div style="padding:10px;color:#666;text-align:center">📭 Belum ada pelanggan selesai hari ini</div>`;
     return;
   }
-
-  el.innerHTML = history.map((item, index) => `
-
-  <div style="
-    border-bottom:1px solid #eee;
-    padding:8px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-  ">
-
-    <div>
-
-      <strong>${item.row.NAMA || "-"}</strong><br>
-
-      NOMET: ${getNoMeter(item.row)}<br>
-
-      MERK: ${getMerkMeter(item.row)}<br>
-
-      HARI BACA: ${getHariBaca(item.row)}<br>
-
-      <small>${item.time}</small>
-
+  const newestFirst = history.map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => historySortTimestamp(b.item) - historySortTimestamp(a.item));
+  el.innerHTML = newestFirst.map(({ item, originalIndex }) => `
+    <div style="border-bottom:1px solid #eee;padding:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong>${String(item.row?.NAMA || "-").replace(/[<>]/g, "")}</strong><br>
+        NOMET: ${String(getNoMeter(item.row) || "-").replace(/[<>]/g, "")}<br>
+        MERK: ${String(getMerkMeter(item.row) || "-").replace(/[<>]/g, "")}<br>
+        HARI BACA: ${String(getHariBaca(item.row) || "-").replace(/[<>]/g, "")}<br>
+        <small>${String(item.time || "-")}</small>
+      </div>
+      <button onclick="undoHistory(${originalIndex})" style="background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:8px;font-size:12px;">Undo</button>
     </div>
-
-    <button
-      onclick="undoHistory(${index})"
-      style="
-        background:#2563eb;
-        color:white;
-        border:none;
-        padding:6px 10px;
-        border-radius:8px;
-        font-size:12px;
-      "
-    >
-      Undo
-    </button>
-
-  </div>
-
-`).join("");
+  `).join("");
 }
 
 
@@ -2297,14 +2282,36 @@ downloadBtn.onclick = () => {
   if (!hasAnyHeader(LAT_COMPARE_ALIASES)) { exportHeaders.push("LAT PEMBANDING"); normSet.add("LATPEMBANDING"); }
   if (!hasAnyHeader(LON_COMPARE_ALIASES)) { exportHeaders.push("LON PEMBANDING"); normSet.add("LONPEMBANDING"); }
 
+  const compareHeaderNorms = new Set([
+    "LATPEMBANDING", "LONPEMBANDING", "LATDIL", "LONDIL",
+    "LATPETUGAS", "LONPETUGAS", "LATCADANGAN", "LONCADANGAN",
+    "LATTH", "LONTH", "LATITUDEPEMBANDING", "LONGITUDEPEMBANDING",
+    "LATITUDEDIL", "LONGITUDEDIL", "LATITUDEPETUGAS", "LONGITUDEPETUGAS",
+    "LATITUDECADANGAN", "LONGITUDECADANGAN"
+  ]);
   const getRowValueForHeader = (row, header) => {
-    const exact = Object.keys(row || {}).find(k => normalizeHeader(k) === normalizeHeader(header));
-    if (exact !== undefined && row[exact] !== "" && row[exact] != null) return row[exact];
+    const keys = Object.keys(row || {});
     const norm = normalizeHeader(header);
-    if (["LATPEMBANDING", "LATDIL", "LATPETUGAS", "LATCADANGAN", "LATTH", "LATITUDEDIL", "LATITUDEPEMBANDING", "LATITUDEPETUGAS", "LATITUDECADANGAN"].includes(norm)) return getDILLat(row) ?? "";
-    if (["LONPEMBANDING", "LONDIL", "LONPETUGAS", "LONCADANGAN", "LONTH", "LONGITUDEDIL", "LONGITUDEPEMBANDING", "LONGITUDEPETUGAS", "LONGITUDECADANGAN"].includes(norm)) return getDILLon(row) ?? "";
-    const mappedCanonical = Object.keys(COLUMN_MAPPING_FIELDS).find(c => (COLUMN_MAPPING_FIELDS[c] || []).some(a => normalizeHeader(a) === norm));
-    if (mappedCanonical) return getMappedValue(row, mappedCanonical) ?? "";
+    // Exact source column wins even when its cell is empty.
+    const exact = keys.find(k => normalizeHeader(k) === norm);
+    if (exact !== undefined) return row[exact] == null ? "" : row[exact];
+
+    // Read an existing alias only; never infer/fill a missing comparison coordinate.
+    if (compareHeaderNorms.has(norm)) {
+      const latAliases = ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE PEMBANDING", "LATITUDE DIL", "LATITUDE PETUGAS", "LATITUDE CADANGAN"];
+      const lonAliases = ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE PEMBANDING", "LONGITUDE DIL", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"];
+      const aliases = norm.startsWith("LAT") ? latAliases : lonAliases;
+      const sourceKey = keys.find(k => aliases.some(alias => normalizeHeader(alias) === normalizeHeader(k)));
+      return sourceKey === undefined || row[sourceKey] == null ? "" : row[sourceKey];
+    }
+
+    const mappedCanonical = Object.keys(COLUMN_MAPPING_FIELDS).find(c =>
+      (COLUMN_MAPPING_FIELDS[c] || []).some(alias => normalizeHeader(alias) === norm)
+    );
+    if (mappedCanonical) {
+      const value = getMappedValue(row, mappedCanonical);
+      return value == null ? "" : value;
+    }
     return "";
   };
   const buildSheetRows = rows => [exportHeaders, ...rows.map(row => exportHeaders.map(header => {
@@ -2376,7 +2383,7 @@ downloadBtn.onclick = () => {
     return;
   }
   XLSX.writeFile(wb, filename, { compression: true });
-  showToast(`✅ Excel V13.1.2: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
+  showToast(`✅ Excel V13.1.4: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
 };
 
 /* ======================
@@ -2529,6 +2536,10 @@ let v13PlaybackTimer = null;
 let v13PlaybackLayer = null;
 let v13PlaybackMarker = null;
 let v13PlaybackIndex = 0;
+let v13PlaybackEntries = [];
+let v13PlaybackLines = [];
+let v13PlaybackCurrentSession = null;
+let v13PlaybackCurrentPoints = [];
 let v13RealizationLayer = null;
 function v13SaveRoutes(){
   try {
@@ -2594,15 +2605,20 @@ function stopRouteRecording(){
 function openRealizationPanel(){
   const p=document.getElementById("realizationPanel");if(p)p.style.display="block";
   const d=document.getElementById("realizationDate");if(d&&!d.value)d.value=localDateTimeParts().dayKey;
-  updateRealizationSummary();showRealizationOnMap();
+  updateRealizationSummary();
+  resetRoutePlayback();
+  showRealizationOnMap();
 }
 function closeRealizationPanel(){
   const p=document.getElementById("realizationPanel");if(p)p.style.display="none";
   pauseRouteHistory();
+  if(v13PlaybackLayer&&map){map.removeLayer(v13PlaybackLayer);v13PlaybackLayer=null;}
+  v13PlaybackMarker=null;v13PlaybackLines=[];v13PlaybackEntries=[];v13PlaybackIndex=0;
   if(v13RealizationLayer&&map){map.removeLayer(v13RealizationLayer);v13RealizationLayer=null;}
   if(v13RealizationModeActive&&map&&clusterGroup&&!map.hasLayer(clusterGroup))map.addLayer(clusterGroup);
   v13RealizationModeActive=false;
   if (typeof applyHariBacaFilter === "function") applyHariBacaFilter();
+  if (typeof zoomToAllMarkers === "function" && markers.length) zoomToAllMarkers();
   showToast("Kembali ke peta pelanggan yang belum selesai.");
 }
 function v13SelectedDate(){return document.getElementById("realizationDate")?.value||localDateTimeParts().dayKey;}
@@ -2639,32 +2655,111 @@ function showRealizationOnMap(){
 function v13RouteSegments(){
   return v13RoutesForDate().map((session,i)=>({key:session.id||`${session.startedAt||"session"}_${i}`,points:(session.points||[]).slice().sort((a,b)=>new Date(a.at)-new Date(b.at))})).filter(x=>x.points.length);
 }
-function pauseRouteHistory(){if(v13PlaybackTimer){clearInterval(v13PlaybackTimer);v13PlaybackTimer=null;}}
-function resetRoutePlayback(){
-  pauseRouteHistory();v13PlaybackIndex=0;
-  if(v13PlaybackLayer&&map)map.removeLayer(v13PlaybackLayer);
-  v13PlaybackLayer=null;v13PlaybackMarker=null;v13PlaybackLine=null;
-  const el=document.getElementById("routePlaybackStatus");if(el)el.textContent="Playback direset.";
+function v13PlaybackBuildEntries() {
+  return v13RouteSegments().flatMap((segment, sessionIndex) =>
+    segment.points.map((point, pointIndex) => ({ point, sessionIndex, breakBefore: pointIndex === 0 }))
+  );
 }
-function playRouteHistory(){
-  const segments=v13RouteSegments(),total=segments.reduce((n,x)=>n+x.points.length,0);
-  if(!total){showToast("Belum ada data rute. Mulai rekam rute dahulu.");return;}
-  pauseRouteHistory();if(!v13PlaybackLayer)v13PlaybackLayer=L.layerGroup().addTo(map);
-  let si=0,pi=0,played=0,line=null,linePoints=[];
-  const speed=Number(document.getElementById("routePlaybackSpeed")?.value||2);
-  v13PlaybackTimer=setInterval(()=>{
-    const seg=segments[si];if(!seg){pauseRouteHistory();return;}
-    const p=seg.points[pi];
-    if(!p){si++;pi=0;line=null;linePoints=[];return;}
-    const ll=[p.lat,p.lon];
-    if(!v13PlaybackMarker)v13PlaybackMarker=L.circleMarker(ll,{radius:9,color:"#fff",weight:2,fillColor:"#2563eb",fillOpacity:1}).addTo(v13PlaybackLayer);
-    else v13PlaybackMarker.setLatLng(ll);
-    linePoints.push(ll);if(line)v13PlaybackLayer.removeLayer(line);
-    line=linePoints.length>1?L.polyline(linePoints,{color:"#2563eb",weight:4}).addTo(v13PlaybackLayer):null;
-    map.panTo(ll,{animate:true,duration:.25});played++;
-    const el=document.getElementById("routePlaybackStatus");if(el)el.textContent=`Playback ${played}/${total} • sesi ${si+1}/${segments.length} • ${new Date(p.at).toLocaleTimeString("id-ID")}`;
-    pi++;if(played>=total)pauseRouteHistory();
-  },Math.max(180,1000/speed));
+function v13PlaybackUpdateControls() {
+  const slider = document.getElementById("routePlaybackProgress");
+  if (slider) {
+    slider.max = String(Math.max(0, v13PlaybackEntries.length - 1));
+    slider.value = String(Math.max(0, Math.min(v13PlaybackIndex - 1, v13PlaybackEntries.length - 1)));
+    slider.disabled = v13PlaybackEntries.length < 2;
+  }
+}
+function v13PlaybackClearDrawing() {
+  if (v13PlaybackLayer && map) map.removeLayer(v13PlaybackLayer);
+  v13PlaybackLayer = L.layerGroup().addTo(map);
+  v13PlaybackMarker = null;
+  v13PlaybackLines = [];
+  v13PlaybackCurrentSession = null;
+  v13PlaybackCurrentPoints = [];
+}
+function v13PlaybackDrawEntry(entry, pan = true) {
+  const p = entry.point, ll = [p.lat, p.lon];
+  if (entry.breakBefore || v13PlaybackCurrentSession !== entry.sessionIndex) {
+    v13PlaybackCurrentSession = entry.sessionIndex;
+    v13PlaybackCurrentPoints = [];
+    v13PlaybackLines.push(L.polyline([], { color: "#2563eb", weight: 4, opacity: .9 }).addTo(v13PlaybackLayer));
+  }
+  v13PlaybackCurrentPoints.push(ll);
+  const line = v13PlaybackLines[v13PlaybackLines.length - 1];
+  if (line) line.setLatLngs(v13PlaybackCurrentPoints);
+  if (!v13PlaybackMarker) {
+    v13PlaybackMarker = L.circleMarker(ll, { radius: 10, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(v13PlaybackLayer);
+  } else v13PlaybackMarker.setLatLng(ll);
+  if (pan) map.panTo(ll, { animate: true, duration: .2 });
+}
+function v13PlaybackRenderTo(targetIndex, pan = true) {
+  v13PlaybackClearDrawing();
+  for (let i = 0; i <= targetIndex && i < v13PlaybackEntries.length; i++) v13PlaybackDrawEntry(v13PlaybackEntries[i], false);
+  const entry = v13PlaybackEntries[targetIndex];
+  if (entry && pan) map.panTo([entry.point.lat, entry.point.lon], { animate: true, duration: .2 });
+}
+function v13PlaybackSetTimer() {
+  pauseRouteHistory();
+  if (v13PlaybackIndex >= v13PlaybackEntries.length) return;
+  const speed = Number(document.getElementById("routePlaybackSpeed")?.value || 2);
+  v13PlaybackTimer = setInterval(() => {
+    const entry = v13PlaybackEntries[v13PlaybackIndex];
+    if (!entry) { pauseRouteHistory(); return; }
+    v13PlaybackDrawEntry(entry, true);
+    const played = v13PlaybackIndex + 1;
+    const status = document.getElementById("routePlaybackStatus");
+    if (status) status.textContent = `Playback ${played}/${v13PlaybackEntries.length} • sesi ${entry.sessionIndex + 1} • ${new Date(entry.point.at).toLocaleTimeString("id-ID")}`;
+    v13PlaybackIndex++;
+    v13PlaybackUpdateControls();
+    if (v13PlaybackIndex >= v13PlaybackEntries.length) pauseRouteHistory();
+  }, Math.max(180, 1000 / speed));
+}
+function pauseRouteHistory() {
+  if (v13PlaybackTimer) { clearInterval(v13PlaybackTimer); v13PlaybackTimer = null; }
+}
+function resetRoutePlayback() {
+  pauseRouteHistory();
+  v13PlaybackEntries = v13PlaybackBuildEntries();
+  v13PlaybackIndex = 0;
+  v13PlaybackClearDrawing();
+  v13PlaybackUpdateControls();
+  const status = document.getElementById("routePlaybackStatus");
+  if (status) status.textContent = v13PlaybackEntries.length
+    ? `Siap diputar • ${v13PlaybackEntries.length} titik GPS dari ${v13RouteSegments().length} sesi.`
+    : "Belum ada rekaman rute pada tanggal ini.";
+}
+function playRouteHistory() {
+  if (!v13PlaybackEntries.length) v13PlaybackEntries = v13PlaybackBuildEntries();
+  if (!v13PlaybackEntries.length) { showToast("Belum ada data rute untuk tanggal ini. Mulai rekam rute dahulu."); return; }
+  if (v13PlaybackIndex >= v13PlaybackEntries.length) { v13PlaybackIndex = 0; v13PlaybackClearDrawing(); }
+  if (!v13PlaybackLayer) v13PlaybackClearDrawing();
+  v13PlaybackSetTimer();
+  const status = document.getElementById("routePlaybackStatus");
+  if (status) status.textContent = `Memutar rute • ${v13PlaybackEntries.length} titik GPS.`;
+}
+function seekRoutePlayback(value) {
+  pauseRouteHistory();
+  if (!v13PlaybackEntries.length) v13PlaybackEntries = v13PlaybackBuildEntries();
+  if (!v13PlaybackEntries.length) return;
+  const target = Math.max(0, Math.min(Number(value) || 0, v13PlaybackEntries.length - 1));
+  v13PlaybackRenderTo(target, true);
+  v13PlaybackIndex = target + 1;
+  v13PlaybackUpdateControls();
+  const entry = v13PlaybackEntries[target];
+  const status = document.getElementById("routePlaybackStatus");
+  if (status) status.textContent = `Posisi ${target + 1}/${v13PlaybackEntries.length} • sesi ${entry.sessionIndex + 1} • ${new Date(entry.point.at).toLocaleTimeString("id-ID")}`;
+}
+function downloadRouteBackup() {
+  const payload = {
+    app: "OYONID Map", version: "V13.1.4", exportedAt: new Date().toISOString(),
+    sessions: v13RouteSessions || [], activeSession: v13ActiveRoute || null
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `OYONID_GPS_BACKUP_${localDateTimeParts().dayKey}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showToast(`Cadangan GPS diunduh • ${(payload.sessions || []).length} sesi.`);
 }
 document.addEventListener("DOMContentLoaded",()=>{
   v13SetRecordingUI(!!v13ActiveRoute);
@@ -2681,8 +2776,13 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("routePlayBtn")?.addEventListener("click", playRouteHistory);
   document.getElementById("routePauseBtn")?.addEventListener("click", pauseRouteHistory);
   document.getElementById("routeResetBtn")?.addEventListener("click", resetRoutePlayback);
+  document.getElementById("routePlaybackProgress")?.addEventListener("input", event => seekRoutePlayback(event.target.value));
+  document.getElementById("routeBackupBtn")?.addEventListener("click", downloadRouteBackup);
+  document.getElementById("routePlaybackSpeed")?.addEventListener("change", () => {
+    if (v13PlaybackTimer) v13PlaybackSetTimer();
+  });
 
-  console.info("[OYONID] V13.1.2 handlers attached");
+  console.info("[OYONID] V13.1.4 handlers attached");
 });
 // Expose functions for compatibility with any older inline buttons.
 Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback});
