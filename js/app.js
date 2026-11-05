@@ -1,3 +1,5 @@
+window.OYONID_BUILD = "V13.1.2-STABILIZATION";
+console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
   console.error(err);
@@ -14,6 +16,37 @@ let petugasMarker = null;
 let history = JSON.parse(
   localStorage.getItem("oyon_history") || "[]"
 );
+// Catatan realisasi kumulatif: tidak direset harian seperti panel Riwayat.
+const COMPLETED_STORAGE_KEY = "oyon_completed_records_v1";
+let completedRecords = (() => {
+  try { return JSON.parse(localStorage.getItem(COMPLETED_STORAGE_KEY) || "[]"); }
+  catch (e) { return []; }
+})();
+function persistCompletedRecords() {
+  try {
+    localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(completedRecords));
+    return true;
+  } catch (e) {
+    console.error("Gagal menyimpan realisasi lokal", e);
+    showToast("⚠️ Penyimpanan lokal penuh. Download Excel Update untuk membuat cadangan.");
+    return false;
+  }
+}
+function completionIdentity(row) {
+  const idpel = String(getMappedValue(row, "IDPEL") || row.IDPEL || "").trim();
+  const meter = String(getNoMeter(row) || "").trim();
+  return `${idpel}|${meter}`;
+}
+function localDateTimeParts(date = new Date()) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return {
+    date: date.toLocaleDateString("id-ID"),
+    dayKey: `${yyyy}-${mm}-${dd}`,
+    time: date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+  };
+}
 
 let originalRows = [];
 let workingRows = [];
@@ -35,8 +68,8 @@ const COLUMN_MAPPING_FIELDS = {
   "ALAMAT": ["ALAMAT", "ALAMAT PELANGGAN", "ADDRESS"],
   "LAT DIJ": ["LAT DIJ", "LAT", "LATITUDE", "LATITUDE DIJ"],
   "LON DIJ": ["LON DIJ", "LON", "LONGITUDE", "LONGITUDE DIJ"],
-  "LAT DIL": ["LAT PEMBANDING", "LAT DIL", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING"],
-  "LON DIL": ["LON PEMBANDING", "LON PETUGAS", "LON DIL", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS"]
+  "LAT DIL": ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"],
+  "LON DIL": ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"]
 };
 function normalizeHeader(value) { return String(value ?? "").trim().toUpperCase().replace(/[\s_\-]+/g, ""); }
 function getMappedValue(row, canonical) {
@@ -50,6 +83,27 @@ function getMappedValue(row, canonical) {
   return "";
 }
 const COLUMN_LABELS = { "LAT DIL": "LAT PEMBANDING", "LON DIL": "LON PEMBANDING" };
+// Kompatibilitas: LAT/LON PETUGAS juga dapat menjadi koordinat Lokasi Cadangan.
+// Jangan hapus mapping lama karena beberapa RBM memakai nama kolom tersebut.
+function parseCoordinate(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return NaN;
+  let s = String(value).trim().replace(/\s/g, "");
+  // Dukung format desimal koma jika tidak ada titik desimal.
+  if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+function firstCoordinateByHeaders(row, headers) {
+  const keys = Object.keys(row || {});
+  for (const name of headers) {
+    const key = keys.find(k => normalizeHeader(k) === normalizeHeader(name));
+    if (key && String(row[key] ?? "").trim() !== "") return parseCoordinate(row[key]);
+  }
+  return NaN;
+}
+function validCoordinatePair(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
 function renderColumnMappingOptions() {
   const host = document.getElementById("columnMappingFields");
   if (!host) return;
@@ -93,19 +147,49 @@ window.compareMarkers = [];
 ====================== */
 
 function getDIJLat(row) {
-  return parseFloat(getMappedValue(row, "LAT DIJ") || row[" LAT DIJ"] || row["LAT DIJ"] || row["LAT"] || 0);
+  const direct = firstCoordinateByHeaders(row, ["LAT DIJ", "LATITUDE DIJ", "LATITUDE", "LAT"]);
+  if (Number.isFinite(direct)) return direct;
+  return parseCoordinate(getMappedValue(row, "LAT DIJ"));
 }
-
 function getDIJLon(row) {
-  return parseFloat(getMappedValue(row, "LON DIJ") || row["LON DIJ"] || row["LON"] || 0);
+  const direct = firstCoordinateByHeaders(row, ["LON DIJ", "LONGITUDE DIJ", "LONGITUDE", "LON"]);
+  if (Number.isFinite(direct)) return direct;
+  return parseCoordinate(getMappedValue(row, "LON DIJ"));
 }
+function getDILCoordinatePair(row) {
+  // Data RBM bisa memakai beberapa nama untuk titik kedua.
+  // Beberapa file memiliki nilai LAT/LON PEMBANDING tertukar:
+  // LAT PEMBANDING berisi longitude (mis. 112.x) dan LON PEMBANDING
+  // berisi latitude (mis. -7.x). Deteksi berdasarkan rentang koordinat,
+  // lalu betulkan untuk tampilan peta dan ekspor tanpa mengubah koordinat DIJ.
+  const latAliases = [
+    "LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN",
+    "LATTH", "LATDIL", "LATITUDE PEMBANDING", "LATITUDE DIL",
+    "LATITUDE PETUGAS", "LATITUDE CADANGAN"
+  ];
+  const lonAliases = [
+    "LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN",
+    "LONTH", "LONDIL", "LONGITUDE PEMBANDING", "LONGITUDE DIL",
+    "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"
+  ];
 
+  let lat = firstCoordinateByHeaders(row, latAliases);
+  let lon = firstCoordinateByHeaders(row, lonAliases);
+
+  if (!Number.isFinite(lat)) lat = parseCoordinate(getMappedValue(row, "LAT DIL"));
+  if (!Number.isFinite(lon)) lon = parseCoordinate(getMappedValue(row, "LON DIL"));
+
+  // Jika pasangan tidak valid tetapi valid saat ditukar, label/nilai di Excel tertukar.
+  if (!validCoordinatePair(lat, lon) && validCoordinatePair(lon, lat)) {
+    return { lat: lon, lon: lat, swapped: true };
+  }
+  return { lat, lon, swapped: false };
+}
 function getDILLat(row) {
-  return parseFloat(getMappedValue(row, "LAT DIL") || row["LAT DIL"] || row["LATTH"] || row["LATDIL"] || 0);
+  return getDILCoordinatePair(row).lat;
 }
-
 function getDILLon(row) {
-  return parseFloat(getMappedValue(row, "LON DIL") || row["LON DIL"] || row["LONTH"] || row["LONDIL"] || 0);
+  return getDILCoordinatePair(row).lon;
 }
 /* ======================
    UTIL — HARI BACA DARI KDDK ACMT
@@ -131,18 +215,29 @@ function getHariBaca(row) {
 ====================== */
 
 function getUrutanBaca(row) {
-  const kddk = String(getMappedValue(row, "KDDK ACMT") || row["KDDK ACMT"] || row.KDDK || row.KODEDK || "").trim();
+  // 1) Jika Excel sudah memiliki kolom URUTAN BACA, gunakan nilai itu dahulu.
+  //    Ini mencegah mapping KDDK lama (misalnya tersimpan sebagai "KDDK")
+  //    membuat nomor urut hilang.
+  const directOrder = firstCoordinateByHeaders(row, ["URUTAN BACA", "URUTAN_BACA", "URUTAN", "NO URUTAN"]);
+  if (Number.isFinite(directOrder) && directOrder >= 0) return Math.trunc(directOrder);
 
-  if (!kddk) return null;
+  // 2) Ambil KDDK ACMT yang benar dari kolom aslinya sebelum memakai mapping lama.
+  const exactKddk = String(
+    row["KDDK ACMT"] ?? row["KDDK_ACMT"] ?? row.KDDK_ACMT ?? ""
+  ).trim();
+  const mappedKddk = String(getMappedValue(row, "KDDK ACMT") || row.KDDK || row.KODEDK || "").trim();
+  const candidates = [exactKddk, mappedKddk, String(row.LANGKAH ?? "").trim()];
 
-  // Contoh CMAWHNQ07800 → 078 → 78
-  const match = kddk.match(/[A-Z](\d{3})\d{2}$/i);
-
-  if (!match) return null;
-
-  const urutan = Number(match[1]);
-
-  return Number.isFinite(urutan) ? urutan : null;
+  // Pola umum: CMAWHPL00100 → 001 → 1. LANGKAH 00100 juga didukung.
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const match = candidate.match(/(\d{3})\d{2}$/);
+    if (match) {
+      const order = Number(match[1]);
+      if (Number.isFinite(order)) return order;
+    }
+  }
+  return null;
 }
 
 function getNoMeter(row){
@@ -210,328 +305,257 @@ const zoomBtn = document.getElementById("zoomBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 
 /* ======================
-   BARCODE SCANNER
-   Scan nomor meter -> isi Search -> jalankan pencarian
+   BARCODE SCANNER V2
+   ZXing (jika CDN tersedia) + BarcodeDetector sebagai fallback.
+   Kontrol zoom, fokus, dan lampu mengikuti kemampuan perangkat.
 ====================== */
-
 let barcodeStream = null;
 let barcodeScannerOpen = false;
 let barcodeScanBusy = false;
 let barcodeDetector = null;
+let barcodeZXingReader = null;
+let barcodeZXingControls = null;
+let barcodeTorchOn = false;
+let barcodeZoomValue = null;
+let barcodeTrack = null;
 
 function addBarcodeScanButton() {
-
-  if (!searchBtn || !searchInput) return;
-  if (document.getElementById("barcodeScanBtn")) return;
-
+  if (!searchBtn || !searchInput || document.getElementById("barcodeScanBtn")) return;
   const btn = document.createElement("button");
   btn.id = "barcodeScanBtn";
   btn.type = "button";
   btn.innerHTML = '<span class="scan-camera-icon">📷</span><span class="scan-caption">Scan Barcode</span>';
   btn.title = "Scan barcode nomor meter";
   btn.setAttribute("aria-label", "Scan barcode nomor meter");
-
-  btn.style.cssText = `
-    margin-left:6px;
-    width:50px;
-    min-width:50px;
-    height:42px;
-    border:none;
-    border-radius:10px;
-    background:#2563eb;
-    color:white;
-    font-size:18px;
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    justify-content:center;
-    gap:0;
-    cursor:pointer;
-    vertical-align:middle;
-    box-shadow:0 2px 6px rgba(0,0,0,.18);
-  `;
-
+  btn.style.cssText = 'margin-left:6px;width:50px;min-width:50px;height:42px;border:0;border-radius:10px;background:#2563eb;color:white;font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;cursor:pointer;vertical-align:middle;box-shadow:0 2px 6px rgba(0,0,0,.18);';
   btn.onclick = openBarcodeScanner;
-
-  // Tombol ditempatkan tepat di sebelah tombol CARI.
   searchBtn.insertAdjacentElement("afterend", btn);
 }
 
 function createBarcodeScannerUI() {
-
-  const old = document.getElementById("barcodeScannerModal");
-  if (old) old.remove();
-
+  document.getElementById("barcodeScannerModal")?.remove();
   const modal = document.createElement("div");
   modal.id = "barcodeScannerModal";
-
   modal.innerHTML = `
-    <div style="
-      position:fixed;
-      inset:0;
-      z-index:99999;
-      background:rgba(0,0,0,.92);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-      box-sizing:border-box;
-    ">
-
-      <div style="
-        width:min(92vw,430px);
-        color:white;
-        text-align:center;
-        font-weight:700;
-        font-size:18px;
-        margin-bottom:14px;
-      ">
-        📷 Scan Nomor Meter
+    <div style="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;overflow:auto;">
+      <div style="width:min(92vw,460px);color:white;text-align:center;font-weight:700;font-size:20px;margin:8px 0 12px;">📷 Scan Nomor Meter</div>
+      <div style="position:relative;width:min(92vw,460px);aspect-ratio:4/3;background:#111;border-radius:16px;overflow:hidden;border:2px solid rgba(255,255,255,.4);">
+        <video id="barcodeVideo" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+        <div style="position:absolute;left:8%;right:8%;top:50%;height:2px;background:#22c55e;box-shadow:0 0 12px #22c55e;pointer-events:none;"></div>
+        <div style="position:absolute;left:8%;right:8%;top:25%;bottom:25%;border:2px solid rgba(255,255,255,.8);border-radius:10px;pointer-events:none;"></div>
       </div>
-
-      <div style="
-        position:relative;
-        width:min(92vw,430px);
-        aspect-ratio:4/3;
-        background:#111;
-        border-radius:16px;
-        overflow:hidden;
-        border:2px solid rgba(255,255,255,.35);
-      ">
-
-        <video
-          id="barcodeVideo"
-          autoplay
-          muted
-          playsinline
-          style="
-            width:100%;
-            height:100%;
-            object-fit:cover;
-          "
-        ></video>
-
-        <div style="
-          position:absolute;
-          left:8%;
-          right:8%;
-          top:50%;
-          height:2px;
-          background:#22c55e;
-          box-shadow:0 0 12px #22c55e;
-        "></div>
-
-        <div style="
-          position:absolute;
-          left:8%;
-          right:8%;
-          top:25%;
-          bottom:25%;
-          border:2px solid rgba(255,255,255,.75);
-          border-radius:10px;
-          pointer-events:none;
-        "></div>
-
+      <div id="barcodeScannerStatus" role="status" style="color:white;text-align:center;margin-top:12px;font-size:14px;max-width:460px;">Membuka kamera…</div>
+      <div style="width:min(92vw,460px);display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin-top:12px;color:white;">
+        <button id="barcodeFocusBtn" type="button" style="padding:12px 16px;border:0;border-radius:10px;font-weight:700;">🎯 Fokus ulang</button>
+        <button id="barcodeTorchBtn" type="button" style="padding:12px 16px;border:0;border-radius:10px;font-weight:700;">🔦 Nyalakan flash</button>
       </div>
-
-      <div id="barcodeScannerStatus" style="
-        color:white;
-        text-align:center;
-        margin-top:14px;
-        font-size:14px;
-        max-width:430px;
-      ">
-        Arahkan kamera ke barcode nomor meter
-      </div>
-
-      <button
-        id="barcodeCloseBtn"
-        type="button"
-        style="
-          margin-top:18px;
-          width:min(92vw,430px);
-          height:46px;
-          border:0;
-          border-radius:12px;
-          background:#ef4444;
-          color:white;
-          font-size:16px;
-          font-weight:700;
-        "
-      >
-        ✕ Tutup Scanner
-      </button>
-
-    </div>
-  `;
-
+      <div style="width:min(92vw,460px);color:#ddd;text-align:center;font-size:12px;margin-top:8px;">Zoom, fokus, dan flash hanya tersedia jika didukung kamera HP. Dekatkan kamera perlahan sampai garis barcode tajam.</div>
+      <button id="barcodeCloseBtn" type="button" style="margin-top:16px;width:min(92vw,460px);height:48px;border:0;border-radius:12px;background:#ef4444;color:white;font-size:17px;font-weight:700;">✕ Tutup Scanner</button>
+    </div>`;
   document.body.appendChild(modal);
-
-  document
-    .getElementById("barcodeCloseBtn")
-    .onclick = closeBarcodeScanner;
-
+  document.getElementById("barcodeCloseBtn").onclick = closeBarcodeScanner;
+  document.getElementById("barcodeFocusBtn").onclick = refocusBarcodeCamera;
+  document.getElementById("barcodeTorchBtn").onclick = toggleBarcodeTorch;
   return modal;
 }
 
 async function openBarcodeScanner() {
-
   if (barcodeScannerOpen) return;
-
-  if (!("BarcodeDetector" in window)) {
-    showToast("⚠️ Browser ini belum mendukung scanner barcode bawaan");
+  if (!navigator.mediaDevices?.getUserMedia) {
+    showToast("⚠️ Browser tidak menyediakan akses kamera. Buka lewat HTTPS atau localhost.");
     return;
   }
-
   barcodeScannerOpen = true;
   barcodeScanBusy = false;
-
+  barcodeTorchOn = false;
   createBarcodeScannerUI();
-
   const video = document.getElementById("barcodeVideo");
   const status = document.getElementById("barcodeScannerStatus");
-
   try {
-
-    let formats = [
-      "code_128",
-      "code_39",
-      "ean_13",
-      "ean_8",
-      "upc_a",
-      "upc_e",
-      "itf",
-      "codabar"
-    ];
-
-    // Beberapa browser hanya menerima format yang benar-benar tersedia.
-    if (BarcodeDetector.getSupportedFormats) {
-      const supported = await BarcodeDetector.getSupportedFormats();
-      formats = formats.filter(f => supported.includes(f));
-    }
-
-    if (!formats.length) {
-      throw new Error("Tidak ada format barcode yang didukung browser");
-    }
-
-    barcodeDetector = new BarcodeDetector({ formats });
-
     barcodeStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: "environment" },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 }, focusMode: { ideal: "continuous" } },
       audio: false
     });
-
+    barcodeTrack = barcodeStream.getVideoTracks()[0];
     video.srcObject = barcodeStream;
-
     await video.play();
+    configureBarcodeCameraControls();
+    status.textContent = "Arahkan barcode ke dalam kotak. Tunggu sampai gambar tajam…";
 
-    status.innerText =
-      "Arahkan kamera ke barcode nomor meter...";
-
-    scanBarcodeFrame();
-
+    // ZXing membaca lebih banyak format daripada BarcodeDetector di banyak perangkat.
+    if (window.ZXingBrowser?.BrowserMultiFormatReader) {
+      try {
+        barcodeZXingReader = new window.ZXingBrowser.BrowserMultiFormatReader();
+        const callback = (result, err) => {
+          if (!barcodeScannerOpen || !result) return;
+          const value = String(result.getText?.() || result.text || "").trim();
+          if (value) handleBarcodeResult(value);
+        };
+        if (typeof barcodeZXingReader.decodeFromVideoElementContinuously === "function") {
+          barcodeZXingControls = await barcodeZXingReader.decodeFromVideoElementContinuously(video, callback);
+        } else if (typeof barcodeZXingReader.decodeFromVideoElement === "function") {
+          barcodeZXingControls = await barcodeZXingReader.decodeFromVideoElement(video, callback);
+        } else {
+          barcodeZXingReader = null;
+        }
+      } catch (zxingErr) {
+        console.warn("ZXing tidak bisa dimulai, mencoba BarcodeDetector", zxingErr);
+        barcodeZXingReader = null;
+      }
+    }
+    if (!barcodeZXingReader && "BarcodeDetector" in window) {
+      let formats = ["code_128", "code_39", "ean_13", "ean_8", "upc_a", "upc_e", "itf", "codabar", "qr_code", "data_matrix"];
+      if (BarcodeDetector.getSupportedFormats) {
+        const supported = await BarcodeDetector.getSupportedFormats();
+        formats = formats.filter(f => supported.includes(f));
+      }
+      if (formats.length) {
+        barcodeDetector = new BarcodeDetector({ formats });
+        scanBarcodeFrame();
+      }
+    }
+    if (!barcodeZXingReader && !barcodeDetector) {
+      status.textContent = "Mesin scan tidak tersedia. Periksa koneksi internet atau coba Chrome terbaru.";
+    } else if (barcodeZXingReader) {
+      status.textContent = "Mesin scan multi-format aktif. Arahkan barcode dan tahan stabil sebentar.";
+    }
   } catch (err) {
-
     console.error("Barcode scanner error:", err);
-
-    status.innerText =
-      "❌ Kamera tidak bisa digunakan. Pastikan izin kamera diberikan.";
-
+    status.textContent = "Kamera tidak bisa digunakan. Periksa izin kamera dan tutup aplikasi kamera lain.";
     showToast("❌ Kamera tidak dapat dibuka");
-
-    setTimeout(() => {
-      if (barcodeScannerOpen) closeBarcodeScanner();
-    }, 2200);
   }
+}
+
+function configureBarcodeCameraControls() {
+  if (!barcodeTrack) return;
+  let caps = {};
+  try { caps = barcodeTrack.getCapabilities?.() || {}; } catch (e) {}
+  const torchBtn = document.getElementById("barcodeTorchBtn");
+  if (torchBtn) {
+    torchBtn.style.display = "inline-block";
+    // Some Android browsers do not report torch in getCapabilities even when applyConstraints may work.
+    torchBtn.disabled = false;
+    torchBtn.title = caps.torch ? "Nyalakan atau matikan lampu kamera" : "Coba lampu kamera; dukungan bergantung pada browser dan kamera yang dipilih";
+    torchBtn.textContent = barcodeTorchOn ? "💡 Matikan lampu" : "🔦 Coba lampu";
+  }
+  const focusBtn = document.getElementById("barcodeFocusBtn");
+  if (focusBtn) {
+    focusBtn.style.display = "inline-block";
+    focusBtn.title = (caps.focusMode || caps.focusDistance) ? "Minta kamera fokus ulang" : "Browser tidak menyediakan kontrol fokus manual untuk kamera ini";
+  }
+}
+
+async function setBarcodeZoom(value) {
+  if (!barcodeTrack) return;
+  const input = document.getElementById("barcodeZoomRange");
+  if (!input || input.disabled) return;
+  const zoom = Math.max(Number(input.min), Math.min(Number(input.max), value));
+  try {
+    await barcodeTrack.applyConstraints({ advanced: [{ zoom }] });
+    input.value = String(zoom);
+    barcodeZoomValue = zoom;
+  } catch (e) {
+    showToast("Zoom kamera ini tidak dapat diubah oleh browser.");
+  }
+}
+function changeBarcodeZoom(delta) {
+  const input = document.getElementById("barcodeZoomRange");
+  if (input && !input.disabled) setBarcodeZoom(Number(input.value) + delta);
+  else showToast("Zoom hardware tidak didukung. Coba atur jarak kamera atau zoom HP.");
+}
+async function refocusBarcodeCamera() {
+  if (!barcodeTrack) return;
+  const btn = document.getElementById("barcodeFocusBtn");
+  try {
+    const caps = barcodeTrack.getCapabilities?.() || {};
+    let applied = false;
+    if (Array.isArray(caps.focusMode) && caps.focusMode.includes("single-shot")) {
+      await barcodeTrack.applyConstraints({ advanced: [{ focusMode: "single-shot" }] });
+      applied = true;
+    } else if (Array.isArray(caps.focusMode) && caps.focusMode.includes("continuous")) {
+      await barcodeTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+      applied = true;
+    } else {
+      // Try continuous autofocus even if the browser's capability report is incomplete.
+      try {
+        await barcodeTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] });
+        applied = true;
+      } catch (e) { /* browser does not expose focus controls */ }
+    }
+    if (caps.focusDistance && Number.isFinite(caps.focusDistance.min) && Number.isFinite(caps.focusDistance.max)) {
+      const current = barcodeTrack.getSettings?.().focusDistance;
+      const near = Math.min(caps.focusDistance.max, Math.max(caps.focusDistance.min, current ?? caps.focusDistance.min));
+      await barcodeTrack.applyConstraints({ advanced: [{ focusDistance: near }] });
+      applied = true;
+    }
+    if (applied) {
+      if (btn) { btn.textContent = "🎯 Fokus diminta"; setTimeout(() => { if (btn && barcodeScannerOpen) btn.textContent = "🎯 Fokus ulang"; }, 1200); }
+      showToast("🎯 Perintah fokus dikirim ke kamera. Hasilnya tergantung dukungan HP/browser.");
+    } else {
+      showToast("Kamera HP/browser tidak menyediakan kontrol fokus manual. Gerakkan HP perlahan sampai barcode tajam.");
+    }
+  } catch (e) { showToast("Kamera menolak kontrol fokus. Coba gerakkan HP perlahan mendekat/menjauh."); }
+}
+
+async function toggleBarcodeTorch() {
+  if (!barcodeTrack) return;
+  try {
+    barcodeTorchOn = !barcodeTorchOn;
+    await barcodeTrack.applyConstraints({ advanced: [{ torch: barcodeTorchOn }] });
+    const btn = document.getElementById("barcodeTorchBtn");
+    if (btn) btn.textContent = barcodeTorchOn ? "💡 Matikan lampu" : "🔦 Lampu";
+  } catch (e) {
+    barcodeTorchOn = false;
+    showToast("Flash tidak didukung kamera ini.");
+  }
+}
+
+function handleBarcodeResult(rawValue) {
+  if (!barcodeScannerOpen || barcodeScanBusy) return;
+  barcodeScanBusy = true;
+  const raw = String(rawValue || "").trim();
+  if (!raw) { barcodeScanBusy = false; return; }
+  searchInput.value = raw;
+  closeBarcodeScanner();
+  showToast("✅ Barcode terbaca: " + raw);
+  setTimeout(() => runSearch(), 250);
 }
 
 async function scanBarcodeFrame() {
-
-  if (!barcodeScannerOpen || !barcodeDetector) return;
-
+  if (!barcodeScannerOpen || !barcodeDetector || barcodeZXingReader) return;
   const video = document.getElementById("barcodeVideo");
-
-  if (!video || video.readyState < 2) {
-    requestAnimationFrame(scanBarcodeFrame);
+  if (!video || video.readyState < 2 || barcodeScanBusy) {
+    if (barcodeScannerOpen) requestAnimationFrame(scanBarcodeFrame);
     return;
   }
-
-  if (barcodeScanBusy) {
-    requestAnimationFrame(scanBarcodeFrame);
-    return;
-  }
-
   barcodeScanBusy = true;
-
   try {
-
     const codes = await barcodeDetector.detect(video);
-
-    if (codes && codes.length) {
-
-      const rawValue = String(codes[0].rawValue || "").trim();
-
-      if (rawValue) {
-
-        // Nomor meter biasanya numerik.
-        // Jika barcode memiliki karakter lain, search engine
-        // akan membersihkannya sendiri.
-        searchInput.value = rawValue;
-
-        closeBarcodeScanner();
-
-        showToast("✅ Barcode terbaca: " + rawValue);
-
-        // Jalankan pencarian otomatis.
-        setTimeout(() => {
-          runSearch();
-        }, 250);
-
-        return;
-      }
+    if (codes?.length) {
+      const raw = String(codes[0].rawValue || "").trim();
+      if (raw) { barcodeScanBusy = false; handleBarcodeResult(raw); return; }
     }
-
-  } catch (err) {
-    console.warn("Barcode detect:", err);
-  } finally {
-    barcodeScanBusy = false;
-  }
-
-  requestAnimationFrame(scanBarcodeFrame);
+  } catch (e) { console.warn("BarcodeDetector:", e); }
+  finally { barcodeScanBusy = false; }
+  if (barcodeScannerOpen) requestAnimationFrame(scanBarcodeFrame);
 }
 
 function closeBarcodeScanner() {
-
   barcodeScannerOpen = false;
   barcodeDetector = null;
   barcodeScanBusy = false;
-
-  if (barcodeStream) {
-
-    barcodeStream.getTracks().forEach(track => {
-      track.stop();
-    });
-
-    barcodeStream = null;
-  }
-
+  try { barcodeZXingControls?.stop?.(); } catch (e) {}
+  barcodeZXingControls = null;
+  try { barcodeZXingReader?.reset?.(); } catch (e) {}
+  barcodeZXingReader = null;
+  if (barcodeStream) barcodeStream.getTracks().forEach(track => track.stop());
+  barcodeStream = null;
+  barcodeTrack = null;
+  barcodeTorchOn = false;
   const video = document.getElementById("barcodeVideo");
-
-  if (video) {
-    video.srcObject = null;
-  }
-
-  document
-    .getElementById("barcodeScannerModal")
-    ?.remove();
+  if (video) video.srcObject = null;
+  document.getElementById("barcodeScannerModal")?.remove();
 }
-
-// Tambahkan tombol setelah elemen search tersedia.
 addBarcodeScanButton();
 
 
@@ -685,7 +709,7 @@ originalHeaders = rawExcel.length > 0
   : [];
 // Simpan format angka koordinat dari file sumber agar jumlah desimal GPS tetap terjaga saat diekspor.
 gpsNumberFormats = {};
-const gpsHeaderNames = new Set(["LAT DIJ", "LON DIJ", "LAT DIL", "LON DIL", "LAT PEMBANDING", "LON PEMBANDING", "LATTH", "LONTH", "LATDIL", "LONDIL"]);
+const gpsHeaderNames = new Set(["LATDIJ", "LONDIJ", "LATDIL", "LONDIL", "LATPEMBANDING", "LONPEMBANDING", "LATPETUGAS", "LONPETUGAS", "LATCADANGAN", "LONCADANGAN", "LATTH", "LONTH", "LATITUDEDIL", "LONGITUDEDIL", "LATITUDEPEMBANDING", "LONGITUDEPEMBANDING", "LATITUDEPETUGAS", "LONGITUDEPETUGAS", "LATITUDECADANGAN", "LONGITUDECADANGAN"]);
 originalHeaders.forEach((header, colIndex) => {
   if (!gpsHeaderNames.has(normalizeHeader(header))) return;
   gpsNumberFormats[header] = [];
@@ -914,6 +938,17 @@ function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
 }
 
+// Safety autosave: primary writes happen immediately; these events provide a final backup attempt.
+function flushOyonidLocalState() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
+    localStorage.setItem("oyon_history", JSON.stringify(history));
+    localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(completedRecords));
+  } catch (e) { console.warn("Autosave OYONID tidak berhasil", e); }
+}
+window.addEventListener("pagehide", flushOyonidLocalState);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushOyonidLocalState(); });
+
 /* ======================
    FILTER MARKER DIJ / DIL / HARI BACA
 ====================== */
@@ -1094,7 +1129,7 @@ searchIndex = [];
     const lat = getDIJLat(row);
     const lng = getDIJLon(row);
 
-    if(lat && lng){
+    if(validCoordinatePair(lat, lng)){
       const hariBaca = getHariBaca(row);
       const color = getColor(hariBaca);
 
@@ -1153,23 +1188,20 @@ searchIndex = [];
 const latDIL = getDILLat(row);
 const lonDIL = getDILLon(row);
 
-const hasDILLocation =
-  latDIL && lonDIL &&
-  !isNaN(latDIL) &&
-  !isNaN(lonDIL);
+const hasDILLocation = validCoordinatePair(latDIL, lonDIL);
 
 if (hasDILLocation) {
 
   // ICON Lokasi Cadangan (WAJIB DULU)
   const iconDIL = L.divIcon({
-    html: `<div class="custom-marker" style="background:#000"></div>`,
-    iconSize: [12, 12],
-    iconAnchor: [6, 12],
+    html: `<div class="custom-marker" style="background:#111827;border:2px solid #fff;box-shadow:0 0 0 2px #111827;width:13px;height:13px;border-radius:50%;box-sizing:border-box"></div>`,
+    iconSize: [17, 17],
+    iconAnchor: [8, 8],
     className: ""
   });
 
   // MARKER Lokasi Cadangan
-  const markerDIL = L.marker([latDIL, lonDIL], { icon: iconDIL, pane: "customerMarkerPane", zIndexOffset: 900, riseOnHover: true });
+  const markerDIL = L.marker([latDIL, lonDIL], { icon: iconDIL, pane: "customerMarkerPane", zIndexOffset: 1800, riseOnHover: true });
 
   markerDIL.bindTooltip(
     `<b>${getMappedValue(row, "NAMA") || row.NAMA || "Pelanggan"}</b><br>IDPEL: ${getMappedValue(row, "IDPEL") || row.IDPEL || "-"}`,
@@ -1382,6 +1414,10 @@ function focusSearchResult(found) {
 
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+
 function showSearchResults(results){
 
   document
@@ -1394,12 +1430,12 @@ function showSearchResults(results){
   popup.id = "searchPopup";
 
   popup.innerHTML = `
-
-    <div class="searchPopupTitle">
-      Pilih Pelanggan
-    </div>
-
-  `;
+    <div class="searchPopupCard">
+      <div class="searchPopupTitle">Pilih Pelanggan</div>
+      <div class="searchPopupSub">Ditemukan ${results.length} pelanggan yang cocok. Periksa akhiran IDPEL dan nomor meter sebelum memilih.</div>
+      <div id="searchPopupItems"></div>
+      <button type="button" class="searchPopupClose">Tutup</button>
+    </div>`;
 
   results.forEach((r, i) => {
 
@@ -1409,18 +1445,15 @@ function showSearchResults(results){
     div.className =
       "searchResultItem";
 
+    const idpelFull = String(getMappedValue(r.row, "IDPEL") || r.row.IDPEL || "");
+    const meterFull = String(getNoMeter(r.row) || "");
+    const idpelTail = idpelFull.slice(-6) || "-";
+    const meterTail = meterFull.slice(-6) || "-";
     div.innerHTML = `
-
-      <strong>
-        ${r.row.NAMA || "-"}
-      </strong><br>
-
-      IDPEL:
-      ${r.row.IDPEL || "-"}<br>
-
-      NOMET:
-      ${getNoMeter(r.row)}
-
+      <strong>${escapeHtml(String(getMappedValue(r.row, "NAMA") || r.row.NAMA || "-"))}</strong><br>
+      IDPEL akhir: <b>${escapeHtml(idpelTail)}</b> <small>(${escapeHtml(idpelFull || "-")})</small><br>
+      NOMET akhir: <b>${escapeHtml(meterTail)}</b> <small>(${escapeHtml(meterFull || "-")})</small><br>
+      <span style="color:#2563eb;font-weight:700;font-size:12px;">Ketuk untuk tampilkan lokasi ↗</span>
     `;
 
     div.onclick = () => {
@@ -1431,10 +1464,11 @@ function showSearchResults(results){
 
     };
 
-    popup.appendChild(div);
+    popup.querySelector("#searchPopupItems").appendChild(div);
 
   });
-
+  popup.querySelector(".searchPopupClose").onclick = () => popup.remove();
+  popup.addEventListener("click", e => { if (e.target === popup) popup.remove(); });
   document.body.appendChild(popup);
 
 }
@@ -1461,6 +1495,8 @@ zoomBtn.onclick = () => {
 ====================== */
 function openDetail(r){
   hasSelectedCustomer = true;
+  // Simpan baris yang benar-benar dipilih agar IDPEL/NOMET duplikat tidak ikut terhapus bersamaan.
+  window.currentDetailRow = r;
   const panel = document.getElementById("detailPanel");
   const left = document.getElementById("detailLeft");
   const right = document.getElementById("detailRight");
@@ -1468,7 +1504,7 @@ function openDetail(r){
   /* FORCE SHOW MARKERS FOR COMPARE */
 
     // simpan IDPEL yang sedang dibuka (global state kecil)
-  window.currentCompareIDPEL = r.IDPEL;
+  window.currentCompareIDPEL = String(getMappedValue(r, "IDPEL") || r.IDPEL || "");
 
   const cardHTML = (label, lat, lon, isDIL = false) => `
   <div class="${isDIL ? "card-DIL" : ""}">
@@ -1669,7 +1705,7 @@ function openDetail(r){
   const dilLat = getDILLat(r);
         const dilLon = getDILLon(r);
 
-        if (dilLat && dilLon) {
+        if (validCoordinatePair(dilLat, dilLon)) {
 
         right.innerHTML = cardHTML(
             "📍 Lokasi Cadangan",
@@ -1803,7 +1839,7 @@ function toggleCompare(checkbox) {
 
     // ambil 2 marker milik IDPEL aktif
     const activeMarkers = markers.filter(
-      m => String(m.row.IDPEL) === idpel
+      m => String(getMappedValue(m.row, "IDPEL") || m.row.IDPEL || "") === idpel
     );
 
     // tampilkan hanya marker tsb
@@ -1819,6 +1855,7 @@ function toggleCompare(checkbox) {
       const group = L.featureGroup(activeMarkers.map(m => m.marker));
       map.flyToBounds(group.getBounds(), {
         padding: [80, 80],
+        maxZoom: 19,
         duration: 0.5
       });
     }
@@ -1899,48 +1936,92 @@ function cancelRoute(){
 /* ======================
    DONE + HISTORY
 ====================== */
-function markDone(idpel){
-
+async function markDone(idpel) {
   if (window.isCompareMode) {
-  const cb = document.querySelector('#detailPanel input[type="checkbox"]');
-  if (cb) cb.checked = false;
-  exitCompareMode();
-}
-
-
+    const cb = document.querySelector('#detailPanel input[type="checkbox"]');
+    if (cb) cb.checked = false;
+    exitCompareMode();
+  }
   idpel = String(idpel);
+  const selectedRow = window.currentDetailRow;
+  const found = selectedRow && workingRows.includes(selectedRow) && String(getMappedValue(selectedRow, "IDPEL") || selectedRow.IDPEL) === idpel
+    ? selectedRow
+    : workingRows.find(r => String(getMappedValue(r, "IDPEL") || r.IDPEL) === idpel);
+  if (!found) { showToast("Pelanggan tidak ditemukan di daftar tersisa."); return; }
 
-  // 1️⃣ ambil data pelanggan
-  const found = workingRows.find(r => String(r.IDPEL) === idpel);
-  if (!found) return;
+  // Ambil GPS aktual saat pekerjaan selesai. Jika izin/lokasi gagal, minta konfirmasi sebelum simpan tanpa GPS.
+  let actualLat = "", actualLon = "", gpsAccuracy = "", gpsError = "";
+  if (navigator.geolocation?.getCurrentPosition) {
+    try {
+      const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, timeout: 10000, maximumAge: 0
+      }));
+      actualLat = pos.coords.latitude;
+      actualLon = pos.coords.longitude;
+      gpsAccuracy = Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : "";
+    } catch (err) {
+      gpsError = err?.message || "GPS tidak tersedia";
+      const proceed = window.confirm("GPS realisasi belum berhasil diambil. Tetap tandai selesai tanpa koordinat GPS aktual?\n\nPilih Batal untuk mencoba lagi.");
+      if (!proceed) { showToast("Pekerjaan belum ditandai selesai. Coba lagi saat GPS siap."); return; }
+    }
+  } else {
+    const proceed = window.confirm("Browser tidak mendukung GPS. Tetap tandai selesai tanpa koordinat GPS aktual?");
+    if (!proceed) return;
+    gpsError = "Geolocation tidak didukung";
+  }
 
-  // 2️⃣ simpan ke history
-  history.push({
-    row: found,
-    time: new Date().toLocaleTimeString("id-ID")
-  });
+  const now = new Date();
+  const dt = localDateTimeParts(now);
+  const identity = completionIdentity(found);
+  const dayKey = dt.dayKey;
+  const alreadyToday = completedRecords.find(item => item.dayKey === dayKey && item.identity === identity);
+  let completionId;
+  const previousCompletedSnapshot = alreadyToday ? structuredClone(alreadyToday) : null;
+  if (alreadyToday) {
+    completionId = alreadyToday.completionId;
+    Object.assign(alreadyToday, {
+      row: structuredClone(found), completedAt: now.toISOString(), date: dt.date, time: dt.time,
+      actualLat, actualLon, gpsAccuracy, gpsError, status: "Selesai"
+    });
+  } else {
+    completionId = `done_${now.getTime()}_${Math.random().toString(36).slice(2, 8)}`;
+    completedRecords.push({
+      completionId, identity, dayKey, row: structuredClone(found),
+      completedAt: now.toISOString(), date: dt.date, time: dt.time,
+      actualLat, actualLon, gpsAccuracy, gpsError, status: "Selesai"
+    });
+  }
+  if (!persistCompletedRecords()) {
+    if (previousCompletedSnapshot) {
+      const pos = completedRecords.findIndex(item => item.completionId === completionId);
+      if (pos >= 0) completedRecords[pos] = previousCompletedSnapshot;
+    } else {
+      completedRecords = completedRecords.filter(item => item.completionId !== completionId);
+    }
+    showToast("⚠️ Realisasi gagal tersimpan di HP. Pelanggan tetap di daftar; coba lagi atau unduh cadangan.");
+    return;
+  }
+
+  history.push({ row: structuredClone(found), time: dt.time, date: dt.date, completionId,
+    actualLat, actualLon, gpsAccuracy, gpsError, dayKey });
   localStorage.setItem("oyon_history", JSON.stringify(history));
-
-  // 3️⃣ hapus dari workingRows
-  workingRows = workingRows.filter(r => String(r.IDPEL) !== idpel);
+  // Hapus hanya baris yang dipilih, bukan semua pelanggan yang kebetulan punya IDPEL sama.
+  workingRows = workingRows.filter(r => r !== found);
   saveState();
-
-  // 4️⃣ HAPUS MARKER DIJ + DIL DENGAN IDPEL YANG SAMA
   markers = markers.filter(obj => {
-    if (String(obj.row.IDPEL) === idpel) {
-      if (map.hasLayer(obj.marker)) {
-        clusterGroup.removeLayer(obj.marker);
-      }
-      return false; // buang dari array
+    if (obj.row === found) {
+      if (map.hasLayer(obj.marker)) clusterGroup.removeLayer(obj.marker);
+      return false;
     }
     return true;
   });
-
-  // 5️⃣ update UI
   renderHistory();
   closeDetail();
-
-  showToast("✅ Pelanggan ditandai selesai");
+  if (actualLat !== "" && actualLon !== "") {
+    showToast(`✅ Selesai tersimpan • GPS realisasi akurasi ±${Math.round(gpsAccuracy || 0)} m • ${dt.time}`);
+  } else {
+    showToast(`✅ Selesai tersimpan tanpa GPS aktual • ${dt.time}`);
+  }
 }
 
 /* ======================
@@ -2017,6 +2098,11 @@ function undoHistory(index) {
   workingRows.push(item.row);
   saveState();
 
+  // Batalkan juga catatan realisasi yang terkait, bila masih ada.
+  if (item.completionId) {
+    completedRecords = completedRecords.filter(rec => rec.completionId !== item.completionId);
+    persistCompletedRecords();
+  }
   // hapus dari history
   history.splice(index, 1);
   localStorage.setItem("oyon_history", JSON.stringify(history));
@@ -2164,96 +2250,154 @@ function showToast(msg){
   t.classList.add("show");
   setTimeout(()=>t.classList.remove("show"),5000);
 }
+function v131AllCompletedRecords() {
+  const records = Array.isArray(completedRecords) ? completedRecords.slice() : [];
+  const seen = new Set(records.map(x => x.completionId ? "id:" + x.completionId : "key:" + (x.dayKey || "") + "|" + (x.identity || "")));
+  (Array.isArray(history) ? history : []).forEach((h, index) => {
+    const row = h.row || h;
+    const identity = completionIdentity(row);
+    const dayKey = h.dayKey || (h.completedAt ? localDateTimeParts(new Date(h.completedAt)).dayKey : localDateTimeParts().dayKey);
+    const completionId = h.completionId || "";
+    const key = completionId ? "id:" + completionId : "key:" + dayKey + "|" + identity;
+    if (seen.has(key)) return;
+    seen.add(key);
+    records.push({
+      completionId: completionId || "legacy_" + dayKey + "_" + index,
+      identity, dayKey, row: structuredClone(row), completedAt: h.completedAt || "",
+      date: h.date || "", time: h.time || "", actualLat: h.actualLat ?? "",
+      actualLon: h.actualLon ?? "", gpsAccuracy: h.gpsAccuracy ?? "",
+      gpsError: h.gpsError || "Riwayat lama: GPS realisasi tidak tersedia", status: "Selesai"
+    });
+  });
+  return records;
+}
+
 /* ======================
    FINISH DAN SIMPAN RBM UPDATE
 ====================== */
 
 downloadBtn.onclick = () => {
-  if (workingRows.length === 0) {
-    showToast("⚠️ Tidak ada data untuk diunduh");
+  const completedForExport = v131AllCompletedRecords();
+  if (workingRows.length === 0 && completedForExport.length === 0) {
+    showToast("⚠️ Tidak ada pelanggan tersisa atau realisasi selesai untuk diunduh");
     return;
   }
-
-  // Ambil nama PETUGAS dari baris pertama
-  const namaPetugas = (
-    workingRows[0]["PETUGAS"] ||
-    workingRows[0]["Petugas"] ||
-    workingRows[0]["petugas"] ||
-    workingRows[0]["KODE PETUGAS"] ||
-    "UNKNOWN"
-  )
-    .toString()
-    .trim()
-    .replace(/[\\/:*?"<>|]/g, "")
-    .replace(/\s+/g, "_");
-
-  // Buat timestamp
+  const sampleRow = workingRows[0] || completedForExport[completedForExport.length - 1]?.row || {};
+  const namaPetugas = String(
+    getMappedValue(sampleRow, "PETUGAS") || sampleRow.PETUGAS || sampleRow.Petugas || sampleRow.petugas || sampleRow["KODE PETUGAS"] || "UNKNOWN"
+  ).trim().replace(/[\\/:*?"<>|]/g, "").replace(/\s+/g, "_");
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, "0");
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const hh = String(now.getHours()).padStart(2, "0");
   const min = String(now.getMinutes()).padStart(2, "0");
+  const filename = `RBM_${namaPetugas}_${dd}-${mm}_${hh}-${min}.xlsx`;
 
-  const filename =
-    `RBM_${namaPetugas}_${dd}-${mm}_${hh}-${min}.xlsx`;
-
-  // ===== EXPORT SEMUA KOLOM ASLI + KOORDINAT PEMBANDING =====
-if (!Array.isArray(originalHeaders) || originalHeaders.length === 0) {
-  const headerSet = new Set();
-  workingRows.forEach(row => Object.keys(row || {}).forEach(key => headerSet.add(key)));
-  originalHeaders = [...headerSet];
-}
-const exportHeaders = [...originalHeaders];
-const normalizedExportHeaders = exportHeaders.map(normalizeHeader);
-if (!normalizedExportHeaders.includes("LATPEMBANDING")) exportHeaders.push("LAT PEMBANDING");
-if (!normalizedExportHeaders.includes("LONPEMBANDING")) exportHeaders.push("LON PEMBANDING");
-
-const getCoordinateForExport = (row, canonical, newHeader) => {
-  // Prioritaskan kolom target yang sudah ada; jika tidak ada, gunakan pemetaan kolom cadangan lama.
-  const targetKey = Object.keys(row || {}).find(k => normalizeHeader(k) === normalizeHeader(newHeader));
-  if (targetKey && String(row[targetKey] ?? "").trim() !== "") return row[targetKey];
-  const value = getMappedValue(row, canonical);
-  return value === "" || value == null ? "" : value;
-};
-const exportData = workingRows.map(row => exportHeaders.map(header => {
-  if (normalizeHeader(header) === "LATPEMBANDING") return getCoordinateForExport(row, "LAT DIL", "LAT PEMBANDING");
-  if (normalizeHeader(header) === "LONPEMBANDING") return getCoordinateForExport(row, "LON DIL", "LON PEMBANDING");
-  return row[header] ?? "";
-}));
-const worksheetData = [exportHeaders, ...exportData];
-const ws = XLSX.utils.aoa_to_sheet(worksheetData);
-
-// Terapkan kembali format koordinat per baris. Nilai koordinat tetap numerik dan tidak dibulatkan.
-const coordinateAliases = {
-  "LATDIJ": ["LAT DIJ", "LAT", "LATITUDE", "LATITUDE DIJ"],
-  "LONDIJ": ["LON DIJ", "LON", "LONGITUDE", "LONGITUDE DIJ"],
-  "LATPEMBANDING": ["LAT PEMBANDING", "LAT DIL", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING"],
-  "LONPEMBANDING": ["LON PEMBANDING", "LON PETUGAS", "LON DIL", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS"]
-};
-for (let c = 0; c < exportHeaders.length; c++) {
-  const outNorm = normalizeHeader(exportHeaders[c]);
-  if (!Object.prototype.hasOwnProperty.call(coordinateAliases, outNorm)) continue;
-  const aliases = coordinateAliases[outNorm].map(normalizeHeader);
-  const sourceHeader = originalHeaders.find(h => aliases.includes(normalizeHeader(h)));
-  const formats = sourceHeader ? gpsNumberFormats[sourceHeader] : null;
-  for (let r = 0; r < workingRows.length; r++) {
-    const addr = XLSX.utils.encode_cell({ r: r + 1, c });
-    const cell = ws[addr];
-    if (!cell || cell.v === "" || cell.v == null) continue;
-    let fmt = formats && formats[r] ? formats[r] : "";
-    if (!fmt && typeof cell.v === "number") {
-      const str = String(cell.v);
-      const decimals = str.includes(".") ? str.split(".")[1].length : 0;
-      if (decimals > 0 && decimals <= 15) fmt = "0." + "0".repeat(decimals);
-    }
-    if (fmt) cell.z = fmt;
+  // Reconcile the saved header list with actual row keys. This prevents stale header
+  // metadata from causing duplicate empty LAT/LON PEMBANDING columns after re-upload.
+  const headerCandidates = [
+    ...(Array.isArray(originalHeaders) ? originalHeaders : []),
+    ...workingRows.flatMap(row => Object.keys(row || {})),
+    ...completedForExport.flatMap(item => Object.keys(item.row || {}))
+  ];
+  const exportHeaders = [];
+  const headerNorms = new Set();
+  for (const candidate of headerCandidates) {
+    const label = String(candidate ?? "").trim();
+    const norm = normalizeHeader(label);
+    if (!label || !norm || headerNorms.has(norm)) continue;
+    headerNorms.add(norm);
+    exportHeaders.push(label);
   }
-}
-const wb = XLSX.utils.book_new();
-wb.Props = { Title: "OYONID MAP EXPORT" };
-XLSX.utils.book_append_sheet(wb, ws, "RBM Update");
-XLSX.writeFile(wb, filename, { compression: true });
-showToast("✅ Excel update berhasil diunduh. Koordinat dan kolom pembanding disertakan.");
+  originalHeaders = [...exportHeaders];
+  try { localStorage.setItem("OYONID_ORIGINAL_HEADERS", JSON.stringify(originalHeaders)); } catch (e) {}
+  const normSet = new Set(exportHeaders.map(normalizeHeader));
+  const hasAnyHeader = aliases => aliases.some(alias => normSet.has(normalizeHeader(alias)));
+  const LAT_COMPARE_ALIASES = ["LAT PEMBANDING", "LAT DIL", "LAT PETUGAS", "LAT CADANGAN", "LATTH", "LATDIL", "LATITUDE DIL", "LATITUDE PEMBANDING", "LATITUDE PETUGAS", "LATITUDE CADANGAN"];
+  const LON_COMPARE_ALIASES = ["LON PEMBANDING", "LON DIL", "LON PETUGAS", "LON CADANGAN", "LONTH", "LONDIL", "LONGITUDE DIL", "LONGITUDE PEMBANDING", "LONGITUDE PETUGAS", "LONGITUDE CADANGAN"];
+  if (!hasAnyHeader(LAT_COMPARE_ALIASES)) { exportHeaders.push("LAT PEMBANDING"); normSet.add("LATPEMBANDING"); }
+  if (!hasAnyHeader(LON_COMPARE_ALIASES)) { exportHeaders.push("LON PEMBANDING"); normSet.add("LONPEMBANDING"); }
+
+  const getRowValueForHeader = (row, header) => {
+    const exact = Object.keys(row || {}).find(k => normalizeHeader(k) === normalizeHeader(header));
+    if (exact !== undefined && row[exact] !== "" && row[exact] != null) return row[exact];
+    const norm = normalizeHeader(header);
+    if (["LATPEMBANDING", "LATDIL", "LATPETUGAS", "LATCADANGAN", "LATTH", "LATITUDEDIL", "LATITUDEPEMBANDING", "LATITUDEPETUGAS", "LATITUDECADANGAN"].includes(norm)) return getDILLat(row) ?? "";
+    if (["LONPEMBANDING", "LONDIL", "LONPETUGAS", "LONCADANGAN", "LONTH", "LONGITUDEDIL", "LONGITUDEPEMBANDING", "LONGITUDEPETUGAS", "LONGITUDECADANGAN"].includes(norm)) return getDILLon(row) ?? "";
+    const mappedCanonical = Object.keys(COLUMN_MAPPING_FIELDS).find(c => (COLUMN_MAPPING_FIELDS[c] || []).some(a => normalizeHeader(a) === norm));
+    if (mappedCanonical) return getMappedValue(row, mappedCanonical) ?? "";
+    return "";
+  };
+  const buildSheetRows = rows => [exportHeaders, ...rows.map(row => exportHeaders.map(header => {
+    const value = getRowValueForHeader(row, header);
+    return value == null ? "" : value;
+  }))];
+  const remainingSheet = XLSX.utils.aoa_to_sheet(buildSheetRows(workingRows));
+
+  // Sheet realisasi memakai kolom RBM + titik GPS aktual + waktu selesai.
+  const completedExtraHeaders = ["LAT REALISASI", "LON REALISASI", "JARAK DIJ KE REALISASI (M)", "AKURASI GPS HP (M)", "TANGGAL SELESAI", "JAM SELESAI", "WAKTU SELESAI ISO", "STATUS REALISASI", "CATATAN GPS"];
+  const completedHeaders = [...exportHeaders];
+  completedExtraHeaders.forEach(h => { if (!completedHeaders.some(x => normalizeHeader(x) === normalizeHeader(h))) completedHeaders.push(h); });
+  const completedRows = completedForExport.map(item => {
+    const row = item.row || {};
+    const base = completedHeaders.map(header => {
+      const n = normalizeHeader(header);
+      if (n === "LATREALISASI") return item.actualLat === "" || item.actualLat == null ? "" : Number(item.actualLat);
+      if (n === "LONREALISASI") return item.actualLon === "" || item.actualLon == null ? "" : Number(item.actualLon);
+      if (n === "JARAKDIJ KEREALISASI(M)".replace(/\s/g, "")) {
+        const lat1 = parseCoordinate(getDIJLat(row)), lon1 = parseCoordinate(getDIJLon(row));
+        const lat2 = parseCoordinate(item.actualLat), lon2 = parseCoordinate(item.actualLon);
+        if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return "";
+        const rad = v => v * Math.PI / 180;
+        const dLat = rad(lat2-lat1), dLon = rad(lon2-lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+        return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
+      }
+      if (n === "AKURASIGPSHP(M)") return item.gpsAccuracy === "" || item.gpsAccuracy == null ? "" : Number(item.gpsAccuracy);
+      if (n === "TANGGALSELESAI") return item.date || "";
+      if (n === "JAMSELESAI") return item.time || "";
+      if (n === "WAKTUSELESAIISO") return item.completedAt || "";
+      if (n === "STATUSREALISASI") return item.status || "Selesai";
+      if (n === "CATATANGPS") return item.gpsError || "";
+      const value = getRowValueForHeader(row, header);
+      return value == null ? "" : value;
+    });
+    return base;
+  });
+  const completedSheet = XLSX.utils.aoa_to_sheet([completedHeaders, ...completedRows]);
+
+  // Pertahankan tampilan desimal GPS di Excel jika format sumber masih tersedia.
+  const gpsHeaderNorms = new Set(["LATDIJ","LONDIJ","LATDIL","LONDIL","LATPEMBANDING","LONPEMBANDING","LATPETUGAS","LONPETUGAS","LATCADANGAN","LONCADANGAN","LATTH","LONTH","LATREALISASI","LONREALISASI"]);
+  const applyGpsFormats = (ws, headers, sourceRows, rowOffset=1) => {
+    headers.forEach((header, c) => {
+      if (!gpsHeaderNorms.has(normalizeHeader(header))) return;
+      const sourceFormats = gpsNumberFormats[header] || [];
+      for (let r=0; r<sourceRows.length; r++) {
+        const cell = ws[XLSX.utils.encode_cell({r:r+rowOffset,c})];
+        if (!cell || cell.v === "" || cell.v == null || typeof cell.v !== "number") continue;
+        let fmt = sourceFormats[r] || "";
+        if (!fmt) {
+          const s = String(cell.v);
+          const decimals = s.includes(".") ? s.split(".")[1].length : 0;
+          if (decimals > 0 && decimals <= 15) fmt = "0." + "0".repeat(decimals);
+        }
+        if (fmt) cell.z = fmt;
+      }
+    });
+  };
+  applyGpsFormats(remainingSheet, exportHeaders, workingRows);
+  applyGpsFormats(completedSheet, completedHeaders, completedForExport.map(x=>x.row || {}));
+  const wb = XLSX.utils.book_new();
+  wb.Props = { Title: "OYONID MAP EXPORT", Subject: "RBM tersisa dan realisasi pekerjaan kumulatif" };
+  XLSX.utils.book_append_sheet(wb, remainingSheet, "Pelanggan Tersisa");
+  XLSX.utils.book_append_sheet(wb, completedSheet, "Realisasi Selesai");
+  if (!wb.SheetNames.includes("Pelanggan Tersisa") || !wb.SheetNames.includes("Realisasi Selesai")) {
+    showToast("❌ Gagal membuat sheet Excel realisasi. File tidak diunduh.");
+    console.error("[OYONID] Workbook sheet validation failed", wb.SheetNames);
+    return;
+  }
+  XLSX.writeFile(wb, filename, { compression: true });
+  showToast(`✅ Excel V13.1.2: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
 };
 
 /* ======================
@@ -2391,3 +2535,174 @@ document.addEventListener("DOMContentLoaded", () => {
   if (details) details.addEventListener("toggle", () => { if (details.open) renderColumnMappingOptions(); });
   renderColumnMappingOptions();
 });
+
+
+/* ======================
+   V13: MANUAL ROUTE RECORDING + REALIZATION VIEW
+   Stored locally per browser origin. GPS recording runs only after user starts it.
+====================== */
+const V13_ROUTE_KEY = "oyon_route_sessions_v1";
+const V13_ACTIVE_ROUTE_KEY = "oyon_active_route_v1";
+let v13RouteSessions = (() => { try { return JSON.parse(localStorage.getItem(V13_ROUTE_KEY) || "[]"); } catch(e) { return []; } })();
+let v13ActiveRoute = (() => { try { return JSON.parse(localStorage.getItem(V13_ACTIVE_ROUTE_KEY) || "null"); } catch(e) { return null; } })();
+let v13RouteWatchId = null;
+let v13PlaybackTimer = null;
+let v13PlaybackLayer = null;
+let v13PlaybackMarker = null;
+let v13PlaybackIndex = 0;
+let v13RealizationLayer = null;
+function v13SaveRoutes(){
+  try {
+    localStorage.setItem(V13_ROUTE_KEY, JSON.stringify(v13RouteSessions));
+    if(v13ActiveRoute) localStorage.setItem(V13_ACTIVE_ROUTE_KEY, JSON.stringify(v13ActiveRoute));
+    else localStorage.removeItem(V13_ACTIVE_ROUTE_KEY);
+    return true;
+  } catch(e) { showToast("⚠️ Penyimpanan rute penuh. Akhiri rekaman dan unduh cadangan."); return false; }
+}
+function v13SetRecordingUI(active){
+  const a=document.getElementById("routeStartBtn"), b=document.getElementById("routeStopBtn"), st=document.getElementById("routeRecordStatus");
+  if(a)a.disabled=!!active; if(b)b.disabled=!active;
+  if(st)st.textContent=active?`🔴 Merekam rute • ${v13ActiveRoute?.points?.length||0} titik GPS`:"Rute tidak sedang direkam";
+}
+function v13MakePoint(pos){
+  const lat=Number(pos?.coords?.latitude), lon=Number(pos?.coords?.longitude), accuracy=Number(pos?.coords?.accuracy);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat>90||lon < -180||lon>180||(lat===0&&lon===0))return null;
+  if(Number.isFinite(accuracy)&&accuracy>60)return null;
+  return {lat,lon,accuracy:Number.isFinite(accuracy)?accuracy:null,at:new Date(pos.timestamp||Date.now()).toISOString()};
+}
+function v13Distance(a,b){
+  const R=6371000,rad=x=>x*Math.PI/180,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon);
+  const q=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
+}
+async function startRouteRecording(){
+  if(v13ActiveRoute){showToast("Rekaman sebelumnya belum diakhiri. Tekan Akhiri Rekam Rute.");v13SetRecordingUI(true);return;}
+  if(!navigator.geolocation?.getCurrentPosition||!navigator.geolocation?.watchPosition){showToast("Browser tidak mendukung GPS.");return;}
+  showToast("Meminta posisi GPS awal…");
+  let pos;
+  try{pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:0,timeout:25000}));}
+  catch(e){showToast("GPS belum siap: "+(e?.message||"izin/lokasi tidak tersedia")+". Rekaman belum dimulai.");return;}
+  const first=v13MakePoint(pos);
+  if(!first){showToast("Akurasi GPS awal harus 60 meter atau lebih baik. Coba di area terbuka.");return;}
+  v13ActiveRoute={id:`route_${Date.now()}`,dayKey:localDateTimeParts().dayKey,startedAt:new Date().toISOString(),endedAt:null,points:[first]};
+  if(!v13SaveRoutes()){v13ActiveRoute=null;return;}
+  v13SetRecordingUI(true);
+  v13RouteWatchId=navigator.geolocation.watchPosition(p=>{
+    if(!v13ActiveRoute)return;
+    const point=v13MakePoint(p);if(!point)return;
+    const pts=v13ActiveRoute.points,last=pts[pts.length-1];
+    const seconds=last?Math.max(0,(new Date(point.at)-new Date(last.at))/1000):0;
+    const meters=last?v13Distance(last,point):Infinity;
+    if(last&&seconds>0&&seconds<=5&&meters>300)return;
+    if(!last||meters>=8||seconds>=15){
+      pts.push(point);
+      if(!v13SaveRoutes()){pts.pop();return;}
+      const st=document.getElementById("routeRecordStatus");if(st)st.textContent=`🔴 Merekam rute • ${pts.length} titik GPS`;
+    }
+  },e=>{showToast("GPS rute terputus: "+(e?.message||"lokasi tidak tersedia"));const st=document.getElementById("routeRecordStatus");if(st)st.textContent="⚠️ GPS terputus — akhiri dan mulai ulang";},
+  {enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+  showToast("🔴 Rekam rute dimulai. Biarkan halaman tetap terbuka dan GPS aktif.");
+}
+function stopRouteRecording(){
+  if(v13RouteWatchId!==null){try{navigator.geolocation.clearWatch(v13RouteWatchId);}catch(e){}v13RouteWatchId=null;}
+  if(!v13ActiveRoute){v13SetRecordingUI(false);showToast("Tidak ada rekaman aktif.");return;}
+  v13ActiveRoute.endedAt=new Date().toISOString();
+  const count=v13ActiveRoute.points?.length||0;
+  if(count){v13RouteSessions.push(v13ActiveRoute);v13RouteSessions=v13RouteSessions.slice(-120);}
+  v13ActiveRoute=null;const saved=v13SaveRoutes();v13SetRecordingUI(false);
+  showToast(saved?`Rekaman rute disimpan: ${count} titik GPS.`:"Rekaman dihentikan; periksa penyimpanan lokal.");
+}
+function openRealizationPanel(){
+  const p=document.getElementById("realizationPanel");if(p)p.style.display="block";
+  const d=document.getElementById("realizationDate");if(d&&!d.value)d.value=localDateTimeParts().dayKey;
+  updateRealizationSummary();showRealizationOnMap();
+}
+function closeRealizationPanel(){
+  const p=document.getElementById("realizationPanel");if(p)p.style.display="none";
+  pauseRouteHistory();
+  if(v13RealizationLayer&&map){map.removeLayer(v13RealizationLayer);v13RealizationLayer=null;}
+  if(v13RealizationModeActive&&map&&clusterGroup&&!map.hasLayer(clusterGroup))map.addLayer(clusterGroup);
+  v13RealizationModeActive=false;showToast("Kembali ke peta pelanggan yang belum selesai.");
+}
+function v13SelectedDate(){return document.getElementById("realizationDate")?.value||localDateTimeParts().dayKey;}
+function v13ValidActual(item){
+  const lat=parseCoordinate(item?.actualLat),lon=parseCoordinate(item?.actualLon);
+  return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180&&!(lat===0&&lon===0)&&item.actualLat!==""&&item.actualLon!==""&&item.actualLat!=null&&item.actualLon!=null;
+}
+function v13CompletedForDate(){return v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()&&v13ValidActual(x));}
+function v13RoutesForDate(){return (v13RouteSessions||[]).filter(x=>x.dayKey===v13SelectedDate());}
+function updateRealizationSummary(){
+  const all=v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()),done=all.filter(v13ValidActual),routes=v13RoutesForDate(),points=routes.reduce((n,r)=>n+(r.points?.length||0),0);
+  const el=document.getElementById("realizationSummary");if(el)el.textContent=`${done.length} pelanggan selesai dengan GPS • ${all.length} selesai total • ${routes.length} sesi rute • ${points} titik GPS.`;
+  const rs=document.getElementById("routePlaybackStatus");if(rs)rs.textContent=routes.length?`Tersedia ${points} titik GPS dari ${routes.length} sesi.`:"Belum ada rekaman rute pada tanggal ini.";
+}
+function showRealizationOnMap(){
+  if(typeof map==="undefined"||typeof L==="undefined")return;
+  pauseRouteHistory();
+  if(v13RealizationLayer)map.removeLayer(v13RealizationLayer);
+  if(clusterGroup&&map.hasLayer(clusterGroup))map.removeLayer(clusterGroup);
+  v13RealizationModeActive=true;v13RealizationLayer=L.layerGroup().addTo(map);
+  const rows=v13CompletedForDate(),bounds=[];
+  rows.forEach((item,i)=>{
+    const lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon),row=item.row||{};
+    const name=String(getMappedValue(row,"NAMA")||row.NAMA||row.nama||"Pelanggan");
+    const idpel=String(getMappedValue(row,"IDPEL")||row.IDPEL||""),meter=String(getNoMeter(row)||"");
+    const m=L.circleMarker([lat,lon],{radius:9,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.96}).addTo(v13RealizationLayer);
+    m.bindPopup(`<b>${i+1}. ${name.replace(/[<>]/g,"")}</b><br>IDPEL: ${idpel.replace(/[<>]/g,"")}<br>Nomor meter: ${meter.replace(/[<>]/g,"")}<br>Selesai: ${item.time||"-"}<br>GPS realisasi: ${lat}, ${lon}`);
+    bounds.push([lat,lon]);
+  });
+  if(bounds.length){map.fitBounds(L.latLngBounds(bounds).pad(.15));showToast(`${bounds.length} pelanggan selesai ditampilkan. Yang belum selesai disembunyikan.`);}
+  else showToast("Belum ada pelanggan selesai dengan GPS realisasi pada tanggal ini.");
+  updateRealizationSummary();
+}
+function v13RouteSegments(){
+  return v13RoutesForDate().map((session,i)=>({key:session.id||`${session.startedAt||"session"}_${i}`,points:(session.points||[]).slice().sort((a,b)=>new Date(a.at)-new Date(b.at))})).filter(x=>x.points.length);
+}
+function pauseRouteHistory(){if(v13PlaybackTimer){clearInterval(v13PlaybackTimer);v13PlaybackTimer=null;}}
+function resetRoutePlayback(){
+  pauseRouteHistory();v13PlaybackIndex=0;
+  if(v13PlaybackLayer&&map)map.removeLayer(v13PlaybackLayer);
+  v13PlaybackLayer=null;v13PlaybackMarker=null;v13PlaybackLine=null;
+  const el=document.getElementById("routePlaybackStatus");if(el)el.textContent="Playback direset.";
+}
+function playRouteHistory(){
+  const segments=v13RouteSegments(),total=segments.reduce((n,x)=>n+x.points.length,0);
+  if(!total){showToast("Belum ada data rute. Mulai rekam rute dahulu.");return;}
+  pauseRouteHistory();if(!v13PlaybackLayer)v13PlaybackLayer=L.layerGroup().addTo(map);
+  let si=0,pi=0,played=0,line=null,linePoints=[];
+  const speed=Number(document.getElementById("routePlaybackSpeed")?.value||2);
+  v13PlaybackTimer=setInterval(()=>{
+    const seg=segments[si];if(!seg){pauseRouteHistory();return;}
+    const p=seg.points[pi];
+    if(!p){si++;pi=0;line=null;linePoints=[];return;}
+    const ll=[p.lat,p.lon];
+    if(!v13PlaybackMarker)v13PlaybackMarker=L.circleMarker(ll,{radius:9,color:"#fff",weight:2,fillColor:"#2563eb",fillOpacity:1}).addTo(v13PlaybackLayer);
+    else v13PlaybackMarker.setLatLng(ll);
+    linePoints.push(ll);if(line)v13PlaybackLayer.removeLayer(line);
+    line=linePoints.length>1?L.polyline(linePoints,{color:"#2563eb",weight:4}).addTo(v13PlaybackLayer):null;
+    map.panTo(ll,{animate:true,duration:.25});played++;
+    const el=document.getElementById("routePlaybackStatus");if(el)el.textContent=`Playback ${played}/${total} • sesi ${si+1}/${segments.length} • ${new Date(p.at).toLocaleTimeString("id-ID")}`;
+    pi++;if(played>=total)pauseRouteHistory();
+  },Math.max(180,1000/speed));
+}
+document.addEventListener("DOMContentLoaded",()=>{
+  v13SetRecordingUI(!!v13ActiveRoute);
+  if(v13ActiveRoute){const st=document.getElementById("routeRecordStatus");if(st)st.textContent=`⚠️ Rekaman sebelumnya terputus • ${v13ActiveRoute.points?.length||0} titik tersimpan. Tekan Akhiri Rekam Rute untuk menyimpan.`;}
+  document.getElementById("realizationDate")?.addEventListener("change",()=>{updateRealizationSummary();resetRoutePlayback();if(v13RealizationModeActive)showRealizationOnMap();});
+  updateRealizationSummary();
+
+  // V13.1.2: explicit event wiring; no inline onclick dependency.
+  document.getElementById("realizationOpenBtn")?.addEventListener("click", openRealizationPanel);
+  document.getElementById("realizationCloseBtn")?.addEventListener("click", closeRealizationPanel);
+  document.getElementById("realizationRefreshBtn")?.addEventListener("click", showRealizationOnMap);
+  document.getElementById("routeStartBtn")?.addEventListener("click", startRouteRecording);
+  document.getElementById("routeStopBtn")?.addEventListener("click", stopRouteRecording);
+  document.getElementById("routePlayBtn")?.addEventListener("click", playRouteHistory);
+  document.getElementById("routePauseBtn")?.addEventListener("click", pauseRouteHistory);
+  document.getElementById("routeResetBtn")?.addEventListener("click", resetRoutePlayback);
+
+  console.info("[OYONID] V13.1.2 handlers attached");
+});
+// Expose functions for compatibility with any older inline buttons.
+Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback});
+window.addEventListener("beforeunload",()=>{if(v13ActiveRoute)v13SaveRoutes();});
