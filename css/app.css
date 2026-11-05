@@ -600,3 +600,64 @@
 
 .chk { display:flex; align-items:center; gap:6px; margin:4px 0; font-size:12px; line-height:1.3; cursor:pointer; }
 .chk input[type="checkbox"] { width:15px; height:15px; margin:0; flex:0 0 auto; accent-color:#2563eb; }
+
+
+/* V10: popup pilihan pelanggan yang nyaman di HP */
+#searchPopup {
+  position: fixed; inset: 0; z-index: 100000; background: rgba(15,23,42,.62);
+  display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;
+}
+#searchPopup .searchPopupCard {
+  width:min(94vw,480px); max-height:78vh; overflow:auto; background:#fffdf1;
+  border-radius:16px; box-shadow:0 16px 48px rgba(0,0,0,.32); padding:14px;
+}
+#searchPopup .searchPopupTitle { font-weight:800; font-size:18px; margin:2px 0 4px; }
+#searchPopup .searchPopupSub { color:#64748b; font-size:12px; margin-bottom:10px; }
+#searchPopup .searchResultItem {
+  background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px; margin:8px 0;
+  cursor:pointer; line-height:1.55; box-shadow:0 2px 5px rgba(0,0,0,.05);
+}
+#searchPopup .searchResultItem:active, #searchPopup .searchResultItem:hover { background:#eff6ff; border-color:#60a5fa; }
+#searchPopup .searchPopupClose { width:100%; padding:11px; border:0; border-radius:10px; background:#1f2937; color:white; font-weight:700; margin-top:6px; }
+
+/* V13: separate realization and manual route tracking panels */
+.v13-tools{display:grid;gap:6px;margin-top:7px}
+.v13-record-status,.route-record-status{font-size:11px;color:#64748b;padding:2px 4px}
+#routeStopBtn:disabled{opacity:.45;cursor:not-allowed}
+.v13-panel{position:fixed;z-index:12000;right:14px;top:90px;width:min(360px,calc(100vw - 28px));max-height:72vh;background:#fffdf1;border:1px solid #eadfb9;border-radius:16px;box-shadow:0 12px 36px #0003;overflow:hidden}
+.v13-panel-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#fff7d7;border-bottom:1px solid #eee2bd}
+.v13-panel-head button{border:0;border-radius:8px;padding:6px 10px;font-size:18px;background:#fee2e2}
+.v13-panel-body{padding:13px;overflow:auto;max-height:calc(72vh - 48px);display:grid;gap:9px}
+.v13-label{font-size:12px;font-weight:700}.v13-panel input[type=date]{width:100%;padding:9px;border:1px solid #ddd;border-radius:9px;background:white}
+.v13-summary{font-size:12px;color:#475569;line-height:1.5;padding:8px;background:#f8fafc;border-radius:9px}
+.v13-play-controls{display:flex;gap:7px}.v13-play-controls button{flex:1;padding:9px;border:0;border-radius:9px;background:#1f2937;color:white;font-weight:700}
+@media(max-width:600px){.v13-panel{top:76px;right:8px;width:calc(100vw - 16px);max-height:68vh}.v13-panel-body{max-height:calc(68vh - 48px)}}
+
+/* V13.1.4 playback controls */
+#routePlaybackSpeed, #routePlaybackProgress { width:100%; accent-color:#2563eb; }
+#routePlaybackProgress:disabled { opacity:.45; }
+#routeBackupBtn { width:100%; }
+#realizationCloseBtn { font-size:13px !important; font-weight:700; white-space:normal; }
+
+/* V13.1.5: persistent realization control dock */
+#realizationQuickBar {
+  position:fixed; z-index:20000; left:12px; right:12px; bottom:18px;
+  max-width:560px; margin:0 auto; padding:10px;
+  background:rgba(255,255,255,.97); border:1px solid #d7deea; border-radius:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,.28); display:flex; flex-direction:column; gap:7px;
+  max-height:42vh; overflow:auto; font-size:13px;
+}
+#realizationQuickBar button {
+  border:0; border-radius:9px; padding:10px 9px; background:#1e293b; color:#fff;
+  font-weight:700; min-height:38px;
+}
+#realizationQuickBar button:disabled { opacity:.45; }
+#realizationQuickBar input[type=range] { width:100%; accent-color:#2563eb; }
+#realizationQuickBar .quick-play-row,#realizationQuickBar .quick-video-row { display:flex; gap:7px; }
+#realizationQuickBar .quick-play-row button,#realizationQuickBar .quick-video-row button { flex:1; }
+#realizationQuickBar #quickRealizationCloseBtn { background:#b91c1c; }
+#realizationQuickBar small { color:#475569; line-height:1.3; }
+.v13-panel-head button#realizationCloseBtn { display:block !important; min-width:44px; min-height:42px; padding:8px 10px; background:#b91c1c; color:#fff; border:0; border-radius:9px; font-weight:700; }
+@media (max-width:600px) {
+  #realizationQuickBar { bottom:22px; max-height:38vh; }
+}
