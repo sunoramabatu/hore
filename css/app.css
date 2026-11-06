@@ -970,3 +970,56 @@ body { background:#e9e5dd; }
 @media(max-width:600px) {
   #realizationPanel { top:70px !important; max-height:29vh !important; }
 }
+
+
+/* V13.1.8 — menu ringkas, popup jelas, dan foto pelanggan */
+#welcomeMessage.welcome-message {
+  display:none; position:fixed !important; left:50% !important; top:50% !important;
+  bottom:auto !important; transform:translate(-50%,-50%) scale(.96) !important;
+  width:min(88vw,480px); max-width:480px; z-index:200000 !important;
+  padding:22px 24px !important; border-radius:20px !important;
+  background:linear-gradient(145deg,#07182d,#173b60) !important;
+  color:#fff !important; border:1px solid rgba(255,255,255,.24) !important;
+  box-shadow:0 18px 55px rgba(0,0,0,.48) !important;
+  font-size:clamp(17px,4.3vw,21px) !important; font-weight:800 !important;
+  line-height:1.45 !important; text-align:center !important;
+  opacity:0; transition:opacity .18s ease, transform .18s ease;
+}
+#welcomeMessage.welcome-visible { opacity:1; transform:translate(-50%,-50%) scale(1) !important; }
+#statusText { display:none !important; }
+#statusText.upload-status-visible {
+  display:block !important; position:fixed !important; left:50% !important; top:18px !important;
+  bottom:auto !important; transform:translateX(-50%) !important; z-index:190000 !important;
+  width:min(90vw,520px); max-width:520px; padding:14px 17px !important;
+  border-radius:16px !important; color:#fff !important; font-weight:700 !important;
+  line-height:1.4; background:rgba(8,24,43,.96) !important;
+  border:1px solid rgba(86,160,255,.55); box-shadow:0 12px 34px #0005;
+}
+.oyon-search-row { display:grid; grid-template-columns:minmax(0,1fr) 86px; gap:8px; align-items:stretch; width:100%; }
+.oyon-search-input-wrap { position:relative; min-width:0; }
+.oyon-search-input-wrap #searchInput { width:100% !important; height:86px !important; box-sizing:border-box; padding:12px 42px 12px 14px !important; border-radius:16px !important; font-size:16px !important; }
+#clearSearchBtn { display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); width:29px; height:29px; place-items:center; border:0; border-radius:50%; background:#dce5ef; color:#17283d; font-size:22px; font-weight:800; line-height:1; }
+.oyon-search-actions { display:flex; flex-direction:column; gap:7px; }
+.oyon-search-actions #searchBtn { width:100% !important; height:39px !important; min-height:39px !important; border-radius:12px !important; }
+#barcodeButtonSlot { width:100%; }
+#barcodeButtonSlot #barcodeScanBtn { height:40px !important; }
+.btn-customer-photo { flex:1; border:0; border-radius:10px; padding:10px 8px; color:#fff; background:linear-gradient(145deg,#1677f2,#0757c8); font-weight:800; box-shadow:0 3px 9px #0002; }
+.btn-done { flex:1; }
+.customer-photo-chooser { display:none; position:fixed; inset:0; z-index:210000; background:rgba(3,10,20,.72); align-items:center; justify-content:center; padding:18px; }
+.customer-photo-chooser.open { display:flex; }
+.customer-photo-card { width:min(92vw,360px); padding:20px; border-radius:20px; background:linear-gradient(145deg,#0b1b30,#193b5c); color:#fff; box-shadow:0 18px 48px #0007; border:1px solid #ffffff35; }
+.customer-photo-card strong { font-size:19px; }
+.customer-photo-card p { color:#d7e5f5; font-size:13px; line-height:1.45; }
+.customer-photo-card button { width:100%; min-height:46px; margin-top:8px; border:0; border-radius:12px; color:#fff; background:#176fe0; font-weight:800; }
+.customer-photo-card .photo-cancel { background:#34465e; }
+/* Scrollbar menu sedikit lebih tebal namun tetap halus */
+#uiContent { scrollbar-width:auto; scrollbar-color:rgba(113,157,211,.78) rgba(255,255,255,.08); }
+#uiContent::-webkit-scrollbar, .ui-bar::-webkit-scrollbar { width:9px; height:9px; }
+#uiContent::-webkit-scrollbar-track, .ui-bar::-webkit-scrollbar-track { background:rgba(255,255,255,.07); border-radius:10px; }
+#uiContent::-webkit-scrollbar-thumb, .ui-bar::-webkit-scrollbar-thumb { background:linear-gradient(#6b9bd0,#315d91); border:2px solid rgba(8,21,37,.8); border-radius:10px; }
+#oyonBottomNav { display:none !important; }
+@media(max-width:600px) {
+  .oyon-search-row { grid-template-columns:minmax(0,1fr) 82px; }
+  .oyon-search-input-wrap #searchInput { height:84px !important; }
+  #statusText.upload-status-visible { top:12px !important; font-size:14px; }
+}
