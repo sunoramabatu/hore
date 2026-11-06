@@ -55,9 +55,15 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       🔍 Zoom Area Tagging
     </button>
 
-    <div style="display:flex; gap:6px; width:100%;">
-      <input id="searchInput" class="ui-input small-input" placeholder="4 digit IDPEL / Meter" />
-      <button id="searchBtn" class="ui-btn small-btn">Cari</button>
+    <div class="oyon-search-row">
+      <div class="oyon-search-input-wrap">
+        <input id="searchInput" class="ui-input small-input" placeholder="4 digit IDPEL / Meter" autocomplete="off" />
+        <button id="clearSearchBtn" type="button" aria-label="Hapus IDPEL" title="Hapus isian">×</button>
+      </div>
+      <div class="oyon-search-actions">
+        <button id="searchBtn" class="ui-btn small-btn">Cari</button>
+        <div id="barcodeButtonSlot"></div>
+      </div>
       <div id="searchResults"></div>
     </div>
 
@@ -184,14 +190,19 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   <small id="quickVideoNote">MP4 jika didukung browser; selain itu WebM. Android dapat memakai Rekam Layar bawaan.</small>
 </div>
 <div id="map"></div>
-<nav id="oyonBottomNav" aria-label="Menu utama">
-  <button type="button" id="bottomMapBtn"><span>⌖</span><small>Peta</small></button>
-  <button type="button" id="bottomUploadBtn"><span>＋</span><small>Upload</small></button>
-  <button type="button" id="bottomHistoryBtn"><span>◷</span><small>Riwayat</small></button>
-  <button type="button" id="bottomRealizationBtn"><span>✓</span><small>Realisasi</small></button>
-</nav>
 <button id="locationPhotoBtn" type="button" aria-label="Tambah foto lokasi" title="Tambah foto lokasi">📷</button>
 <input id="locationPhotoInput" type="file" accept="image/*" capture="environment" hidden />
+<input id="customerPhotoInput" type="file" accept="image/*" capture="environment" hidden />
+<div id="customerPhotoChooser" class="customer-photo-chooser" role="dialog" aria-modal="true" aria-label="Jenis foto pelanggan">
+  <div class="customer-photo-card">
+    <strong>📷 Tambah Foto Pelanggan</strong>
+    <p>Foto akan ditautkan ke IDPEL dan nomor meter pelanggan yang sedang dibuka.</p>
+    <button type="button" onclick="startCustomerPhotoCapture('house')">🏠 Foto Rumah</button>
+    <button type="button" onclick="startCustomerPhotoCapture('meter')">⚡ Foto Meteran</button>
+    <button type="button" class="photo-cancel" onclick="closeCustomerPhotoChooser()">Batal</button>
+  </div>
+</div>
+
 <div id="detailPanel" class="detail-panel">
   <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
 
@@ -238,6 +249,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.7"></script>
+<script src="./js/app.js?v=13.1.8"></script>
 </body>
 </html>
