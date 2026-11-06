@@ -654,8 +654,23 @@ map.on("moveend", renderVisibleMarkers);
 map.on("zoomend", renderVisibleMarkers);
 
 
+function moveOyonOverlayOutsideMenu(element) {
+  if (!element || !document.body) return element;
+  const menu = document.getElementById("uiBar");
+  if (menu && menu.contains(element)) document.body.appendChild(element);
+  return element;
+}
+
+// Portal popup elements outside the scrollable menu to prevent clipping on mobile.
+window.addEventListener("DOMContentLoaded", () => {
+  moveOyonOverlayOutsideMenu(document.getElementById("welcomeMessage"));
+  moveOyonOverlayOutsideMenu(document.getElementById("statusText"));
+  moveOyonOverlayOutsideMenu(document.getElementById("toast"));
+});
+moveOyonOverlayOutsideMenu(document.getElementById("welcomeMessage"));
+moveOyonOverlayOutsideMenu(document.getElementById("statusText"));
 function welcomeFieldOfficer(rows, options = {}) {
-  const host = document.getElementById("welcomeMessage");
+  const host = moveOyonOverlayOutsideMenu(document.getElementById("welcomeMessage"));
   const firstWithPetugas = (rows || []).find(row => String(getMappedValue(row, "PETUGAS") || row.PETUGAS || row["NAMA PETUGAS"] || "").trim());
   const rawPetugas = String(firstWithPetugas ? (getMappedValue(firstWithPetugas, "PETUGAS") || firstWithPetugas.PETUGAS || firstWithPetugas["NAMA PETUGAS"] || "") : "").trim();
   let namePart = rawPetugas.includes(".") ? rawPetugas.split(".").slice(1).join(".") : rawPetugas;
@@ -1154,6 +1169,7 @@ workingRows = filterAlreadyCompletedRows(structuredClone(originalRows));
     const localMatchedDoneCount = Math.max(0, originalRows.length - workingRows.length);
     const alreadyDoneCount = Math.max(importedCompletedRows.length, localMatchedDoneCount);
     if (statusText) {
+      moveOyonOverlayOutsideMenu(statusText);
       const sheet2Info = completedSheetName
         ? `${alreadyDoneCount} sudah selesai (termasuk Sheet 2)`
         : `${alreadyDoneCount} sudah selesai (riwayat HP)`;
@@ -2627,9 +2643,11 @@ function fallbackCopyText(value, label) {
 ====================== */
 function showToast(msg){
   const t = document.getElementById("toast");
-  t.innerHTML = msg;
+  if (!t) return;
+  t.textContent = String(msg ?? "");
   t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),4000);
+  window.clearTimeout(window.oyonToastTimer);
+  window.oyonToastTimer = window.setTimeout(() => t.classList.remove("show"), 4000);
 }
 function v131AllCompletedRecords() {
   const records = Array.isArray(completedRecords) ? completedRecords.slice() : [];
