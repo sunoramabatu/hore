@@ -131,6 +131,11 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   <div class="v13-panel-body">
     <label class="v13-label">Tanggal realisasi</label>
     <input id="realizationDate" type="date" />
+    <div class="oyon-stats-row">
+      <div class="oyon-stat stat-blue"><strong id="statReadCount">0</strong><span>Dibaca (Sheet 1)</span></div>
+      <div class="oyon-stat stat-green"><strong id="statDoneCount">0</strong><span>Selesai (Sheet 2)</span></div>
+      <div class="oyon-stat stat-slate"><strong id="statLeftCount">0</strong><span>Tersisa</span></div>
+    </div>
     <div id="realizationSummary" class="v13-summary">Pilih tanggal untuk melihat titik realisasi.</div>
     <button class="ui-btn" id="realizationRefreshBtn" type="button">Tampilkan Ulang Pelanggan Selesai</button>
     <hr>
@@ -156,6 +161,11 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 </div>
 
 
+<div id="playbackPhotoBox" aria-live="polite">
+  <img id="playbackPhotoImage" alt="Foto lokasi saat playback" />
+  <div class="photo-caption"><span>📷</span><span id="playbackPhotoCaption">Foto lokasi</span></div>
+</div>
+
 <div id="realizationQuickBar" aria-label="Kontrol realisasi dan animasi rute" style="display:none">
   <button id="quickRealizationCloseBtn" type="button" title="Kembali ke pelanggan tersisa">✕ Kembali</button>
   <div class="quick-play-row">
@@ -174,6 +184,12 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   <small id="quickVideoNote">MP4 jika didukung browser; selain itu WebM. Android dapat memakai Rekam Layar bawaan.</small>
 </div>
 <div id="map"></div>
+<nav id="oyonBottomNav" aria-label="Menu utama">
+  <button type="button" id="bottomMapBtn"><span>⌖</span><small>Peta</small></button>
+  <button type="button" id="bottomUploadBtn"><span>＋</span><small>Upload</small></button>
+  <button type="button" id="bottomHistoryBtn"><span>◷</span><small>Riwayat</small></button>
+  <button type="button" id="bottomRealizationBtn"><span>✓</span><small>Realisasi</small></button>
+</nav>
 <button id="locationPhotoBtn" type="button" aria-label="Tambah foto lokasi" title="Tambah foto lokasi">📷</button>
 <input id="locationPhotoInput" type="file" accept="image/*" capture="environment" hidden />
 <div id="detailPanel" class="detail-panel">
@@ -210,7 +226,8 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>\n<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <button id="cancelRouteBtn" onclick="cancelRoute()" style="display:none;">
@@ -221,6 +238,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.6"></script>
+<script src="./js/app.js?v=13.1.7"></script>
 </body>
 </html>
