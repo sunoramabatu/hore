@@ -323,6 +323,9 @@ const searchBtn = document.getElementById("searchBtn");
 const searchInput = document.getElementById("searchInput");
 const zoomBtn = document.getElementById("zoomBtn");
 const downloadBtn = document.getElementById("downloadBtn");
+const clearSearchBtn = document.getElementById("clearSearchBtn");
+clearSearchBtn?.addEventListener("click", () => { searchInput.value=""; searchInput.focus(); document.getElementById("searchResults").innerHTML=""; });
+searchInput?.addEventListener("input", () => { if(clearSearchBtn) clearSearchBtn.style.display=searchInput.value ? "grid" : "none"; });
 
 /* ======================
    BARCODE SCANNER V2
@@ -347,9 +350,10 @@ function addBarcodeScanButton() {
   btn.innerHTML = '<span class="scan-camera-icon">📷</span><span class="scan-caption">Scan Barcode</span>';
   btn.title = "Scan barcode nomor meter";
   btn.setAttribute("aria-label", "Scan barcode nomor meter");
-  btn.style.cssText = 'margin-left:6px;width:50px;min-width:50px;height:42px;border:0;border-radius:10px;background:#2563eb;color:white;font-size:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;cursor:pointer;vertical-align:middle;box-shadow:0 2px 6px rgba(0,0,0,.18);';
+  btn.style.cssText = 'width:100%;min-width:76px;height:42px;border:0;border-radius:12px;background:linear-gradient(145deg,#2563eb,#0757c8);color:white;font-size:12px;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:5px;cursor:pointer;box-shadow:0 4px 10px rgba(0,0,0,.18);';
   btn.onclick = openBarcodeScanner;
-  searchBtn.insertAdjacentElement("afterend", btn);
+  const slot=document.getElementById("barcodeButtonSlot");
+  if(slot) slot.appendChild(btn); else searchBtn.insertAdjacentElement("afterend",btn);
 }
 
 function createBarcodeScannerUI() {
@@ -680,9 +684,12 @@ function welcomeFieldOfficer(rows, options = {}) {
     host.classList.remove("welcome-visible");
     requestAnimationFrame(() => host.classList.add("welcome-visible"));
   }
-  const hideAfterVoice = () => window.setTimeout(() => {
-    if (host) { host.classList.remove("welcome-visible"); window.setTimeout(() => { host.style.display = "none"; }, 250); }
-  }, 5000);
+  // Popup sambutan tampil singkat di tengah layar; suara tidak menahan popup.
+  window.clearTimeout(window.oyonWelcomeTimer);
+  window.oyonWelcomeTimer = window.setTimeout(() => {
+    if (host) { host.classList.remove("welcome-visible"); window.setTimeout(() => { host.style.display = "none"; }, 180); }
+  }, 3000);
+  const hideAfterVoice = () => {};
   if ("speechSynthesis" in window) {
     try {
       window.speechSynthesis.cancel();
@@ -941,6 +948,103 @@ async function v13ShowPhotosAtPlayback(entry) {
 
 
 /* ======================
+   FOTO RUMAH / METER PELANGGAN
+   File disimpan di IndexedDB; versi ringkas base64 ikut diekspor ke Excel.
+====================== */
+const OYON_CUSTOMER_PHOTO_META_KEY = "oyon_customer_photos_v1";
+let oyonPendingCustomerPhotoType = "house";
+function oyonCustomerPhotoIdentity(row) {
+  const id = String(getMappedValue(row, "IDPEL") || row?.IDPEL || "").trim();
+  const meter = String(getNoMeter(row) || row?.NOMORKWH || row?.NOMOR_METER || "").trim();
+  return `${id}|${meter}`;
+}
+function oyonCustomerPhotoKey(identity, type) { return `customer_${type}_${identity}`; }
+function oyonCustomerPhotoMeta() {
+  try { return JSON.parse(localStorage.getItem(OYON_CUSTOMER_PHOTO_META_KEY) || "{}"); }
+  catch (e) { return {}; }
+}
+function oyonSaveCustomerPhotoMeta(meta) {
+  localStorage.setItem(OYON_CUSTOMER_PHOTO_META_KEY, JSON.stringify(meta));
+}
+function openCustomerPhotoChooser() {
+  if (!window.currentDetailRow) { showToast("Pilih pelanggan terlebih dahulu."); return; }
+  document.getElementById("customerPhotoChooser")?.classList.add("open");
+}
+function closeCustomerPhotoChooser() { document.getElementById("customerPhotoChooser")?.classList.remove("open"); }
+function startCustomerPhotoCapture(type) {
+  oyonPendingCustomerPhotoType = type === "meter" ? "meter" : "house";
+  closeCustomerPhotoChooser();
+  const input = document.getElementById("customerPhotoInput");
+  if (input) { input.value = ""; input.click(); }
+}
+async function oyonCompressCustomerPhoto(file) {
+  const image = new Image(); const url = URL.createObjectURL(file);
+  try {
+    await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=url;});
+    for (const maxSide of [220, 170, 130]) {
+      const scale=Math.min(1,maxSide/Math.max(image.width,image.height));
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.max(1,Math.round(image.width*scale));
+      canvas.height=Math.max(1,Math.round(image.height*scale));
+      canvas.getContext("2d").drawImage(image,0,0,canvas.width,canvas.height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.38));
+      if(blob && blob.size<21000) return blob;
+    }
+    throw new Error("Ukuran foto terlalu besar untuk kolom Excel.");
+  } finally { URL.revokeObjectURL(url); }
+}
+async function handleCustomerPhotoFile(file) {
+  if (!file || !window.currentDetailRow) return;
+  try {
+    const row=window.currentDetailRow, identity=oyonCustomerPhotoIdentity(row);
+    if (!identity || identity === "|") throw new Error("IDPEL/nomor meter pelanggan tidak ditemukan.");
+    const blob=await oyonCompressCustomerPhoto(file);
+    const key=oyonCustomerPhotoKey(identity,oyonPendingCustomerPhotoType);
+    await v13SavePhotoBlob(key,blob);
+    const meta=oyonCustomerPhotoMeta();
+    meta[key]={ identity, type:oyonPendingCustomerPhotoType, idpel:String(getMappedValue(row,"IDPEL")||row.IDPEL||""),
+      meter:String(getNoMeter(row)||""), at:new Date().toISOString(), name:file.name||"Foto pelanggan" };
+    oyonSaveCustomerPhotoMeta(meta);
+    showToast(oyonPendingCustomerPhotoType === "house" ? "📸 Foto rumah pelanggan tersimpan." : "📸 Foto meter pelanggan tersimpan.");
+  } catch(err) { console.error("Customer photo:",err); showToast("Foto gagal disimpan: "+(err.message||"coba lagi")); }
+}
+async function oyonBlobToDataUrl(blob) {
+  if (!blob) return "";
+  return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=reject;r.readAsDataURL(blob);});
+}
+async function oyonAttachCustomerPhotos(rows) {
+  const result=[];
+  for (const source of rows || []) {
+    const row={...(source||{})}; const identity=oyonCustomerPhotoIdentity(row);
+    for (const [type,header] of [["house","FOTO RUMAH DATA"],["meter","FOTO METER DATA"]]) {
+      const key=oyonCustomerPhotoKey(identity,type);
+      try { const blob=await v13GetPhotoBlob(key); row[header]=blob ? await oyonBlobToDataUrl(blob) : (row[header]||""); }
+      catch(e) { row[header]=row[header]||""; }
+    }
+    result.push(row);
+  }
+  return result;
+}
+async function oyonImportCustomerPhotosFromWorkbook(wb) {
+  const jobs=[];
+  for (const sheetName of wb.SheetNames || []) {
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{defval:""});
+    for (const row of rows) {
+      const identity=oyonCustomerPhotoIdentity(row); if(!identity||identity==="|") continue;
+      for (const [header,type] of [["FOTO RUMAH DATA","house"],["FOTO METER DATA","meter"]]) {
+        const value=row[header] || row[header.toLowerCase()];
+        if(typeof value!=="string" || !value.startsWith("data:image/")) continue;
+        try {
+          const blob=await (await fetch(value)).blob();
+          const key=oyonCustomerPhotoKey(identity,type); await v13SavePhotoBlob(key,blob);
+          const meta=oyonCustomerPhotoMeta();meta[key]={identity,type,idpel:String(row.IDPEL||""),meter:String(row.NOMORKWH||row.NOMOR_METER||""),at:new Date().toISOString(),name:"Diimpor dari Excel"};oyonSaveCustomerPhotoMeta(meta);
+        } catch(e) { console.warn("Foto Excel tidak dapat dipulihkan",e); }
+      }
+    }
+  }
+}
+
+/* ======================
    LOAD EXCEL
 ====================== */
 upload.onchange = e => {
@@ -951,8 +1055,9 @@ upload.onchange = e => {
   localStorage.setItem("RBM_FILENAME", file.name);
 
   const reader = new FileReader();
-  reader.onload = evt => {
+  reader.onload = async evt => {
     const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
+    await oyonImportCustomerPhotosFromWorkbook(wb);
     const sheet = wb.Sheets[wb.SheetNames[0]];
 
 // Simpan seluruh nama kolom asli dan urutannya
@@ -1055,6 +1160,12 @@ workingRows = filterAlreadyCompletedRows(structuredClone(originalRows));
       statusText.innerText = diag.dijCreated > 0
         ? `✅ ${originalRows.length} dibaca • ${sheet2Info} • ${workingRows.length} tersisa • ${diag.dijCreated} marker DIJ • ${diag.backupCreated} cadangan • ${diag.dijInvalid} koordinat DIJ tidak valid`
         : `⚠️ ${originalRows.length} dibaca • ${sheet2Info} • ${workingRows.length} tersisa, tetapi 0 marker DIJ dibuat. Periksa LAT/LON dan format koordinat.`;
+      statusText.classList.add("upload-status-visible");
+      window.clearTimeout(window.oyonUploadStatusTimer);
+      window.oyonUploadStatusTimer = window.setTimeout(() => {
+        statusText.classList.remove("upload-status-visible");
+        statusText.textContent = "";
+      }, 4000);
     }
     zoomBtn.style.display = diag.dijCreated > 0 ? "block" : "none";
 
@@ -1974,6 +2085,7 @@ function openDetail(r){
           ? `<button class="btn-go" onclick="goTo(${lat},${lon})">🧭 Tampil Rute</button>`
           : ``
       }
+      ${!isDIL ? `<button class="btn-customer-photo" type="button" onclick="openCustomerPhotoChooser()">📷 Foto</button>` : ``}
       <button class="btn-done" onclick="markDone('${r.IDPEL}')">✅ Selesai</button>
     </div>
   </div>
@@ -2517,7 +2629,7 @@ function showToast(msg){
   const t = document.getElementById("toast");
   t.innerHTML = msg;
   t.classList.add("show");
-  setTimeout(()=>t.classList.remove("show"),5000);
+  setTimeout(()=>t.classList.remove("show"),4000);
 }
 function v131AllCompletedRecords() {
   const records = Array.isArray(completedRecords) ? completedRecords.slice() : [];
@@ -2545,7 +2657,7 @@ function v131AllCompletedRecords() {
    FINISH DAN SIMPAN RBM UPDATE
 ====================== */
 
-downloadBtn.onclick = () => {
+downloadBtn.onclick = async () => {
   const completedForExport = v131AllCompletedRecords();
   if (workingRows.length === 0 && completedForExport.length === 0) {
     showToast("⚠️ Tidak ada pelanggan tersisa atau realisasi selesai untuk diunduh");
@@ -2587,6 +2699,10 @@ downloadBtn.onclick = () => {
   if (!hasAnyHeader(LAT_COMPARE_ALIASES)) { exportHeaders.push("LAT PEMBANDING"); normSet.add("LATPEMBANDING"); }
   if (!hasAnyHeader(LON_COMPARE_ALIASES)) { exportHeaders.push("LON PEMBANDING"); normSet.add("LONPEMBANDING"); }
 
+  ["FOTO RUMAH DATA", "FOTO METER DATA"].forEach(h => {
+    if (!exportHeaders.some(x => normalizeHeader(x) === normalizeHeader(h))) exportHeaders.push(h);
+  });
+
   const compareHeaderNorms = new Set([
     "LATPEMBANDING", "LONPEMBANDING", "LATDIL", "LONDIL",
     "LATPETUGAS", "LONPETUGAS", "LATCADANGAN", "LONCADANGAN",
@@ -2619,11 +2735,15 @@ downloadBtn.onclick = () => {
     }
     return "";
   };
+  const workingRowsWithPhotos = await oyonAttachCustomerPhotos(workingRows);
+  const completedForExportWithPhotos = await Promise.all(completedForExport.map(async item => ({
+    ...item, row: (await oyonAttachCustomerPhotos([item.row || {}]))[0]
+  })));
   const buildSheetRows = rows => [exportHeaders, ...rows.map(row => exportHeaders.map(header => {
     const value = getRowValueForHeader(row, header);
     return value == null ? "" : value;
   }))];
-  const remainingSheet = XLSX.utils.aoa_to_sheet(buildSheetRows(workingRows));
+  const remainingSheet = XLSX.utils.aoa_to_sheet(buildSheetRows(workingRowsWithPhotos));
 
   // Sheet realisasi memakai kolom RBM + titik GPS aktual + waktu selesai.
   const completedExtraHeaders = ["LAT REALISASI", "LON REALISASI", "JARAK DIJ KE REALISASI (M)", "AKURASI GPS HP (M)", "TANGGAL SELESAI", "JAM SELESAI", "WAKTU SELESAI ISO", "STATUS REALISASI", "CATATAN GPS"];
@@ -2637,7 +2757,7 @@ downloadBtn.onclick = () => {
     });
     if (!exists) completedHeaders.push(h);
   });
-  const completedRows = completedForExport.map(item => {
+  const completedRows = completedForExportWithPhotos.map(item => {
     const row = item.row || {};
     const base = completedHeaders.map(header => {
       const n = normalizeHeader(header);
@@ -2688,8 +2808,8 @@ downloadBtn.onclick = () => {
       }
     });
   };
-  applyGpsFormats(remainingSheet, exportHeaders, workingRows);
-  applyGpsFormats(completedSheet, completedHeaders, completedForExport.map(x=>x.row || {}));
+  applyGpsFormats(remainingSheet, exportHeaders, workingRowsWithPhotos);
+  applyGpsFormats(completedSheet, completedHeaders, completedForExportWithPhotos.map(x=>x.row || {}));
   const wb = XLSX.utils.book_new();
   wb.Props = { Title: "OYONID MAP EXPORT", Subject: "RBM tersisa dan realisasi pekerjaan kumulatif" };
   XLSX.utils.book_append_sheet(wb, remainingSheet, "Pelanggan Tersisa");
@@ -2700,7 +2820,7 @@ downloadBtn.onclick = () => {
     return;
   }
   XLSX.writeFile(wb, filename, { compression: true });
-  showToast(`✅ Excel V13.1.6: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
+  showToast(`✅ Excel V13.1.8: ${workingRows.length} tersisa • ${completedForExport.length} selesai • foto pelanggan ikut disertakan jika ada.`);
 };
 
 /* ======================
@@ -3206,17 +3326,15 @@ document.addEventListener("DOMContentLoaded",()=>{
     if (file) await v13HandleLocationPhoto(file);
     event.target.value = "";
   });
-  document.getElementById("bottomMapBtn")?.addEventListener("click", () => {
-    document.getElementById("uiBar")?.classList.remove("minimized");
-    document.getElementById("toggleBtn").textContent = "−";
-    if (map) setTimeout(() => map.invalidateSize(), 100);
+  document.getElementById("customerPhotoInput")?.addEventListener("change", async event => {
+    const file=event.target.files?.[0]; if(file) await handleCustomerPhotoFile(file); event.target.value="";
   });
-  document.getElementById("bottomUploadBtn")?.addEventListener("click", () => document.getElementById("upload")?.click());
-  document.getElementById("bottomHistoryBtn")?.addEventListener("click", () => document.getElementById("historyToggleBtn")?.click());
-  document.getElementById("bottomRealizationBtn")?.addEventListener("click", openRealizationPanel);
+  document.getElementById("customerPhotoChooser")?.addEventListener("click", event => {
+    if(event.target.id === "customerPhotoChooser") closeCustomerPhotoChooser();
+  });
 
   console.info("[OYONID] V13.1.7 smooth playback and design handlers attached");
 });
 // Expose functions for compatibility with any older inline buttons.
-Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback});
+Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback,openCustomerPhotoChooser,closeCustomerPhotoChooser,startCustomerPhotoCapture});
 window.addEventListener("beforeunload",()=>{if(v13ActiveRoute)v13SaveRoutes();});
