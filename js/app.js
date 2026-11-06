@@ -742,24 +742,34 @@ async function startMapCanvasRecording() {
   if (typeof html2canvas !== "function") {
     throw new Error("Perekam layar browser tidak tersedia dan modul perekam peta belum termuat.");
   }
-  const mapElement = document.getElementById("map");
-  if (!mapElement || !mapElement.clientWidth || !mapElement.clientHeight) throw new Error("Area peta belum siap direkam.");
+  const stage = document.body;
+  const width = Math.max(320, window.innerWidth || document.documentElement.clientWidth);
+  const height = Math.max(480, window.innerHeight || document.documentElement.clientHeight);
   realizationCaptureCanvas = document.createElement("canvas");
-  realizationCaptureCanvas.width = Math.min(1280, mapElement.clientWidth * 2);
-  realizationCaptureCanvas.height = Math.min(1280, mapElement.clientHeight * 2);
+  realizationCaptureCanvas.width = Math.min(1080, width * 1.5);
+  realizationCaptureCanvas.height = Math.min(1920, height * 1.5);
   const ctx = realizationCaptureCanvas.getContext("2d");
-  const stream = realizationCaptureCanvas.captureStream(12);
+  const stream = realizationCaptureCanvas.captureStream(15);
   realizationMediaStream = stream;
+  let frameBusy = false;
   const drawFrame = async () => {
-    if (!realizationMediaRecorder || realizationMediaRecorder.state !== "recording") return;
+    if (frameBusy || !realizationMediaRecorder || realizationMediaRecorder.state !== "recording") return;
+    frameBusy = true;
     try {
-      const shot = await html2canvas(mapElement, { backgroundColor: "#e5e7eb", useCORS: true, scale: 1, logging: false });
+      const shot = await html2canvas(stage, {
+        backgroundColor: "#e9e5dd", useCORS: true, scale: 1,
+        width, height, windowWidth: width, windowHeight: height,
+        scrollX: 0, scrollY: 0, logging: false
+      });
       ctx.clearRect(0, 0, realizationCaptureCanvas.width, realizationCaptureCanvas.height);
       ctx.drawImage(shot, 0, 0, realizationCaptureCanvas.width, realizationCaptureCanvas.height);
-    } catch (e) { console.warn("[OYONID] Map frame capture failed", e); }
+      const track = stream.getVideoTracks()[0];
+      track?.requestFrame?.();
+    } catch (e) { console.warn("[OYONID] App frame capture failed", e); }
+    finally { frameBusy = false; }
   };
   await drawFrame();
-  realizationCaptureTimer = setInterval(drawFrame, 800);
+  realizationCaptureTimer = setInterval(drawFrame, 140);
 }
 async function startRealizationScreenRecording() {
   if (typeof MediaRecorder === "undefined") {
@@ -904,31 +914,28 @@ async function v13HandleLocationPhoto(file) {
   }
 }
 async function v13ShowPhotosAtPlayback(entry) {
-  if (!entry?.point?.at || !v13PlaybackLayer) return;
+  if (!entry?.point?.at) return;
   const playbackTime = new Date(entry.point.at).getTime();
   if (!Number.isFinite(playbackTime)) return;
-  const photos = v13PhotoMetadata().filter(photo =>
-    photo.dayKey === v13SelectedDate() &&
-    new Date(photo.at).getTime() <= playbackTime &&
-    !v13ShownPhotoIds.has(photo.id)
-  );
-  for (const photo of photos) {
-    v13ShownPhotoIds.add(photo.id);
-    try {
-      const blob = await v13GetPhotoBlob(photo.id);
-      if (!blob) continue;
-      const url = URL.createObjectURL(blob);
-      const marker = L.marker([photo.lat, photo.lon], {
-        icon: L.divIcon({
-          className: "oyon-photo-marker",
-          html: '<span>📷</span>',
-          iconSize: [34, 34],
-          iconAnchor: [17, 17]
-        }),
-        zIndexOffset: 1500
-      }).addTo(v13PlaybackLayer);
-      marker.bindPopup(`<div class="oyon-photo-popup"><img src="${url}" alt="Foto lokasi" /><small>${new Date(photo.at).toLocaleString("id-ID")}</small></div>`);
-    } catch (e) { console.warn("[OYONID] Playback photo could not be loaded", e); }
+  const photos = v13PhotoMetadata()
+    .filter(photo => photo.dayKey === v13SelectedDate() && new Date(photo.at).getTime() <= playbackTime)
+    .sort((a, b) => new Date(a.at) - new Date(b.at));
+  const photo = photos[photos.length - 1];
+  const box = document.getElementById("playbackPhotoBox");
+  if (!photo || !box || photo.id === v13CurrentPlaybackPhotoId) return;
+  v13CurrentPlaybackPhotoId = photo.id;
+  try {
+    const blob = await v13GetPhotoBlob(photo.id);
+    if (!blob) return;
+    if (v13PlaybackPhotoObjectUrl) URL.revokeObjectURL(v13PlaybackPhotoObjectUrl);
+    v13PlaybackPhotoObjectUrl = URL.createObjectURL(blob);
+    const img = document.getElementById("playbackPhotoImage");
+    const caption = document.getElementById("playbackPhotoCaption");
+    if (img) img.src = v13PlaybackPhotoObjectUrl;
+    if (caption) caption.textContent = `${new Date(photo.at).toLocaleString("id-ID")} • GPS ${Number(photo.accuracy || 0).toFixed(0)} m`;
+    box.classList.add("is-visible");
+  } catch (e) {
+    console.warn("[OYONID] Playback photo could not be loaded", e);
   }
 }
 
@@ -2843,6 +2850,14 @@ let v13RouteSessions = (() => { try { return JSON.parse(localStorage.getItem(V13
 let v13ActiveRoute = (() => { try { return JSON.parse(localStorage.getItem(V13_ACTIVE_ROUTE_KEY) || "null"); } catch(e) { return null; } })();
 let v13RouteWatchId = null;
 let v13PlaybackTimer = null;
+let v13PlaybackFrame = null;
+let v13PlaybackLegStart = 0;
+let v13PlaybackLegDuration = 1200;
+let v13PlaybackLegFrom = null;
+let v13PlaybackLegTo = null;
+let v13PlaybackCurrentPosition = null;
+let v13PlaybackPhotoObjectUrl = null;
+let v13CurrentPlaybackPhotoId = null;
 let v13PlaybackLayer = null;
 let v13PlaybackMarker = null;
 let v13PlaybackIndex = 0;
@@ -2913,14 +2928,19 @@ function stopRouteRecording(){
   showToast(saved?`Rekaman rute disimpan: ${count} titik GPS.`:"Rekaman dihentikan; periksa penyimpanan lokal.");
 }
 function openRealizationPanel(){
+  const uiBar=document.getElementById("uiBar");
+  if(uiBar){uiBar.classList.add("minimized");const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent="＋";}
   const p=document.getElementById("realizationPanel");if(p)p.style.display="block";
   const quick = document.getElementById("realizationQuickBar"); if (quick) quick.style.display = "flex";
+  const bottomNav = document.getElementById("oyonBottomNav"); if (bottomNav) bottomNav.style.display = "none";
   const d=document.getElementById("realizationDate");if(d&&!d.value)d.value=localDateTimeParts().dayKey;
   updateRealizationSummary();
   resetRoutePlayback();
   showRealizationOnMap();
 }
 function closeRealizationPanel(){
+  const uiBar=document.getElementById("uiBar");
+  if(uiBar){uiBar.classList.remove("minimized");const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent="−";}
   const p=document.getElementById("realizationPanel");if(p)p.style.display="none";
   pauseRouteHistory();
   if(v13PlaybackLayer&&map){map.removeLayer(v13PlaybackLayer);v13PlaybackLayer=null;}
@@ -2929,6 +2949,8 @@ function closeRealizationPanel(){
   if(v13RealizationModeActive&&map&&clusterGroup&&!map.hasLayer(clusterGroup))map.addLayer(clusterGroup);
   v13RealizationModeActive=false;
   const quick = document.getElementById("realizationQuickBar"); if (quick) quick.style.display = "none";
+  const bottomNav = document.getElementById("oyonBottomNav"); if (bottomNav) bottomNav.style.display = "flex";
+  const photoBox = document.getElementById("playbackPhotoBox"); if (photoBox) photoBox.classList.remove("is-visible");
   if (typeof applyHariBacaFilter === "function") applyHariBacaFilter();
   if (typeof zoomToAllMarkers === "function" && markers.length) zoomToAllMarkers();
   showToast("Kembali ke peta pelanggan yang belum selesai.");
@@ -2943,6 +2965,12 @@ function v13RoutesForDate(){return (v13RouteSessions||[]).filter(x=>x.dayKey===v
 function updateRealizationSummary(){
   const all=v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()),done=all.filter(v13ValidActual),routes=v13RoutesForDate(),points=routes.reduce((n,r)=>n+(r.points?.length||0),0);
   const el=document.getElementById("realizationSummary");if(el)el.textContent=`${done.length} pelanggan selesai dengan GPS • ${all.length} selesai total • ${routes.length} sesi rute • ${points} titik GPS.`;
+  const readEl=document.getElementById("statReadCount");
+  const doneEl=document.getElementById("statDoneCount");
+  const leftEl=document.getElementById("statLeftCount");
+  if(readEl)readEl.textContent=String(Array.isArray(originalRows)?originalRows.length:0);
+  if(doneEl)doneEl.textContent=String(all.length);
+  if(leftEl)leftEl.textContent=String(Array.isArray(workingRows)?workingRows.length:0);
   const rs=document.getElementById("routePlaybackStatus");if(rs)rs.textContent=routes.length?`Tersedia ${points} titik GPS dari ${routes.length} sesi.`:"Belum ada rekaman rute pada tanggal ini.";
 }
 function showRealizationOnMap(){
@@ -2986,14 +3014,19 @@ function v13PlaybackUpdateControls() {
 function v13PlaybackClearDrawing() {
   if (v13PlaybackLayer && map) map.removeLayer(v13PlaybackLayer);
   v13ShownPhotoIds = new Set();
+  v13CurrentPlaybackPhotoId = null;
+  const photoBox = document.getElementById("playbackPhotoBox");
+  if (photoBox) photoBox.classList.remove("is-visible");
   v13PlaybackLayer = L.layerGroup().addTo(map);
   v13PlaybackMarker = null;
+  v13PlaybackCurrentPosition = null;
   v13PlaybackLines = [];
   v13PlaybackCurrentSession = null;
   v13PlaybackCurrentPoints = [];
 }
 function v13PlaybackDrawEntry(entry, pan = true) {
   const p = entry.point, ll = [p.lat, p.lon];
+  v13PlaybackCurrentPosition = ll;
   if (entry.breakBefore || v13PlaybackCurrentSession !== entry.sessionIndex) {
     v13PlaybackCurrentSession = entry.sessionIndex;
     v13PlaybackCurrentPoints = [];
@@ -3017,21 +3050,77 @@ function v13PlaybackRenderTo(targetIndex, pan = true) {
 function v13PlaybackSetTimer() {
   pauseRouteHistory();
   if (v13PlaybackIndex >= v13PlaybackEntries.length) return;
-  const speed = Number(document.getElementById("routePlaybackSpeed")?.value || 2);
-  v13PlaybackTimer = setInterval(() => {
-    const entry = v13PlaybackEntries[v13PlaybackIndex];
-    if (!entry) { pauseRouteHistory(); return; }
-    v13PlaybackDrawEntry(entry, true);
-    const played = v13PlaybackIndex + 1;
-    const status = document.getElementById("routePlaybackStatus");
-    if (status) status.textContent = `Playback ${played}/${v13PlaybackEntries.length} • sesi ${entry.sessionIndex + 1} • ${new Date(entry.point.at).toLocaleTimeString("id-ID")}`;
-    v13PlaybackIndex++;
-    v13PlaybackUpdateControls();
-    if (v13PlaybackIndex >= v13PlaybackEntries.length) pauseRouteHistory();
-  }, Math.max(180, 1000 / speed));
+
+  const speed = Math.max(1, Number(document.getElementById("routePlaybackSpeed")?.value || 1));
+  const duration = Math.max(650, 1350 / speed);
+
+  const beginLeg = () => {
+    if (v13PlaybackIndex >= v13PlaybackEntries.length) {
+      pauseRouteHistory();
+      const status = document.getElementById("routePlaybackStatus");
+      if (status) status.textContent = "Playback selesai.";
+      return;
+    }
+    const target = v13PlaybackEntries[v13PlaybackIndex];
+    const previous = v13PlaybackIndex > 0 ? v13PlaybackEntries[v13PlaybackIndex - 1] : null;
+
+    if (!previous || target.breakBefore || previous.sessionIndex !== target.sessionIndex) {
+      v13PlaybackDrawEntry(target, false);
+      v13PlaybackIndex++;
+      v13PlaybackUpdateControls();
+      const status = document.getElementById("routePlaybackStatus");
+      if (status) status.textContent = `Perjalanan ${v13PlaybackIndex}/${v13PlaybackEntries.length} • sesi ${target.sessionIndex + 1}`;
+      beginLeg();
+      return;
+    }
+
+    v13PlaybackLegFrom = (v13PlaybackCurrentPosition && previous.sessionIndex === target.sessionIndex)
+      ? [...v13PlaybackCurrentPosition]
+      : [Number(previous.point.lat), Number(previous.point.lon)];
+    v13PlaybackLegTo = [Number(target.point.lat), Number(target.point.lon)];
+    v13PlaybackLegStart = performance.now();
+    v13PlaybackLegDuration = duration;
+    const frame = now => {
+      if (!v13PlaybackFrame) return;
+      const t = Math.min(1, (now - v13PlaybackLegStart) / v13PlaybackLegDuration);
+      // Smoothstep easing: starts and stops gently, without abrupt GPS-to-GPS jumps.
+      const eased = t * t * (3 - 2 * t);
+      const lat = v13PlaybackLegFrom[0] + (v13PlaybackLegTo[0] - v13PlaybackLegFrom[0]) * eased;
+      const lon = v13PlaybackLegFrom[1] + (v13PlaybackLegTo[1] - v13PlaybackLegFrom[1]) * eased;
+      const ll = [lat, lon];
+      v13PlaybackCurrentPosition = ll;
+
+      const line = v13PlaybackLines[v13PlaybackLines.length - 1];
+      if (line) {
+        const currentPath = line.getLatLngs();
+        if (!currentPath.length) currentPath.push(L.latLng(v13PlaybackLegFrom[0], v13PlaybackLegFrom[1]));
+        if (currentPath.length > 1) currentPath[currentPath.length - 1] = L.latLng(lat, lon);
+        else currentPath.push(L.latLng(lat, lon));
+        line.setLatLngs(currentPath);
+      }
+      if (v13PlaybackMarker) v13PlaybackMarker.setLatLng(ll);
+      else v13PlaybackMarker = L.circleMarker(ll, {
+        radius: 9, color: "#fff", weight: 3, fillColor: "#1685ff", fillOpacity: 1
+      }).addTo(v13PlaybackLayer);
+
+      // Do not pan the map on every frame; that creates visual shaking on phones.
+      if (t >= 1) {
+        v13PlaybackIndex++;
+        v13PlaybackUpdateControls();
+        const status = document.getElementById("routePlaybackStatus");
+        if (status) status.textContent = `Perjalanan ${v13PlaybackIndex}/${v13PlaybackEntries.length} • sesi ${target.sessionIndex + 1} • ${new Date(target.point.at).toLocaleTimeString("id-ID")}`;
+        v13PlaybackFrame = requestAnimationFrame(beginLeg);
+      } else {
+        v13PlaybackFrame = requestAnimationFrame(frame);
+      }
+    };
+    v13PlaybackFrame = requestAnimationFrame(frame);
+  };
+  beginLeg();
 }
 function pauseRouteHistory() {
   if (v13PlaybackTimer) { clearInterval(v13PlaybackTimer); v13PlaybackTimer = null; }
+  if (v13PlaybackFrame) { cancelAnimationFrame(v13PlaybackFrame); v13PlaybackFrame = null; }
 }
 function resetRoutePlayback() {
   pauseRouteHistory();
@@ -3067,7 +3156,7 @@ function seekRoutePlayback(value) {
 }
 function downloadRouteBackup() {
   const payload = {
-    app: "OYONID Map", version: "V13.1.6", exportedAt: new Date().toISOString(),
+    app: "OYONID Map", version: "V13.1.7", exportedAt: new Date().toISOString(),
     sessions: v13RouteSessions || [], activeSession: v13ActiveRoute || null
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -3096,7 +3185,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("routePlaybackProgress")?.addEventListener("input", event => seekRoutePlayback(event.target.value));
   document.getElementById("routeBackupBtn")?.addEventListener("click", downloadRouteBackup);
   document.getElementById("routePlaybackSpeed")?.addEventListener("change", () => {
-    if (v13PlaybackTimer) v13PlaybackSetTimer();
+    if (v13PlaybackFrame) { pauseRouteHistory(); v13PlaybackSetTimer(); }
   });
   document.getElementById("quickRealizationCloseBtn")?.addEventListener("click", closeRealizationPanel);
   document.getElementById("quickRoutePlayBtn")?.addEventListener("click", playRouteHistory);
@@ -3106,7 +3195,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("quickRouteSpeed")?.addEventListener("change", event => {
     const panelSpeed = document.getElementById("routePlaybackSpeed");
     if (panelSpeed) panelSpeed.value = event.target.value;
-    if (v13PlaybackTimer) v13PlaybackSetTimer();
+    if (v13PlaybackFrame) { pauseRouteHistory(); v13PlaybackSetTimer(); }
   });
   document.getElementById("quickVideoStartBtn")?.addEventListener("click", startRealizationScreenRecording);
   document.getElementById("quickVideoStopBtn")?.addEventListener("click", () => stopRealizationScreenRecording(true));
@@ -3117,8 +3206,16 @@ document.addEventListener("DOMContentLoaded",()=>{
     if (file) await v13HandleLocationPhoto(file);
     event.target.value = "";
   });
+  document.getElementById("bottomMapBtn")?.addEventListener("click", () => {
+    document.getElementById("uiBar")?.classList.remove("minimized");
+    document.getElementById("toggleBtn").textContent = "−";
+    if (map) setTimeout(() => map.invalidateSize(), 100);
+  });
+  document.getElementById("bottomUploadBtn")?.addEventListener("click", () => document.getElementById("upload")?.click());
+  document.getElementById("bottomHistoryBtn")?.addEventListener("click", () => document.getElementById("historyToggleBtn")?.click());
+  document.getElementById("bottomRealizationBtn")?.addEventListener("click", openRealizationPanel);
 
-  console.info("[OYONID] V13.1.6 handlers attached");
+  console.info("[OYONID] V13.1.7 smooth playback and design handlers attached");
 });
 // Expose functions for compatibility with any older inline buttons.
 Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback});
