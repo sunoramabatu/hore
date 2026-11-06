@@ -3,8 +3,8 @@
   
 
 <head>
-  <link rel="stylesheet" href="./css/app.css?v=13.1.10">
-  <title>OyonID Map V13.1.10</title>
+  <link rel="stylesheet" href="./css/app.css?v=13.1.11">
+  <title>OyonID Map V13.1.11</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -40,7 +40,9 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       <details id="columnMappingPanel" class="column-mapping-menu">
         <summary class="ui-btn small-btn">⚙️ Kolom Excel</summary>
         <div class="column-mapping-popover">
-          <div class="mapping-help">Pilih judul kolom yang sesuai jika nama di Excel berbeda. Opsi terisi setelah Excel diunggah.</div>
+          <div class="mapping-help">Pilih sheet sumber data, lalu sesuaikan judul kolom jika diperlukan.</div>
+          <label class="sheet-picker-label" for="workbookSheetSelect">Sheet yang dipakai untuk peta</label>
+          <select id="workbookSheetSelect" class="sheet-picker"><option value="">Upload Excel terlebih dahulu</option></select>
           <div id="columnMappingFields" style="display:grid;grid-template-columns:1fr;gap:7px;"></div>
           <button type="button" id="applyColumnMappingBtn" class="ui-btn small-btn" style="margin-top:8px;width:100%;">Terapkan Judul Kolom</button>
         </div>
@@ -119,8 +121,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
     </button>
     <div class="v13-tools">
       <button class="ui-btn small-btn" id="realizationOpenBtn" type="button">📍 Lihat Realisasi</button>
-      <button class="ui-btn small-btn" id="routeStartBtn" type="button">▶ Mulai Rekam Rute</button>
-      <button class="ui-btn small-btn" id="routeStopBtn" type="button" disabled>■ Akhiri Rekam Rute</button>
       <div id="routeRecordStatus" class="route-record-status">Rute belum direkam</div>
     </div>
     
@@ -184,12 +184,12 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   <label for="quickRouteSpeed">Kecepatan <span id="quickSpeedLabel">2×</span></label>
   <input id="quickRouteSpeed" type="range" min="1" max="5" value="2" />
   <div class="quick-video-row">
-    <button id="quickVideoStartBtn" type="button">🎥 Rekam layar</button>
-    <button id="quickVideoStopBtn" type="button" disabled>■ Simpan video</button>
+    <button id="quickVideoDownloadBtn" type="button">⬇ Buat &amp; Download Video Rute</button>
   </div>
-  <small id="quickVideoNote">MP4 jika didukung browser; selain itu WebM. Android dapat memakai Rekam Layar bawaan.</small>
+  <small id="quickVideoNote">Video dibuat dari peta dan rute saja. Menu aplikasi tidak ikut direkam.</small>
 </div>
 <div id="map"></div>
+<button id="routeRecordFloatBtn" type="button" aria-pressed="false">▶ Mulai Rekam Rute</button>
 <button id="locationPhotoBtn" type="button" aria-label="Tambah foto lokasi" title="Tambah foto lokasi">📷</button>
 <input id="locationPhotoInput" type="file" accept="image/*" capture="environment" hidden />
 <input id="customerPhotoInput" type="file" accept="image/*" capture="environment" hidden />
@@ -249,6 +249,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.10"></script>
+<script src="./js/app.js?v=13.1.11"></script>
 </body>
 </html>
