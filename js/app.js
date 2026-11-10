@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.11-ROUTE-VIDEO-SHEET";
+window.OYONID_BUILD = "V13.1.19-PHOTO-FIT-QUALITY";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -1020,13 +1020,13 @@ async function v13HandleLocationPhoto(file) {
     const image = new Image();
     const tempUrl = URL.createObjectURL(file);
     await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = tempUrl; });
-    const maxSide = 1280, scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+    const maxSide = 1920, scale = Math.min(1, maxSide / Math.max(image.width, image.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.width * scale));
     canvas.height = Math.max(1, Math.round(image.height * scale));
     canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
     URL.revokeObjectURL(tempUrl);
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.88));
     if (!blob) throw new Error("Foto gagal dikompres.");
     const id = "photo_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     await v13SavePhotoBlob(id, blob);
@@ -1063,7 +1063,7 @@ function v13PlaybackPhotoMetadata() {
     [["FOTO RUMAH DATA","house"],["FOTO METER DATA","meter"]].forEach(([header,type])=>{
       const key=Object.keys(row).find(k=>normalizeHeader(k)===normalizeHeader(header));
       const dataUrl=key?String(row[key]||"").trim():"";
-      if(!/^data:image\\//i.test(dataUrl))return;
+      if(!/^data:image\//i.test(dataUrl))return;
       const id=`excel_${identity}_${type}`;
       if(result.some(p=>p.id===id))return;
       result.push({
@@ -1077,7 +1077,7 @@ function v13PlaybackPhotoMetadata() {
   return result;
 }
 async function v13LoadPlaybackPhotoBlob(photo) {
-  if(photo?.dataUrl && /^data:image\\//i.test(photo.dataUrl)){
+  if(photo?.dataUrl && /^data:image\//i.test(photo.dataUrl)){
     const response=await fetch(photo.dataUrl);
     if(!response.ok)throw new Error("Foto Excel tidak dapat dibaca.");
     return await response.blob();
@@ -3398,6 +3398,44 @@ function updateRealizationSummary(){
   v13RenderAvailableRealizationDates();
 }
 
+function v13AttachCustomerPhotosToPopup(marker,item){
+  marker.on("popupopen",async event=>{
+    const popup=event.popup?.getElement();
+    const content=popup?.querySelector(".leaflet-popup-content");
+    if(!content)return;
+    let host=content.querySelector(".oyon-popup-customer-photos");
+    if(!host){
+      host=document.createElement("div");
+      host.className="oyon-popup-customer-photos";
+      host.style.cssText="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:9px;max-width:320px;width:min(320px,78vw)";
+      content.appendChild(host);
+    }
+    host.textContent="Memuat foto pelanggan…";
+    const row=item.row||{};
+    const identity=item.identity||completionIdentity(row)||oyonCustomerPhotoIdentity(row);
+    const photos=v13PlaybackPhotoMetadata().filter(photo=>photo.dayKey===v13SelectedDate()&&photo.identity===identity);
+    if(!photos.length){host.textContent="Foto pelanggan belum tersedia di Excel atau penyimpanan perangkat.";return;}
+    host.textContent="";
+    for(const photo of photos){
+      try{
+        const blob=await v13LoadPlaybackPhotoBlob(photo);
+        if(!blob||!host.isConnected)return;
+        const url=URL.createObjectURL(blob);
+        const card=document.createElement("div");
+        const img=document.createElement("img");
+        const label=document.createElement("div");
+        img.src=url;img.alt=photo.name||photo.type||"Foto pelanggan";
+        img.style.cssText="width:100%;height:150px;object-fit:contain;object-position:center;background:#101b2a;border-radius:7px;display:block";
+        label.textContent=photo.type||photo.name||"Foto";
+        label.style.cssText="font-size:11px;margin-top:3px;text-align:center";
+        card.append(img,label);host.appendChild(card);
+        marker.once("popupclose",()=>URL.revokeObjectURL(url));
+      }catch(error){console.warn("[OYONID] Foto popup gagal dimuat",error);}
+    }
+    if(!host.children.length)host.textContent="Foto pelanggan tidak dapat dibaca.";
+  });
+}
+
 function showRealizationOnMap(){
   if(typeof map==="undefined"||typeof L==="undefined")return;
   pauseRouteHistory();
@@ -3411,6 +3449,7 @@ function showRealizationOnMap(){
     const idpel=String(getMappedValue(row,"IDPEL")||row.IDPEL||""),meter=String(getNoMeter(row)||"");
     const m=L.circleMarker([lat,lon],{radius:9,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.96}).addTo(v13RealizationLayer);
     m.bindPopup(`<b>${i+1}. ${name.replace(/[<>]/g,"")}</b><br>IDPEL: ${idpel.replace(/[<>]/g,"")}<br>Nomor meter: ${meter.replace(/[<>]/g,"")}<br>Selesai: ${item.time||"-"}<br>GPS realisasi: ${lat}, ${lon}`);
+    v13AttachCustomerPhotosToPopup(m,item);
     bounds.push([lat,lon]);
   });
   if(bounds.length){map.fitBounds(L.latLngBounds(bounds).pad(.15));showToast(`${bounds.length} pelanggan selesai ditampilkan. Yang belum selesai disembunyikan.`);}
@@ -3793,7 +3832,7 @@ async function downloadRouteVideo() {
     stream=canvas.captureStream(24);
     const mimeCandidates=["video/mp4;codecs=avc1.42E01E","video/mp4","video/webm;codecs=vp9","video/webm"];
     const mimeType=typeof MediaRecorder.isTypeSupported==="function"?(mimeCandidates.find(type=>MediaRecorder.isTypeSupported(type))||""):"";
-    recorder=new MediaRecorder(stream,mimeType?{mimeType,videoBitsPerSecond:4500000}:{videoBitsPerSecond:4500000});
+    recorder=new MediaRecorder(stream,mimeType?{mimeType,videoBitsPerSecond:7000000}:{videoBitsPerSecond:7000000});
     const chunks=[];
     const finished=new Promise((resolve,reject)=>{
       recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
@@ -3840,13 +3879,20 @@ async function downloadRouteVideo() {
       ctx.fillStyle="rgba(9,27,47,.88)";ctx.fillRect(18,H-14,W-36,5);ctx.fillStyle="#19b66d";ctx.fillRect(18,H-14,(W-36)*Math.max(0,Math.min(1,progress)),5);
       if(moving?.cutPauseBefore){ctx.fillStyle="rgba(9,27,47,.92)";ctx.beginPath();ctx.roundRect(W-310,108,292,42,12);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 14px Arial";ctx.fillText("⏩ Jeda GPS 30+ menit dilewati",W-294,135);}
       if(activeCustomer||photoImage){
-        const x=18,y=H-250,w=250,h=205;
+        const x=18,y=H-300,w=300,h=255,photoH=190;
         ctx.save();ctx.shadowColor="rgba(0,0,0,.35)";ctx.shadowBlur=12;ctx.fillStyle="#fff";ctx.beginPath();ctx.roundRect(x-5,y-5,w+10,h+10,12);ctx.fill();ctx.shadowBlur=0;
-        if(photoImage){const ratio=Math.max(w/photoImage.width,145/photoImage.height),sw=w/ratio,sh=145/ratio,sx=(photoImage.width-sw)/2,sy=(photoImage.height-sh)/2;ctx.drawImage(photoImage,sx,sy,sw,sh,x,y,w,145);}
-        else{ctx.fillStyle="#d8e0e8";ctx.fillRect(x,y,w,145);ctx.fillStyle="#526579";ctx.font="bold 15px Arial";ctx.fillText("Foto tidak tersedia",x+15,y+78);}
-        ctx.fillStyle="#10243b";ctx.fillRect(x,y+145,w,55);ctx.fillStyle="#fff";ctx.font="bold 13px Arial";ctx.fillText(photoNow?.name||photoNow?.type||"Pelanggan selesai",x+9,y+163);
+        ctx.save();ctx.beginPath();ctx.roundRect(x,y,w,photoH,8);ctx.clip();ctx.fillStyle="#101b2a";ctx.fillRect(x,y,w,photoH);
+        if(photoImage){
+          const fit=Math.min(w/photoImage.width,photoH/photoImage.height);
+          const dw=photoImage.width*fit,dh=photoImage.height*fit;
+          const dx=x+(w-dw)/2,dy=y+(photoH-dh)/2;
+          ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+          ctx.drawImage(photoImage,0,0,photoImage.width,photoImage.height,dx,dy,dw,dh);
+        }else{ctx.fillStyle="#d8e0e8";ctx.fillRect(x,y,w,photoH);ctx.fillStyle="#526579";ctx.font="bold 15px Arial";ctx.fillText("Foto tidak tersedia",x+15,y+100);}
+        ctx.restore();
+        ctx.fillStyle="#10243b";ctx.fillRect(x,y+photoH,w,65);ctx.fillStyle="#fff";ctx.font="bold 14px Arial";ctx.fillText(photoNow?.name||photoNow?.type||"Pelanggan selesai",x+10,y+photoH+20);
         const row=activeCustomer?.row||{};const idpel=String(getMappedValue(row,"IDPEL")||row.IDPEL||"");const meter=String(getNoMeter(row)||"");
-        ctx.font="11px Arial";ctx.fillText(`IDPEL ${idpel.slice(-12)}  •  Meter ${meter.slice(-10)}`,x+9,y+185);ctx.restore();
+        ctx.font="12px Arial";ctx.fillText(`IDPEL ${idpel.slice(-12)}  •  Meter ${meter.slice(-10)}`,x+10,y+photoH+44);ctx.restore();
       }
     };
     let previous=world[0];

@@ -1791,3 +1791,25 @@ body.oyon-realization-active #realizationPanel {
   #realizationPanel button#realizationMinimizeBtn { width:34px !important; min-width:34px !important; }
   #quickVideoDuration { min-width:112px !important; }
 }
+
+
+/* V13.1.19 PHOTO FIT + QUALITY: preserve full customer photo without center crop */
+#playbackPhotoImage,
+body.oyon-realization-active #playbackPhotoBox #playbackPhotoImage {
+  height:150px !important;
+  object-fit:contain !important;
+  object-position:center center !important;
+  background:#101b2a !important;
+}
+body.oyon-realization-active #playbackPhotoBox {
+  width:min(210px,54vw) !important;
+  padding:7px !important;
+}
+@media(max-width:600px) {
+  body.oyon-realization-active #playbackPhotoBox { width:min(190px,52vw) !important; }
+  body.oyon-realization-active #playbackPhotoBox #playbackPhotoImage { height:132px !important; }
+}
+.oyon-popup-customer-photos img {
+  object-fit:contain !important; object-position:center center !important;
+  background:#101b2a !important;
+}
