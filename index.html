@@ -3,8 +3,8 @@
   
 
 <head>
-  <link rel="stylesheet" href="./css/app.css?v=13.1.12">
-  <title>OyonID Map V13.1.12</title>
+  <link rel="stylesheet" href="./css/app.css?v=13.1.17">
+  <title>OyonID Map V13.1.17</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -44,7 +44,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
           <label class="sheet-picker-label" for="workbookSheetSelect">Sheet yang dipakai untuk peta</label>
           <select id="workbookSheetSelect" class="sheet-picker"><option value="">Upload Excel terlebih dahulu</option></select>
           <div id="columnMappingFields" style="display:grid;grid-template-columns:1fr;gap:7px;"></div>
-          <button type="button" id="applyColumnMappingBtn" class="ui-btn small-btn" style="margin-top:8px;width:100%;">Terapkan Judul Kolom</button>
+          <div class="column-mapping-footer"><button type="button" id="applyColumnMappingBtn" class="ui-btn small-btn">Terapkan Judul Kolom</button><button type="button" id="cancelColumnMappingBtn" class="ui-btn small-btn">Batal</button></div>
         </div>
       </details>
     </div>
@@ -133,30 +133,29 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 </div>
 
 <div id="realizationPanel" class="v13-panel" style="display:none">
-  <div class="v13-panel-head"><strong>📍 Mode Realisasi & Rute</strong><button id="realizationCloseBtn" type="button" aria-label="Tutup Realisasi">← Kembali ke Pelanggan Tersisa</button></div>
+  <div class="v13-panel-head"><strong>📍 Mode Realisasi &amp; Rute</strong><div class="realization-head-actions"><button id="realizationCloseBtn" type="button" aria-label="Kembali ke Tagging">← Kembali ke Tagging</button><button id="realizationMinimizeBtn" type="button" aria-label="Minimize kalender" aria-expanded="true">−</button></div></div>
   <div class="v13-panel-body">
     <label class="v13-label">Tanggal realisasi</label>
-    <input id="realizationDate" type="date" />
+    <input id="realizationDate" type="date" hidden />
+    <div class="realization-calendar" aria-label="Kalender tanggal realisasi">
+      <div class="realization-calendar-head">
+        <button type="button" id="realizationMonthPrev" aria-label="Bulan sebelumnya">‹</button>
+        <strong id="realizationMonthLabel">Bulan</strong>
+        <button type="button" id="realizationMonthNext" aria-label="Bulan berikutnya">›</button>
+      </div>
+      <div class="realization-calendar-grid realization-weekdays" aria-hidden="true">
+        <span>Sen</span><span>Sel</span><span>Rab</span><span>Kam</span><span>Jum</span><span>Sab</span><span>Min</span>
+      </div>
+      <div id="realizationAvailableDates" class="realization-calendar-grid"></div>
+      <div class="realization-calendar-legend"><span><i></i> Ada realisasi</span><span><b></b> Tanggal dipilih</span></div>
+    </div>
     <div class="oyon-stats-row">
       <div class="oyon-stat stat-blue"><strong id="statReadCount">0</strong><span>Dibaca (Sheet 1)</span></div>
       <div class="oyon-stat stat-green"><strong id="statDoneCount">0</strong><span>Selesai (Sheet 2)</span></div>
       <div class="oyon-stat stat-slate"><strong id="statLeftCount">0</strong><span>Tersisa</span></div>
     </div>
-    <div id="realizationSummary" class="v13-summary">Pilih tanggal untuk melihat titik realisasi.</div>
-    <button class="ui-btn" id="realizationRefreshBtn" type="button">Tampilkan Ulang Pelanggan Selesai</button>
-    <hr>
-    <strong>Playback rute petugas</strong>
-    <div class="v13-play-controls">
-      <button id="routePlayBtn" type="button">▶ Putar</button>
-      <button id="routePauseBtn" type="button">Ⅱ Jeda</button>
-      <button id="routeResetBtn" type="button">↺ Ulang</button>
-    </div>
-    <label class="v13-label" for="routePlaybackSpeed">Kecepatan animasi: 1× sampai 5×</label>
-    <input id="routePlaybackSpeed" type="range" min="1" max="5" value="2" />
-    <label class="v13-label" for="routePlaybackProgress">Posisi perjalanan</label>
-    <input id="routePlaybackProgress" type="range" min="0" max="0" value="0" disabled />
-    <button class="ui-btn" id="routeBackupBtn" type="button">⬇ Unduh Cadangan GPS (JSON)</button>
-    <div id="routePlaybackStatus" class="v13-summary">Rute hanya tersedia jika perekaman manual pernah dijalankan.</div>
+    <div id="realizationSummary" class="v13-summary" aria-live="polite">Pilih tanggal untuk melihat titik realisasi.</div>
+    <button class="ui-btn realization-refresh-compact" id="realizationRefreshBtn" type="button">Tampilkan pelanggan selesai di peta</button>
   </div>
 </div>
 
@@ -172,21 +171,21 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   <div class="photo-caption"><span>📷</span><span id="playbackPhotoCaption">Foto lokasi</span></div>
 </div>
 
-<div id="realizationQuickBar" aria-label="Kontrol realisasi dan animasi rute" style="display:none">
-  <button id="quickRealizationCloseBtn" type="button" title="Kembali ke pelanggan tersisa">✕ Kembali</button>
-  <div class="quick-play-row">
-    <button id="quickRoutePlayBtn" type="button">▶ Putar</button>
-    <button id="quickRoutePauseBtn" type="button">Ⅱ Jeda</button>
-    <button id="quickRouteResetBtn" type="button">↺ Ulang</button>
+<div id="realizationQuickBar" aria-label="Kontrol animasi realisasi" style="display:none">
+  <div class="realization-play-row">
+    <button id="quickRoutePlayBtn" type="button" aria-label="Putar perjalanan">▶ Putar</button>
+    <button id="quickRouteResetBtn" type="button" aria-label="Ulangi perjalanan">↺ Ulang</button>
+    <button id="quickVideoDownloadBtn" type="button">⬇ Buat Video</button>
   </div>
-  <label for="quickRouteProgress">Posisi perjalanan</label>
-  <input id="quickRouteProgress" type="range" min="0" max="0" value="0" disabled />
-  <label for="quickRouteSpeed">Kecepatan <span id="quickSpeedLabel">2×</span></label>
-  <input id="quickRouteSpeed" type="range" min="1" max="5" value="2" />
-  <div class="quick-video-row">
-    <button id="quickVideoDownloadBtn" type="button">⬇ Buat &amp; Download Video Rute</button>
+  <div class="realization-speed-row">
+    <label for="quickVideoDuration">Durasi video</label>
+    <select id="quickVideoDuration" aria-label="Pilih durasi video">
+      <option value="15">15 detik</option><option value="30" selected>30 detik</option><option value="45">45 detik</option>
+      <option value="60">1 menit</option><option value="120">2 menit</option><option value="300">5 menit</option>
+    </select>
   </div>
-  <small id="quickVideoNote">Video dibuat dari peta dan rute saja. Menu aplikasi tidak ikut direkam.</small>
+  <input id="quickRouteProgress" type="range" min="0" max="0" value="0" disabled aria-label="Posisi perjalanan" />
+  <small id="routePlaybackStatus" class="quick-route-status">Pilih tanggal untuk melihat perjalanan.</small>
 </div>
 <div id="map"></div>
 <button id="routeRecordFloatBtn" type="button" aria-pressed="false">▶ Mulai Rekam Rute</button>
@@ -249,6 +248,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.12"></script>
+<script src="./js/app.js?v=13.1.17"></script>
 </body>
 </html>
