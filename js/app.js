@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.11-ROUTE-VIDEO-SHEET";
+window.OYONID_BUILD = "V13.1.18-PHOTO-VIDEO-HOTFIX";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -1063,7 +1063,7 @@ function v13PlaybackPhotoMetadata() {
     [["FOTO RUMAH DATA","house"],["FOTO METER DATA","meter"]].forEach(([header,type])=>{
       const key=Object.keys(row).find(k=>normalizeHeader(k)===normalizeHeader(header));
       const dataUrl=key?String(row[key]||"").trim():"";
-      if(!/^data:image\\//i.test(dataUrl))return;
+      if(!/^data:image\//i.test(dataUrl))return;
       const id=`excel_${identity}_${type}`;
       if(result.some(p=>p.id===id))return;
       result.push({
@@ -1077,7 +1077,7 @@ function v13PlaybackPhotoMetadata() {
   return result;
 }
 async function v13LoadPlaybackPhotoBlob(photo) {
-  if(photo?.dataUrl && /^data:image\\//i.test(photo.dataUrl)){
+  if(photo?.dataUrl && /^data:image\//i.test(photo.dataUrl)){
     const response=await fetch(photo.dataUrl);
     if(!response.ok)throw new Error("Foto Excel tidak dapat dibaca.");
     return await response.blob();
@@ -3398,6 +3398,44 @@ function updateRealizationSummary(){
   v13RenderAvailableRealizationDates();
 }
 
+function v13AttachCustomerPhotosToPopup(marker,item){
+  marker.on("popupopen",async event=>{
+    const popup=event.popup?.getElement();
+    const content=popup?.querySelector(".leaflet-popup-content");
+    if(!content)return;
+    let host=content.querySelector(".oyon-popup-customer-photos");
+    if(!host){
+      host=document.createElement("div");
+      host.className="oyon-popup-customer-photos";
+      host.style.cssText="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:9px;max-width:260px";
+      content.appendChild(host);
+    }
+    host.textContent="Memuat foto pelanggan…";
+    const row=item.row||{};
+    const identity=item.identity||completionIdentity(row)||oyonCustomerPhotoIdentity(row);
+    const photos=v13PlaybackPhotoMetadata().filter(photo=>photo.dayKey===v13SelectedDate()&&photo.identity===identity);
+    if(!photos.length){host.textContent="Foto pelanggan belum tersedia di Excel atau penyimpanan perangkat.";return;}
+    host.textContent="";
+    for(const photo of photos){
+      try{
+        const blob=await v13LoadPlaybackPhotoBlob(photo);
+        if(!blob||!host.isConnected)return;
+        const url=URL.createObjectURL(blob);
+        const card=document.createElement("div");
+        const img=document.createElement("img");
+        const label=document.createElement("div");
+        img.src=url;img.alt=photo.name||photo.type||"Foto pelanggan";
+        img.style.cssText="width:100%;height:105px;object-fit:cover;border-radius:7px;display:block";
+        label.textContent=photo.type||photo.name||"Foto";
+        label.style.cssText="font-size:11px;margin-top:3px;text-align:center";
+        card.append(img,label);host.appendChild(card);
+        marker.once("popupclose",()=>URL.revokeObjectURL(url));
+      }catch(error){console.warn("[OYONID] Foto popup gagal dimuat",error);}
+    }
+    if(!host.children.length)host.textContent="Foto pelanggan tidak dapat dibaca.";
+  });
+}
+
 function showRealizationOnMap(){
   if(typeof map==="undefined"||typeof L==="undefined")return;
   pauseRouteHistory();
@@ -3411,6 +3449,7 @@ function showRealizationOnMap(){
     const idpel=String(getMappedValue(row,"IDPEL")||row.IDPEL||""),meter=String(getNoMeter(row)||"");
     const m=L.circleMarker([lat,lon],{radius:9,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.96}).addTo(v13RealizationLayer);
     m.bindPopup(`<b>${i+1}. ${name.replace(/[<>]/g,"")}</b><br>IDPEL: ${idpel.replace(/[<>]/g,"")}<br>Nomor meter: ${meter.replace(/[<>]/g,"")}<br>Selesai: ${item.time||"-"}<br>GPS realisasi: ${lat}, ${lon}`);
+    v13AttachCustomerPhotosToPopup(m,item);
     bounds.push([lat,lon]);
   });
   if(bounds.length){map.fitBounds(L.latLngBounds(bounds).pad(.15));showToast(`${bounds.length} pelanggan selesai ditampilkan. Yang belum selesai disembunyikan.`);}
