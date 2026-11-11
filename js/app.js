@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.22-GPS-RECOVERY-VIDEO-COMPAT";
+window.OYONID_BUILD = "V13.1.23-WIDE-JOURNEY-CINEMATIC";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -3666,40 +3666,40 @@ function showRealizationOnMap(){
 }
 function v13RouteSegments(){
   const raw=[];
+  // Keep every GPS session separate. Only exact duplicate GPS samples inside the SAME
+  // session may be removed; customer completion events are never merged with GPS samples.
   v13RoutesForDate().forEach((session,sessionIndex)=>{
+    const sessionKey=String(session.id||`route_${sessionIndex}`);
     (session.points||[]).forEach((point,pointIndex)=>{
       const lat=Number(point.lat),lon=Number(point.lon);
       if(!Number.isFinite(lat)||!Number.isFinite(lon)||!point.at)return;
-      raw.push({...point,lat,lon,kind:"track",sessionKey:session.id||`route_${sessionIndex}`,sourceOrder:pointIndex});
+      raw.push({...point,lat,lon,kind:"track",sessionKey,sourceOrder:pointIndex});
     });
   });
-  // Customer completion GPS points are also real, timestamped route waypoints.
-  // This lets playback cover every completed customer even when watchPosition produced only a few samples.
   v13CompletedForDate().forEach((item,index)=>{
     const lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);
     if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
-    let at="";
+    let at=item.completedAt||"";
     if(item.dayKey){
       const time=String(item.time||"").trim().replace(/\./g,":");
-      const normalized=/^\d{1,2}:\d{2}(?::\d{2})?$/.test(time)?time:"12:00:00";
-      const baseTime=new Date(`${item.dayKey}T${normalized}`);
-      if(!Number.isNaN(baseTime.getTime())){
-        if(!time)baseTime.setSeconds(index%60);
-        at=baseTime.toISOString();
+      if(/^\d{1,2}:\d{2}(?::\d{2})?$/.test(time)){
+        const d=new Date(`${item.dayKey}T${time}`);
+        if(!Number.isNaN(d.getTime()))at=d.toISOString();
       }
     }
-    if(!at)at=item.completedAt||"";
     if(!at)return;
-    raw.push({lat,lon,at,accuracy:Number(item.gpsAccuracy)||null,kind:"customer",completionId:item.completionId,identity:item.identity||completionIdentity(item.row||{}),sourceOrder:index});
+    raw.push({lat,lon,at,kind:"customer",completionId:item.completionId,
+      identity:item.identity||completionIdentity(item.row||{}),sourceOrder:index});
   });
   raw.sort((a,b)=>new Date(a.at)-new Date(b.at));
   const ordered=[];
   for(const point of raw){
     const previous=ordered[ordered.length-1];
-    if(previous && Math.abs(new Date(point.at)-new Date(previous.at))<5000 && v13Distance(previous,point)<3){
-      if(point.kind==="customer")Object.assign(previous,{kind:"customer",completionId:point.completionId,identity:point.identity});
-      continue;
-    }
+    const duplicateTrack=previous&&point.kind==="track"&&previous.kind==="track"&&
+      point.sessionKey===previous.sessionKey&&Math.abs(new Date(point.at)-new Date(previous.at))<1000&&
+      v13Distance(previous,point)<1;
+    if(duplicateTrack)continue;
+    // Never merge customer arrivals with one another or with GPS track samples.
     ordered.push(point);
   }
   const journeys=[];
@@ -3709,8 +3709,8 @@ function v13RouteSegments(){
     const last=previousJourney.points[previousJourney.points.length-1];
     const gapMs=Math.max(0,new Date(point.at)-new Date(last.at));
     const gapMeters=v13Distance(last,point);
-    const sameManualSession=point.sessionKey && point.sessionKey===last.sessionKey;
-    const sameJourney=sameManualSession || (gapMs<=30*60*1000 && gapMeters<=2000);
+    const sameManualSession=point.kind==="track"&&last.kind==="track"&&point.sessionKey===last.sessionKey;
+    const sameJourney=sameManualSession||(point.kind==="customer"&&last.kind==="customer"&&gapMs<=30*60*1000&&gapMeters<=2000);
     if(sameJourney)previousJourney.points.push(point);
     else journeys.push({key:`journey_${journeys.length+1}`,points:[point]});
   }
