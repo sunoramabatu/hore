@@ -1,9 +1,87 @@
-window.OYONID_BUILD = "V13.1.19-PHOTO-FIT-QUALITY";
+window.OYONID_BUILD = "V13.1.20-LOCAL-FIRST-ACCUMULATIVE";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
   console.error(err);
 };
+/* ======================
+   LOCAL-FIRST DATABASE (IndexedDB)
+   localStorage remains as a compatibility fallback; IndexedDB is the durable primary mirror.
+====================== */
+const OYON_LOCAL_DB_NAME = "OYONID_LOCAL_FIRST_DB";
+const OYON_LOCAL_DB_VERSION = 1;
+let oyonLocalDbPromise = null;
+function oyonOpenLocalDb() {
+  if (!("indexedDB" in window)) return Promise.reject(new Error("IndexedDB tidak tersedia"));
+  if (oyonLocalDbPromise) return oyonLocalDbPromise;
+  oyonLocalDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(OYON_LOCAL_DB_NAME, OYON_LOCAL_DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv", { keyPath: "key" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error("Gagal membuka database lokal"));
+    req.onblocked = () => console.warn("[OYONID] Database lokal tertahan tab lain.");
+  });
+  return oyonLocalDbPromise;
+}
+async function oyonLocalPut(key, value) {
+  const db = await oyonOpenLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", "readwrite");
+    tx.objectStore("kv").put({ key, value, updatedAt: new Date().toISOString() });
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error || new Error("Gagal menyimpan database lokal"));
+    tx.onabort = () => reject(tx.error || new Error("Penyimpanan lokal dibatalkan"));
+  });
+}
+async function oyonLocalGet(key) {
+  const db = await oyonOpenLocalDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("kv", "readonly");
+    const req = tx.objectStore("kv").get(key);
+    req.onsuccess = () => resolve(req.result ? req.result.value : undefined);
+    req.onerror = () => reject(req.error || new Error("Gagal membaca database lokal"));
+  });
+}
+function oyonMirrorLocal(key, value) {
+  // Fire-and-forget mirror; localStorage remains a quick fallback for older app versions.
+  oyonLocalPut(key, value).catch(err => console.warn(`[OYONID] IndexedDB write ${key} gagal:`, err));
+}
+async function oyonRestoreLocalFirstState() {
+  try {
+    const saved = await oyonLocalGet("workingRows");
+    if (Array.isArray(saved) && saved.length) workingRows = saved;
+    const source = await oyonLocalGet("sourceRows");
+    if (Array.isArray(source) && source.length) originalRows = source;
+    const headers = await oyonLocalGet("originalHeaders");
+    if (Array.isArray(headers) && headers.length) originalHeaders = headers;
+    const completed = await oyonLocalGet("completedRecords");
+    if (Array.isArray(completed) && (completed.length || !completedRecords.length)) completedRecords = completed;
+    const mapping = await oyonLocalGet("columnMapping");
+    if (mapping && typeof mapping === "object") columnMapping = mapping;
+    const formats = await oyonLocalGet("gpsNumberFormats");
+    if (formats && typeof formats === "object") gpsNumberFormats = formats;
+    const routes = await oyonLocalGet("routeSessions");
+    if (Array.isArray(routes) && (routes.length || !v13RouteSessions.length)) v13RouteSessions = routes;
+    const activeRoute = await oyonLocalGet("activeRoute");
+    if (activeRoute && typeof activeRoute === "object") v13ActiveRoute = activeRoute;
+    // Rebuild the current worklist from the saved source plus the cumulative completion ledger.
+    if (originalRows.length) workingRows = filterAlreadyCompletedRows(structuredClone(originalRows));
+    try {
+      if (workingRows.length) localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
+      localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(completedRecords));
+      if (originalHeaders.length) localStorage.setItem("OYONID_ORIGINAL_HEADERS", JSON.stringify(originalHeaders));
+      localStorage.setItem("oyon_column_mapping", JSON.stringify(columnMapping));
+    } catch (e) { console.warn("[OYONID] localStorage fallback tidak cukup ruang", e); }
+    return true;
+  } catch (err) {
+    console.warn("[OYONID] Restore IndexedDB gagal; memakai cadangan localStorage:", err);
+    return false;
+  }
+}
+
 /* ======================
    GLOBAL STATE
 ====================== */
@@ -23,14 +101,16 @@ let completedRecords = (() => {
   catch (e) { return []; }
 })();
 function persistCompletedRecords() {
-  try {
-    localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(completedRecords));
-    return true;
-  } catch (e) {
-    console.error("Gagal menyimpan realisasi lokal", e);
-    showToast("⚠️ Penyimpanan lokal penuh. Download Excel Update untuk membuat cadangan.");
-    return false;
+  let localOk = true;
+  try { localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(completedRecords)); }
+  catch (e) {
+    localOk = false;
+    console.warn("localStorage penuh; realisasi tetap dicadangkan ke IndexedDB", e);
   }
+  // IndexedDB is the durable primary mirror and must still be attempted when localStorage is full.
+  oyonMirrorLocal("completedRecords", completedRecords);
+  if (!localOk) showToast("⚠️ Ruang localStorage terbatas. Data realisasi sedang disimpan ke database lokal perangkat.");
+  return true;
 }
 function completionIdentity(row) {
   const idpel = String(getMappedValue(row, "IDPEL") || row.IDPEL || "").trim();
@@ -153,8 +233,11 @@ function oyonSelectWorkbookSheet(sheetName) {
   try {
     localStorage.setItem("OYONID_ORIGINAL_HEADERS", JSON.stringify(originalHeaders));
     localStorage.setItem("OYON_SELECTED_SHEET", sheetName);
+    localStorage.setItem("OYONID_COLUMN_HEADERS_V1", JSON.stringify(originalHeaders));
   } catch(e) {}
   renderColumnMappingOptions();
+  oyonMirrorLocal("sourceRows", originalRows);
+  oyonMirrorLocal("originalHeaders", originalHeaders);
   saveState();
   buildMarkers();
   renderHistory();
@@ -232,8 +315,10 @@ function validCoordinatePair(lat, lon) {
 function renderColumnMappingOptions() {
   const host = document.getElementById("columnMappingFields");
   if (!host) return;
-  const headers = [...new Set([...(originalHeaders || []), ...Object.keys(workingRows[0] || {})].filter(Boolean))];
-  if (!headers.length) { host.innerHTML = '<div style="font-size:12px;color:#64748b;">Upload Excel terlebih dahulu.</div>'; return; }
+  let rememberedHeaders = [];
+  try { rememberedHeaders = JSON.parse(localStorage.getItem("OYONID_COLUMN_HEADERS_V1") || "[]"); } catch(e) {}
+  const headers = [...new Set([...(originalHeaders || []), ...rememberedHeaders, ...Object.keys(workingRows[0] || {}), ...Object.values(columnMapping || {})].filter(Boolean))];
+  if (!headers.length) { host.innerHTML = '<div style="font-size:12px;color:#64748b;">Upload Excel terlebih dahulu. Pengaturan kolom akan tersimpan setelah file dimuat.</div>'; return; }
   host.innerHTML = Object.keys(COLUMN_MAPPING_FIELDS).map(canonical => {
     const guesses = COLUMN_MAPPING_FIELDS[canonical];
     const auto = headers.find(h => guesses.some(g => normalizeHeader(g) === normalizeHeader(h)));
@@ -247,6 +332,9 @@ function applyColumnMapping() {
     else delete columnMapping[sel.dataset.mapKey];
   });
   localStorage.setItem("oyon_column_mapping", JSON.stringify(columnMapping));
+  localStorage.setItem("OYONID_COLUMN_HEADERS_V1", JSON.stringify(originalHeaders || []));
+  oyonMirrorLocal("columnMapping", columnMapping);
+  oyonMirrorLocal("originalHeaders", originalHeaders || []);
   if (workingRows.length) { buildMarkers(); if (hasSelectedCustomer) { const id = String(window.currentCompareIDPEL || ""); const row = workingRows.find(r => String(getMappedValue(r,"IDPEL") || r.IDPEL) === id); if (row) openDetail(row); } }
   showToast("✅ Pemetaan judul kolom diterapkan");
 }
@@ -1292,9 +1380,13 @@ localStorage.setItem(
   "OYONID_ORIGINAL_HEADERS",
   JSON.stringify(originalHeaders)
 );
+localStorage.setItem("OYONID_COLUMN_HEADERS_V1", JSON.stringify(originalHeaders));
+oyonMirrorLocal("originalHeaders", originalHeaders);
+oyonMirrorLocal("gpsNumberFormats", gpsNumberFormats);
 
 // Sheet 1 = daftar pelanggan aktif/tersisa.
 originalRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+oyonMirrorLocal("sourceRows", originalRows);
 
 // Sheet 2 = daftar realisasi yang sudah selesai. Jangan hanya membaca sheet pertama.
 const completedSheetName = wb.SheetNames.find(name =>
@@ -1383,8 +1475,9 @@ hariBacaList = [...new Set(
 /* ======================
    SAAT LOAD
 ====================== */
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
   requestPersistentOyonStorage();
+  await oyonRestoreLocalFirstState();
 
   // Restore filename
   const savedFilename = localStorage.getItem("RBM_FILENAME");
@@ -1410,6 +1503,8 @@ window.addEventListener("load", () => {
     map.whenReady(() => {
       buildMarkers();
       renderHistory();
+      renderColumnMappingOptions();
+      positionRouteRecordButton();
       // Sambutan baru setiap kali aplikasi dibuka/refresh, berdasarkan isi kolom PETUGAS.
       welcomeFieldOfficer(workingRows, { force: true });
 
@@ -1508,7 +1603,9 @@ function renderVisibleMarkers() {
    SIMPAN STATE
 ====================== */
 function saveState() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows)); } catch (e) { console.warn("[OYONID] localStorage worklist penuh", e); }
+  oyonMirrorLocal("workingRows", workingRows);
+  if (Array.isArray(originalRows) && originalRows.length) oyonMirrorLocal("sourceRows", originalRows);
 }
 
 // Safety autosave: primary writes happen immediately; these events provide a final backup attempt.
@@ -1517,7 +1614,12 @@ function flushOyonidLocalState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(workingRows));
     localStorage.setItem("oyon_history", JSON.stringify(history));
     localStorage.setItem(COMPLETED_STORAGE_KEY, JSON.stringify(completedRecords));
-  } catch (e) { console.warn("Autosave OYONID tidak berhasil", e); }
+  } catch (e) { console.warn("Autosave OYONID localStorage tidak berhasil", e); }
+  oyonMirrorLocal("workingRows", workingRows);
+  oyonMirrorLocal("sourceRows", originalRows);
+  oyonMirrorLocal("completedRecords", completedRecords);
+  oyonMirrorLocal("columnMapping", columnMapping);
+  oyonMirrorLocal("originalHeaders", originalHeaders);
 }
 window.addEventListener("pagehide", flushOyonidLocalState);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushOyonidLocalState(); });
@@ -2081,6 +2183,29 @@ zoomBtn.onclick = () => {
 /* ======================
    DETAIL PANEL
 ====================== */
+function positionRouteRecordButton() {
+  const btn = document.getElementById("routeRecordFloatBtn");
+  const panel = document.getElementById("detailPanel");
+  if (!btn) return;
+  if (panel && panel.classList.contains("open")) {
+    const rect = panel.getBoundingClientRect();
+    const gap = 12;
+    const bottom = Math.max(12, window.innerHeight - rect.top + gap);
+    btn.style.setProperty("bottom", `calc(${bottom}px + env(safe-area-inset-bottom, 0px))`, "important");
+  } else {
+    btn.style.setProperty("bottom", "calc(16px + env(safe-area-inset-bottom, 0px))", "important");
+  }
+}
+window.addEventListener("resize", () => requestAnimationFrame(positionRouteRecordButton));
+window.addEventListener("load", () => {
+  const panel = document.getElementById("detailPanel");
+  if (panel && "ResizeObserver" in window) {
+    const observer = new ResizeObserver(() => requestAnimationFrame(positionRouteRecordButton));
+    observer.observe(panel);
+    window.oyonDetailPanelObserver = observer;
+  }
+});
+
 function openDetail(r){
   hasSelectedCustomer = true;
   // Simpan baris yang benar-benar dipilih agar IDPEL/NOMET duplikat tidak ikut terhapus bersamaan.
@@ -2317,12 +2442,14 @@ function openDetail(r){
         }
 
     panel.classList.add("open");
+    requestAnimationFrame(positionRouteRecordButton);
   }
 
 
 function closeDetail(){
   document.getElementById("detailPanel").classList.remove("open");
   hasSelectedCustomer = false;
+  requestAnimationFrame(positionRouteRecordButton);
 }
 
 function toggleFullMap() {
@@ -3008,13 +3135,13 @@ downloadBtn.onclick = async () => {
   wb.Props = { Title: "OYONID MAP EXPORT", Subject: "RBM tersisa dan realisasi pekerjaan kumulatif" };
   XLSX.utils.book_append_sheet(wb, remainingSheet, "Pelanggan Tersisa");
   XLSX.utils.book_append_sheet(wb, completedSheet, "Realisasi Selesai");
-  if (!wb.SheetNames.includes("Pelanggan Tersisa") || !wb.SheetNames.includes("Realisasi Selesai")) {
+  if (wb.SheetNames.length !== 2 || !wb.SheetNames.includes("Pelanggan Tersisa") || !wb.SheetNames.includes("Realisasi Selesai")) {
     showToast("❌ Gagal membuat sheet Excel realisasi. File tidak diunduh.");
     console.error("[OYONID] Workbook sheet validation failed", wb.SheetNames);
     return;
   }
   XLSX.writeFile(wb, filename, { compression: true });
-  showToast(`✅ Excel V13.1.8: ${workingRows.length} tersisa • ${completedForExport.length} selesai • foto pelanggan ikut disertakan jika ada.`);
+  showToast(`✅ Excel V13.1.20: ${workingRows.length} tersisa • ${completedForExport.length} selesai • tepat 2 sheet.`);
 };
 
 /* ======================
@@ -3236,12 +3363,16 @@ let v13PlaybackCurrentSession = null;
 let v13PlaybackCurrentPoints = [];
 let v13RealizationLayer = null;
 function v13SaveRoutes(){
+  let localOk = true;
   try {
     localStorage.setItem(V13_ROUTE_KEY, JSON.stringify(v13RouteSessions));
     if(v13ActiveRoute) localStorage.setItem(V13_ACTIVE_ROUTE_KEY, JSON.stringify(v13ActiveRoute));
     else localStorage.removeItem(V13_ACTIVE_ROUTE_KEY);
-    return true;
-  } catch(e) { showToast("⚠️ Penyimpanan rute penuh. Akhiri rekaman dan unduh cadangan."); return false; }
+  } catch(e) { localOk = false; console.warn("localStorage rute penuh; memakai IndexedDB", e); }
+  oyonMirrorLocal("routeSessions", v13RouteSessions);
+  oyonMirrorLocal("activeRoute", v13ActiveRoute);
+  if (!localOk) showToast("⚠️ Penyimpanan rute memakai database lokal perangkat.");
+  return true;
 }
 function v13SetRecordingUI(active){
   const float=document.getElementById("routeRecordFloatBtn");
