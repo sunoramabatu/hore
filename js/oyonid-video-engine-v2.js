@@ -1,4 +1,4 @@
-/* OYONID MAP V13.1.24 — Local Area Cinematic Camera
+/* OYONID MAP V13.1.25 — 3D Follow Cinematic
  * GPS sessions remain separate; customer arrival events are independent and never create blue route segments.
  * Four cinematic angles are sequenced in one video: Wide, Follow, Oblique, Arrival.
  */
@@ -8,53 +8,66 @@
   const lerp=(a,b,t)=>a+(b-a)*t, smooth=t=>{t=clamp(t,0,1);return t*t*(3-2*t);};
   const wrapAngle=a=>Math.atan2(Math.sin(a),Math.cos(a));
 
-  function drawWorker(ctx,x,y,dirX,phase,walking=true){
-    // Upright, shaded 2.5D technician. Keep screen-facing so map camera turns never flip the body.
-    const bob=walking?Math.sin(phase*Math.PI*2)*2.4:0;
-    const stride=walking?Math.sin(phase*Math.PI*2)*.55:0;
-    ctx.save();ctx.translate(x,y+bob);
-    ctx.fillStyle="rgba(3,12,24,.32)";ctx.beginPath();ctx.ellipse(0,47,23,7,0,0,Math.PI*2);ctx.fill();
-    const leg=(side,angle)=>{
-      ctx.save();ctx.translate(side*7,15);ctx.rotate(angle);
-      const trouser=ctx.createLinearGradient(-6,0,7,31);trouser.addColorStop(0,"#526174");trouser.addColorStop(.45,"#253448");trouser.addColorStop(1,"#111b29");
-      ctx.fillStyle=trouser;ctx.beginPath();ctx.moveTo(-5,0);ctx.lineTo(5,0);ctx.lineTo(7,28);ctx.lineTo(2,33);ctx.lineTo(-7,29);ctx.closePath();ctx.fill();
-      ctx.fillStyle="#151b24";ctx.beginPath();ctx.roundRect(-8,27,19,8,4);ctx.fill();
-      ctx.fillStyle="#596577";ctx.fillRect(-4,3,2,20);ctx.restore();
+  function drawWorker(ctx,x,y,dirX,phase,walking=true,view="FOLLOW"){
+    // Procedural 3D technician built from shaded volumes and articulated limbs.
+    // Feet are anchored at the GPS point; camera changes never rotate the body upside down.
+    const gait=walking?phase*Math.PI*2:0, stride=walking?Math.sin(gait)*.62:0;
+    const bob=walking?Math.abs(Math.sin(gait))*1.8:0, armSwing=walking?Math.sin(gait+Math.PI)*.48:0;
+    const scale=.72, rear=view!=="ARRIVAL";
+    ctx.save();ctx.translate(x,y+bob);ctx.scale(scale,scale);
+    ctx.fillStyle="rgba(3,10,20,.34)";ctx.beginPath();ctx.ellipse(0,2,19,5,0,0,Math.PI*2);ctx.fill();
+    const limb=(x1,y1,z1,x2,y2,z2,r,color1,color2)=>{
+      // 3D segment projected with depth shading and a rounded joint.
+      const project=(x,y,z)=>({x:x+z*.20,y:y-z*.10});
+      const p1=project(x1,y1,z1),p2=project(x2,y2,z2),dx=p2.x-p1.x,dy=p2.y-p1.y;
+      const len=Math.hypot(dx,dy),ang=Math.atan2(dy,dx);
+      ctx.save();ctx.translate(p1.x,p1.y);ctx.rotate(ang+Math.PI/2);
+      const g=ctx.createLinearGradient(-r,0,r,0);g.addColorStop(0,color2);g.addColorStop(.35,color1);g.addColorStop(1,color2);
+      ctx.fillStyle=g;ctx.beginPath();ctx.roundRect(-r,0,r*2,len,Math.min(r,5));ctx.fill();
+      ctx.fillStyle="rgba(255,255,255,.18)";ctx.fillRect(-r*.48,2,r*.28,Math.max(2,len-5));ctx.restore();
+      ctx.fillStyle=color1;ctx.beginPath();ctx.arc(p2.x,p2.y,r*.72,0,Math.PI*2);ctx.fill();
+    };
+    // legs: alternating hip/knee/ankle positions
+    const leg=(side,sw)=>{
+      const hipX=side*5,hipY=-29,kneeX=hipX+sw*8,kneeY=-15,ankleX=hipX-sw*10,ankleY=-2;
+      limb(hipX,hipY,side*2,kneeX,kneeY,side*3,4.5,"#35475c","#172638");
+      limb(kneeX,kneeY,side*3,ankleX,ankleY,side*4,4.1,"#27384d","#101c2b");
+      // work shoe
+      ctx.fillStyle="#111b27";ctx.beginPath();ctx.ellipse(ankleX+2,ankleY+2,6,3,0,0,Math.PI*2);ctx.fill();
     };
     leg(-1,stride);leg(1,-stride);
-    // torso and shirt
-    const shirt=ctx.createLinearGradient(-19,-27,20,23);shirt.addColorStop(0,"#8be9f5");shirt.addColorStop(.25,"#21c1df");shirt.addColorStop(.72,"#0798c2");shirt.addColorStop(1,"#075e86");
-    ctx.fillStyle=shirt;ctx.beginPath();ctx.moveTo(-14,-28);ctx.lineTo(13,-28);ctx.lineTo(20,15);ctx.lineTo(14,22);ctx.lineTo(-15,22);ctx.lineTo(-21,14);ctx.closePath();ctx.fill();
-    ctx.fillStyle="#cbd4d7";ctx.beginPath();ctx.moveTo(-14,-28);ctx.lineTo(0,-22);ctx.lineTo(13,-28);ctx.lineTo(17,-19);ctx.lineTo(8,-14);ctx.lineTo(-8,-14);ctx.lineTo(-18,-19);ctx.closePath();ctx.fill();
-    ctx.strokeStyle="rgba(255,255,255,.35)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(0,17);ctx.stroke();
-    // chest pockets
-    ctx.fillStyle="rgba(0,80,112,.28)";ctx.fillRect(-13,-9,9,9);ctx.fillRect(4,-9,9,9);
-    ctx.strokeStyle="rgba(255,255,255,.25)";ctx.strokeRect(-13,-9,9,9);ctx.strokeRect(4,-9,9,9);
-    // shoulder / arm swing
-    const arm=(side,angle)=>{
-      ctx.save();ctx.translate(side*17,-20);ctx.rotate(angle);
-      ctx.fillStyle="#24364a";ctx.beginPath();ctx.roundRect(-5,0,10,24,5);ctx.fill();
-      ctx.fillStyle="#0b8fb6";ctx.beginPath();ctx.roundRect(-6,0,12,12,4);ctx.fill();
-      ctx.fillStyle="#b98264";ctx.beginPath();ctx.ellipse(0,27,4.5,6,0,0,Math.PI*2);ctx.fill();
-      ctx.restore();
+    // torso volume with rear panel / shirt seams
+    const body=ctx.createLinearGradient(-13,-70,14,-25);body.addColorStop(0,"#8ceafa");body.addColorStop(.35,"#19b6d8");body.addColorStop(.72,"#087fa8");body.addColorStop(1,"#07516f");
+    ctx.fillStyle=body;ctx.beginPath();ctx.moveTo(-11,-70);ctx.lineTo(11,-70);ctx.lineTo(14,-32);ctx.lineTo(10,-27);ctx.lineTo(-10,-27);ctx.lineTo(-14,-32);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#cbd5d8";ctx.beginPath();ctx.moveTo(-11,-70);ctx.lineTo(0,-64);ctx.lineTo(11,-70);ctx.lineTo(14,-63);ctx.lineTo(7,-58);ctx.lineTo(-7,-58);ctx.lineTo(-14,-63);ctx.closePath();ctx.fill();
+    ctx.strokeStyle="rgba(255,255,255,.35)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,-63);ctx.lineTo(0,-31);ctx.stroke();
+    // shoulder and arm joints
+    const arm=(side,sw)=>{
+      const shoulderX=side*13,shoulderY=-65,elbowX=shoulderX+sw*7,elbowY=-47,handX=elbowX+sw*5,handY=-31;
+      limb(shoulderX,shoulderY,side*3,elbowX,elbowY,side*4,4.2,"#1b2d42","#0c1929");
+      limb(elbowX,elbowY,side*4,handX,handY,side*5,3.7,"#1b2d42","#0c1929");
+      ctx.fillStyle="#b77f61";ctx.beginPath();ctx.arc(handX,handY,3.4,0,Math.PI*2);ctx.fill();
+      // cyan sleeve cuff
+      ctx.strokeStyle="#0aa5cb";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(handX-sw*1.5,handY-4);ctx.lineTo(handX+sw*1.5,handY+2);ctx.stroke();
     };
-    arm(-1,-stride*.65);arm(1,stride*.65);
-    // work bag strap and side pouch
-    ctx.strokeStyle="#283344";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(10,-24);ctx.lineTo(18,10);ctx.stroke();
-    const bag=ctx.createLinearGradient(12,-2,28,14);bag.addColorStop(0,"#9ba5aa");bag.addColorStop(1,"#384654");
-    ctx.fillStyle=bag;ctx.beginPath();ctx.roundRect(12,0,15,15,4);ctx.fill();
-    ctx.fillStyle="#d3d9d9";ctx.fillRect(15,3,8,3);
-    // neck, face, glasses
-    ctx.fillStyle="#b98264";ctx.fillRect(-4,-36,8,10);
-    ctx.fillStyle="#d9a17d";ctx.beginPath();ctx.ellipse(0,-46,10,13,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="#b98264";ctx.beginPath();ctx.ellipse(-9,-45,2.5,4,0,0,Math.PI*2);ctx.ellipse(9,-45,2.5,4,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="#202b38";ctx.strokeStyle="#172333";ctx.lineWidth=1.5;
-    ctx.beginPath();ctx.roundRect(-9,-49,8,6,2);ctx.roundRect(1,-49,8,6,2);ctx.stroke();ctx.beginPath();ctx.moveTo(-1,-46);ctx.lineTo(1,-46);ctx.stroke();
-    ctx.fillStyle="#30343a";ctx.beginPath();ctx.arc(0,-41,5,.15,Math.PI-.15);ctx.fill();
-    // grey cap with small readable lettering
-    ctx.fillStyle="#858d94";ctx.beginPath();ctx.ellipse(0,-57,12,6,0,Math.PI,Math.PI*2);ctx.fill();
-    ctx.fillStyle="#68727c";ctx.beginPath();ctx.ellipse(1,-55,15,3,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="#e8ecee";ctx.font="bold 3.4px Arial";ctx.textAlign="center";ctx.fillText("MANBILL",0,-57);ctx.fillText("UP3",0,-53);
+    arm(-1,armSwing);arm(1,-armSwing);
+    // grey utility bag on hip, visible in rear and arrival views
+    ctx.fillStyle="#4d5b68";ctx.beginPath();ctx.roundRect(8,-42,12,14,3);ctx.fill();
+    ctx.fillStyle="#b9c3c8";ctx.fillRect(10,-39,7,3);
+    // neck and head volume
+    ctx.fillStyle="#a97055";ctx.fillRect(-3,-77,6,9);
+    const face=ctx.createRadialGradient(-3,-86,2,0,-84,10);face.addColorStop(0,"#e0b08d");face.addColorStop(1,"#9b624b");
+    ctx.fillStyle=face;ctx.beginPath();ctx.ellipse(0,-86,8,10,0,0,Math.PI*2);ctx.fill();
+    if(rear){
+      ctx.fillStyle="#3b2925";ctx.beginPath();ctx.arc(0,-88,8,Math.PI,Math.PI*2);ctx.fill();
+    }else{
+      ctx.fillStyle="#27313b";ctx.strokeStyle="#1a2734";ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.roundRect(-7,-88,6,4,1.5);ctx.roundRect(1,-88,6,4,1.5);ctx.stroke();
+    }
+    // grey cap with MANBILL UP3 label
+    ctx.fillStyle="#858e96";ctx.beginPath();ctx.ellipse(0,-95,9,5,0,Math.PI,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#626d78";ctx.beginPath();ctx.ellipse(2,-93,12,2.5,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#f2f4f5";ctx.font="bold 2.7px Arial";ctx.textAlign="center";ctx.fillText("MANBILL",0,-95);ctx.fillText("UP3",0,-91);
     ctx.restore();
   }
   function loadPhoto(meta){
@@ -67,7 +80,7 @@
   }
   function timestamp(p){const t=new Date(p?.at||p?.timestamp||"").getTime();return Number.isFinite(t)?t:null;}
 
-  window.downloadRouteVideo=async function downloadRouteVideoV24(){
+  window.downloadRouteVideo=async function downloadRouteVideoV25(){
     const button=document.getElementById("quickVideoDownloadBtn");
     if(button){button.disabled=true;button.textContent="⏳ Menyiapkan Wide Journey…";}
     let stream=null,photoUrls=[];
@@ -173,6 +186,13 @@
         });
         return total;
       };
+      const formatOriginalElapsed=ms=>{
+        const total=Math.max(0,Math.floor(ms/1000));
+        const hh=String(Math.floor(total/3600)).padStart(2,"0");
+        const mm=String(Math.floor((total%3600)/60)).padStart(2,"0");
+        const ss=String(total%60).padStart(2,"0");
+        return `${hh}:${mm}:${ss}`;
+      };
       const started=performance.now();
       const draw=(now)=>{
         const elapsed=now-started,progress=clamp(elapsed/durationMs,0,1),virtualTime=lerp(minTime,maxTime,smooth(progress));
@@ -185,10 +205,10 @@
         travelled=distanceAtTime(virtualTime);
 
         // Camera target stays around the current reading block, never the entire city route.
-        const targetZoom=phase==="AREA"?.92:phase==="FOLLOW"?1.42:phase==="OBLIQUE"?1.22:1.68;
-        const targetAngle=phase==="OBLIQUE"?-.785:phase==="ARRIVAL"?-.35:0;
-        const targetSquash=phase==="OBLIQUE"?.78:phase==="ARRIVAL"?.88:1;
-        const desiredX=activePoint?.x??W/2,desiredY=(activePoint?.y??H/2)-((H*.10)/(targetZoom*targetSquash));
+        const targetZoom=phase==="AREA"?1.85:phase==="FOLLOW"?2.65:phase==="OBLIQUE"?2.25:3.05;
+        const targetAngle=phase==="OBLIQUE"?-.785:phase==="ARRIVAL"?-.22:0;
+        const targetSquash=phase==="OBLIQUE"?.70:phase==="ARRIVAL"?.90:1;
+        const desiredX=activePoint?.x??W/2,desiredY=(activePoint?.y??H/2)-((H*.17)/(targetZoom*targetSquash));
         camX=lerp(camX,desiredX,.055);camY=lerp(camY,desiredY,.055);
         camZoom=lerp(camZoom,targetZoom,.045);camAngle=lerp(camAngle,targetAngle,.035);camSquash=lerp(camSquash,targetSquash,.04);
         phaseLabel=phase==="AREA"?"AREA VIEW":phase==="FOLLOW"?"FOLLOW":phase==="OBLIQUE"?"45° OBLIQUE":"ARRIVAL";
@@ -226,13 +246,14 @@
           const facing=(Math.abs(vx)>=Math.abs(vy)?(vx<0?-1:1):1);
           const walking=!!worker&&(!arrival||Math.abs(arrival.at-virtualTime)>18000);
           const walkPhase=worker?((worker.time-minTime)/1000*1.65)%1:(now/650)%1;
-          drawWorker(ctx,projected.x,projected.y,facing,walkPhase,walking);
+          drawWorker(ctx,projected.x,projected.y,facing,walkPhase,walking,phase);
         }
         // HUD
-        ctx.fillStyle="rgba(9,27,47,.95)";ctx.beginPath();ctx.roundRect(18,16,500,96,16);ctx.fill();
+        ctx.fillStyle="rgba(9,27,47,.95)";ctx.beginPath();ctx.roundRect(18,16,570,116,16);ctx.fill();
         ctx.fillStyle="#fff";ctx.font="bold 20px Arial";ctx.fillText("OYONID MAP • WIDE JOURNEY",34,46);
         ctx.fillStyle="#62e39a";ctx.font="bold 18px Arial";ctx.fillText(`Selesai ${reached}/${pins.length}`,34,79);
-        ctx.fillStyle="#fff";ctx.font="bold 15px Arial";ctx.fillText(`${(travelled/1000).toFixed(2).replace(".",",")} km`,300,79);
+        ctx.fillStyle="#fff";ctx.font="bold 15px Arial";ctx.fillText(`${(travelled/1000).toFixed(2).replace(".",",")} km`,255,79);
+        ctx.fillStyle="#dce8f5";ctx.font="bold 15px Arial";ctx.fillText(`Durasi asli ${formatOriginalElapsed(virtualTime-minTime)}`,34,105);
         ctx.fillStyle="#dce8f5";ctx.font="bold 15px Arial";ctx.fillText(phaseLabel,W-155,46);
         if(currentPhoto){
           const x=18,y=H-302,w=310,ph=194;
@@ -255,8 +276,8 @@
       a.href=url;a.download=`OYONID_WIDE_JOURNEY_${v13SelectedDate()}_${Math.round(durationSeconds)}detik.${ext}`;
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
       showToast(`Wide Journey berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
-    }catch(err){console.error("[OYONID] Wide Journey V13.1.24 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
+    }catch(err){console.error("[OYONID] Wide Journey V13.1.25 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
     finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}}
   };
-  console.info("[OYONID] Local Area Cinematic V13.1.24 loaded.");
+  console.info("[OYONID] 3D Follow Cinematic V13.1.25 loaded.");
 })();
