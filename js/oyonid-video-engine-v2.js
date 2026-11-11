@@ -1,4 +1,4 @@
-/* OYONID MAP V13.1.25 — 3D Follow Cinematic
+/* OYONID MAP V13.1.26 — Animated Worker & Satellite Journey
  * GPS sessions remain separate; customer arrival events are independent and never create blue route segments.
  * Four cinematic angles are sequenced in one video: Wide, Follow, Oblique, Arrival.
  */
@@ -78,9 +78,29 @@
       }catch(e){resolve(null);}
     });
   }
+  async function loadWorkerWalkFrames(){
+    const base=new URL("../assets/worker-walk/",document.currentScript?.src||location.href);
+    const frames=await Promise.all(Array.from({length:8},(_,i)=>new Promise(resolve=>{
+      const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>resolve(null);
+      img.src=new URL(`worker-${i}.png`,base).href;
+    })));
+    return frames.filter(Boolean);
+  }
+  function drawAnimatedWorker(ctx,x,y,dirX,phase,walking,frames){
+    if(!frames?.length)return;
+    const idx=walking?Math.floor(((phase%1)+1)%1*frames.length)%frames.length:frames.length-1;
+    const img=frames[idx];if(!img)return;
+    // Feet anchor exactly to the projected GPS point. The sprite is side/three-quarter view,
+    // and flips with east/west direction instead of staring directly into the camera.
+    const h=150,w=h*(img.width/img.height),flip=dirX<0?-1:1;
+    ctx.save();ctx.translate(x,y);ctx.scale(flip,1);
+    ctx.drawImage(img,-w/2,-h,w,h);
+    ctx.restore();
+  }
+
   function timestamp(p){const t=new Date(p?.at||p?.timestamp||"").getTime();return Number.isFinite(t)?t:null;}
 
-  window.downloadRouteVideo=async function downloadRouteVideoV25(){
+  window.downloadRouteVideo=async function downloadRouteVideoV26(){
     const button=document.getElementById("quickVideoDownloadBtn");
     if(button){button.disabled=true;button.textContent="⏳ Menyiapkan Wide Journey…";}
     let stream=null,photoUrls=[];
@@ -116,16 +136,29 @@
       const controls=map.getContainer().querySelector(".leaflet-control-container"),oldVisibility=controls?.style.visibility;
       if(controls)controls.style.visibility="hidden";
       document.getElementById("locationPhotoBtn")?.style.setProperty("visibility","hidden");
-      let mapShot,segments,pins;
+      let mapShot,segments,pins,satelliteLayer=null;
       try{
         map.invalidateSize({animate:false});
-        map.fitBounds(L.latLngBounds(allBounds).pad(.20),{animate:false,maxZoom:15});
-        await new Promise(r=>setTimeout(r,450));
-        mapShot=await html2canvas(map.getContainer(),{backgroundColor:"#e9e5dd",useCORS:true,allowTaint:false,scale:1,logging:false});
-        segments=sessions.map(s=>s.points.map(p=>{const q=map.latLngToContainerPoint([p.lat,p.lon]);return {...p,x:q.x,y:q.y};}));
+        map.fitBounds(L.latLngBounds(allBounds).pad(.20),{animate:false,maxZoom:16});
+        // Cinematic export prefers satellite imagery; if unavailable, the existing OSM map remains underneath.
+        try{
+          satelliteLayer=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{
+            maxZoom:19,attribution:"Tiles © Esri",crossOrigin:true
+          }).addTo(map);
+          const loaded=await Promise.race([
+            new Promise(resolve=>satelliteLayer.once("load",()=>resolve(true))),
+            new Promise(resolve=>setTimeout(()=>resolve(false),2200))
+          ]);
+          if(!loaded){map.removeLayer(satelliteLayer);satelliteLayer=null;}
+        }catch(e){if(satelliteLayer&&map.hasLayer(satelliteLayer))map.removeLayer(satelliteLayer);satelliteLayer=null;}
+        await new Promise(r=>setTimeout(r,350));
+        const captureScale=2;
+        mapShot=await html2canvas(map.getContainer(),{backgroundColor:"#e9e5dd",useCORS:true,allowTaint:false,scale:captureScale,logging:false});
+        segments=sessions.map(s=>s.points.map(p=>{const q=map.latLngToContainerPoint([p.lat,p.lon]);return {...p,x:q.x*captureScale,y:q.y*captureScale};}));
         pins=customers.map(c=>{const lat=parseCoordinate(c.item.actualLat),lon=parseCoordinate(c.item.actualLon);if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-          const q=map.latLngToContainerPoint([lat,lon]);return {...c,x:q.x,y:q.y};}).filter(Boolean);
+          const q=map.latLngToContainerPoint([lat,lon]);return {...c,x:q.x*captureScale,y:q.y*captureScale};}).filter(Boolean);
       }finally{
+        if(satelliteLayer&&map.hasLayer(satelliteLayer))map.removeLayer(satelliteLayer);
         map.setView(oldCenter,oldZoom,{animate:false});removed.forEach(l=>l.addTo(map));
         if(controls)controls.style.visibility=oldVisibility||"";
         document.getElementById("locationPhotoBtn")?.style.setProperty("visibility","");
@@ -140,6 +173,7 @@
       pins=pins.map(p=>({...p,...toScreen(p)}));
       const photoMetas=v13PlaybackPhotoMetadata().filter(p=>p.dayKey===v13SelectedDate());
       const photoAssets=[];for(const meta of photoMetas){const a=await loadPhoto(meta);if(a)photoAssets.push(a);}
+      const workerFrames=await loadWorkerWalkFrames();
       photoUrls=photoAssets.map(p=>p.url);
       const durationMs=Math.max(15000,Math.min(300000,Number(document.getElementById("quickVideoDuration")?.value||30)*1000));
       const allTimes=[...segments.flatMap(s=>s.map(p=>p.time)),...pins.map(p=>p.at)].filter(Number.isFinite);
@@ -205,9 +239,9 @@
         travelled=distanceAtTime(virtualTime);
 
         // Camera target stays around the current reading block, never the entire city route.
-        const targetZoom=phase==="AREA"?1.85:phase==="FOLLOW"?2.65:phase==="OBLIQUE"?2.25:3.05;
+        const targetZoom=phase==="AREA"?2.35:phase==="FOLLOW"?3.35:phase==="OBLIQUE"?2.85:3.65;
         const targetAngle=phase==="OBLIQUE"?-.785:phase==="ARRIVAL"?-.22:0;
-        const targetSquash=phase==="OBLIQUE"?.70:phase==="ARRIVAL"?.90:1;
+        const targetSquash=phase==="OBLIQUE"?.86:phase==="ARRIVAL"?.94:1;
         const desiredX=activePoint?.x??W/2,desiredY=(activePoint?.y??H/2)-((H*.17)/(targetZoom*targetSquash));
         camX=lerp(camX,desiredX,.055);camY=lerp(camY,desiredY,.055);
         camZoom=lerp(camZoom,targetZoom,.045);camAngle=lerp(camAngle,targetAngle,.035);camSquash=lerp(camSquash,targetSquash,.04);
@@ -246,15 +280,26 @@
           const facing=(Math.abs(vx)>=Math.abs(vy)?(vx<0?-1:1):1);
           const walking=!!worker&&(!arrival||Math.abs(arrival.at-virtualTime)>18000);
           const walkPhase=worker?((worker.time-minTime)/1000*1.65)%1:(now/650)%1;
-          drawWorker(ctx,projected.x,projected.y,facing,walkPhase,walking,phase);
+          drawAnimatedWorker(ctx,projected.x,projected.y,facing,walkPhase,walking,workerFrames);
         }
-        // HUD
-        ctx.fillStyle="rgba(9,27,47,.95)";ctx.beginPath();ctx.roundRect(18,16,570,116,16);ctx.fill();
-        ctx.fillStyle="#fff";ctx.font="bold 20px Arial";ctx.fillText("OYONID MAP • WIDE JOURNEY",34,46);
-        ctx.fillStyle="#62e39a";ctx.font="bold 18px Arial";ctx.fillText(`Selesai ${reached}/${pins.length}`,34,79);
-        ctx.fillStyle="#fff";ctx.font="bold 15px Arial";ctx.fillText(`${(travelled/1000).toFixed(2).replace(".",",")} km`,255,79);
-        ctx.fillStyle="#dce8f5";ctx.font="bold 15px Arial";ctx.fillText(`Durasi asli ${formatOriginalElapsed(virtualTime-minTime)}`,34,105);
-        ctx.fillStyle="#dce8f5";ctx.font="bold 15px Arial";ctx.fillText(phaseLabel,W-155,46);
+        // Premium compact HUD: brand, selected date, progress, distance and original elapsed time.
+        const hx=18,hy=16,hw=W-36,hh=112;
+        const hg=ctx.createLinearGradient(hx,hy,hx,hy+hh);hg.addColorStop(0,"rgba(10,39,68,.97)");hg.addColorStop(1,"rgba(5,20,39,.96)");
+        ctx.fillStyle=hg;ctx.beginPath();ctx.roundRect(hx,hy,hw,hh,18);ctx.fill();
+        ctx.strokeStyle="rgba(125,190,235,.35)";ctx.lineWidth=1.5;ctx.stroke();
+        ctx.fillStyle="#ff9b35";ctx.beginPath();ctx.arc(hx+23,hy+25,8,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle="#fff";ctx.font="bold 18px Arial";ctx.textAlign="left";ctx.fillText("OYONID MAP",hx+40,hy+29);
+        ctx.fillStyle="#9fc8e8";ctx.font="bold 11px Arial";ctx.fillText("WIDE JOURNEY • REALISASI",hx+40,hy+45);
+        const rawDate=String(v13SelectedDate()||"");
+        const dateText=rawDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/,"$3/$2/$1");
+        ctx.fillStyle="rgba(255,255,255,.12)";ctx.beginPath();ctx.roundRect(W-170,hy+12,132,28,14);ctx.fill();
+        ctx.fillStyle="#e7f2ff";ctx.font="bold 12px Arial";ctx.textAlign="center";ctx.fillText(dateText,W-104,hy+30);
+        ctx.textAlign="left";
+        const statsY=hy+78;
+        ctx.fillStyle="#5be39b";ctx.font="bold 16px Arial";ctx.fillText(`✓ ${reached}/${pins.length} selesai`,hx+16,statsY);
+        ctx.fillStyle="#fff";ctx.font="bold 15px Arial";ctx.fillText(`${(travelled/1000).toFixed(2).replace(".",",")} km`,hx+220,statsY);
+        ctx.fillStyle="#dce8f5";ctx.font="bold 14px Arial";ctx.fillText(`◷ ${formatOriginalElapsed(virtualTime-minTime)}`,hx+365,statsY);
+        ctx.fillStyle="#a9c6df";ctx.font="bold 10px Arial";ctx.textAlign="right";ctx.fillText(phaseLabel,W-34,hy+48);ctx.textAlign="left";
         if(currentPhoto){
           const x=18,y=H-302,w=310,ph=194;
           ctx.fillStyle="rgba(9,27,47,.96)";ctx.beginPath();ctx.roundRect(x,y,w,270,14);ctx.fill();
@@ -276,7 +321,7 @@
       a.href=url;a.download=`OYONID_WIDE_JOURNEY_${v13SelectedDate()}_${Math.round(durationSeconds)}detik.${ext}`;
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
       showToast(`Wide Journey berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
-    }catch(err){console.error("[OYONID] Wide Journey V13.1.25 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
+    }catch(err){console.error("[OYONID] Wide Journey V13.1.26 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
     finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}}
   };
   console.info("[OYONID] 3D Follow Cinematic V13.1.25 loaded.");
