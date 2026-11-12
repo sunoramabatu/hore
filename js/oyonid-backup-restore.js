@@ -25,11 +25,37 @@ function unpack(v){
   const o={};for(const k of Object.keys(v))o[k]=unpack(v[k]);return o;
  }return v;
 }
-function openDB(name){
- return new Promise((resolve,reject)=>{const r=indexedDB.open(name);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.onupgradeneeded=()=>{r.transaction.abort();};});
+function dbExists(name){
+ return new Promise(async(resolve)=>{
+  try{
+   if(typeof indexedDB.databases==="function"){
+    const all=await indexedDB.databases();resolve(all.some(x=>x.name===name));return;
+   }
+  }catch(e){}
+  // Older browsers: a non-destructive probe. If DB is absent, the temporary DB is removed.
+  let created=false;
+  const req=indexedDB.open(name);
+  req.onupgradeneeded=()=>{created=true;};
+  req.onsuccess=()=>{const db=req.result;db.close();if(created){try{indexedDB.deleteDatabase(name);}catch(e){}resolve(false);}else resolve(true);};
+  req.onerror=()=>resolve(false);
+ });
+}
+function openDB(name,version){
+ return new Promise((resolve,reject)=>{
+  const r=version?indexedDB.open(name,version):indexedDB.open(name);
+  r.onsuccess=()=>resolve(r.result);
+  r.onerror=()=>reject(r.error);
+  r.onblocked=()=>reject(new Error("Database masih dibuka tab lain. Tutup tab OYONID lain lalu coba lagi."));
+ });
+}
+function storeSchema(st){
+ return {name:st.name,keyPath:st.keyPath,autoIncrement:st.autoIncrement,indexes:Array.from(st.indexNames).map(n=>{
+  const ix=st.index(n);return {name:ix.name,keyPath:ix.keyPath,unique:ix.unique,multiEntry:ix.multiEntry};
+ })};
 }
 async function exportDB(name){
- let db;try{db=await openDB(name);}catch(e){return {name,missing:true,stores:[]};}
+ if(!(await dbExists(name)))return {name,missing:true,stores:[]};
+ const db=await openDB(name);
  const stores=[];
  for(const sn of Array.from(db.objectStoreNames)){
   const rows=await new Promise((resolve,reject)=>{
@@ -37,31 +63,52 @@ async function exportDB(name){
    tx.oncomplete=async()=>{try{const out=[];for(let i=0;i<vr.result.length;i++)out.push({key:await pack(kr.result[i]),value:await pack(vr.result[i])});resolve(out);}catch(e){reject(e);}};
    tx.onerror=()=>reject(tx.error);
   });
-  stores.push({name:sn,rows});
+  const tx=db.transaction(sn,"readonly");
+  stores.push({...storeSchema(tx.objectStore(sn)),rows});
  }
- db.close();return {name,version:db.version,stores};
+ const version=db.version;db.close();return {name,version,stores};
 }
-async function makeBackup(){
- const local={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);local[k]=localStorage.getItem(k);}
- const dbs=[];for(const n of DB_NAMES)dbs.push(await exportDB(n));
- return {format:PREFIX,app:"OYONID MAP",createdAt:new Date().toISOString(),origin:location.origin,localStorage:local,databases:dbs};
-}
-function download(data,filename){
- const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
- const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);
+function createStoreFromSpec(db,storeSpec){
+ const opts={};
+ if(storeSpec.keyPath!==undefined&&storeSpec.keyPath!==null)opts.keyPath=storeSpec.keyPath;
+ if(storeSpec.autoIncrement)opts.autoIncrement=true;
+ const st=db.createObjectStore(storeSpec.name,opts);
+ for(const ix of (storeSpec.indexes||[]))st.createIndex(ix.name,ix.keyPath,{unique:!!ix.unique,multiEntry:!!ix.multiEntry});
 }
 async function restoreDB(spec){
  if(spec.missing)return;
- const db=await openDB(spec.name);
- for(const storeSpec of spec.stores){
-  if(!db.objectStoreNames.contains(storeSpec.name))throw new Error("Object store tidak dikenal: "+storeSpec.name);
-  await new Promise((resolve,reject)=>{
-   const tx=db.transaction(storeSpec.name,"readwrite"),st=tx.objectStore(storeSpec.name);st.clear();
-   for(const row of storeSpec.rows){const key=unpack(row.key),val=unpack(row.value);if(st.keyPath===null)st.put(val,key);else st.put(val);}
-   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("Restore dibatalkan"));
+ const exists=await dbExists(spec.name);
+ let db;
+ if(!exists){
+  db=await new Promise((resolve,reject)=>{
+   const r=indexedDB.open(spec.name,Math.max(1,Number(spec.version)||1));
+   r.onupgradeneeded=()=>{
+    const d=r.result;
+    for(const ss of spec.stores||[])if(!d.objectStoreNames.contains(ss.name))createStoreFromSpec(d,ss);
+   };
+   r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
   });
+ }else{
+  let current=await openDB(spec.name);const missing=(spec.stores||[]).filter(ss=>!current.objectStoreNames.contains(ss.name));
+  if(missing.length){
+   const next=current.version+1;current.close();
+   db=await new Promise((resolve,reject)=>{
+    const r=indexedDB.open(spec.name,next);
+    r.onupgradeneeded=()=>{const d=r.result;for(const ss of missing)createStoreFromSpec(d,ss);};
+    r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);
+   });
+  }else db=current;
  }
- db.close();
+ try{
+  for(const storeSpec of spec.stores||[]){
+   if(!db.objectStoreNames.contains(storeSpec.name))throw new Error("Object store tidak dikenal: "+storeSpec.name);
+   await new Promise((resolve,reject)=>{
+    const tx=db.transaction(storeSpec.name,"readwrite"),st=tx.objectStore(storeSpec.name);st.clear();
+    for(const row of storeSpec.rows||[]){const key=unpack(row.key),val=unpack(row.value);if(st.keyPath===null)st.put(val,key);else st.put(val);}
+    tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||new Error("Restore dibatalkan"));
+   });
+  }
+ }finally{db.close();}
 }
 function isAppKey(k){return /^(OYON|oyon|oyon_|oyonid|RBM_)/i.test(k)||k==="history"||k==="history_date";}
 async function restoreBackup(file){

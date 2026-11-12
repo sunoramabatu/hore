@@ -1,4 +1,4 @@
-OYONID MAP V13.1.26 + BACKUP & RESTORE LOKAL V1
+OYONID MAP V13.1.26 + BACKUP & RESTORE LOKAL V1.1 (FIX)
 
 FITUR BARU
 - Tombol "Backup & Restore" muncul di bawah Download Excel Update.
@@ -25,3 +25,11 @@ Catatan teknis:
 - Versi dasar: V13.1.26.
 - Perubahan hanya menambah js/oyonid-backup-restore.js dan satu pemanggilan script di index.html.
 - Tidak mengubah app.js, CSS, skema database, atau format Excel dua sheet.
+
+PATCH V1.1:
+- Memperbaiki error "Version change transaction was aborted in upgradeneeded event handler".
+- Backup sekarang memeriksa keberadaan database tanpa sengaja membatalkan transaksi upgrade.
+- File backup menyimpan skema object store (keyPath, autoIncrement, indexes).
+- Restore dapat membuat database IndexedDB yang belum ada di origin Preview/hostname baru, lalu memulihkan records.
+- Jika object store belum ada, restore menambahkannya melalui upgrade versi yang sah.
+- Tidak menghapus database sumber di perangkat lain. Restore tetap mengganti data lokal pada origin yang sedang dibuka.
