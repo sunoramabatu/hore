@@ -98,73 +98,9 @@
     ctx.restore();
   }
 
-  async function loadJourneyEnvironment(lat,lon,dayKey){
-    const out={weather:"Cuaca tidak tersedia",temp:null,cloud:null,prayer:[]};
-    if(!Number.isFinite(lat)||!Number.isFinite(lon))return out;
-    const date=dayKey||new Date().toISOString().slice(0,10);
-    try{
-      const u=`https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&hourly=temperature_2m,weather_code,cloud_cover&timezone=Asia%2FJakarta`;
-      const r=await fetch(u);if(r.ok){const j=await r.json(),hours=j.hourly?.time||[];
-        const idx=Math.max(0,Math.min(hours.length-1,12));
-        out.temp=j.hourly?.temperature_2m?.[idx]??null;out.cloud=j.hourly?.cloud_cover?.[idx]??null;
-        const code=Number(j.hourly?.weather_code?.[idx]);
-        out.weather=code===0?"Cerah":code<=3?"Berawan":code<=48?"Berkabut":code<=67?"Hujan":code<=77?"Salju":code<=82?"Hujan lokal":code<=99?"Badai petir":"Cuaca";
-      }
-    }catch(e){/* offline: keep graceful label */}
-    try{
-      const [y,m,d]=date.split("-").map(Number);
-      const u=`https://api.aladhan.com/v1/timings/${d}-${m}-${y}?latitude=${lat}&longitude=${lon}&method=20&school=0`;
-      const r=await fetch(u);if(r.ok){const j=await r.json(),t=j.data?.timings||{};
-        ["Dhuhr","Asr"].forEach(k=>{const raw=String(t[k]||"").slice(0,5),parts=raw.split(":").map(Number);if(parts.length===2&&parts.every(Number.isFinite))out.prayer.push({name:k==="Dhuhr"?"Dhuhur":"Asar",minute:parts[0]*60+parts[1]});});
-      }
-    }catch(e){/* prayer scene disabled if times unavailable */}
-    return out;
-  }
-  function detectPrayerStops(sessions,prayerTimes){
-    const stops=[];
-    for(const session of sessions){
-      const pts=session.points||[];let start=null,anchor=null,last=null;
-      for(const p of pts){
-        if(!start){start=p.time;anchor=p;last=p;continue;}
-        const dist=distanceMeters(anchor,p),elapsed=p.time-start;
-        if(dist<=20&&elapsed>=300000){stops.push({start,end:p.time,lat:p.lat,lon:p.lon});}
-        if(dist>20){start=p.time;anchor=p;}
-        last=p;
-      }
-    }
-    return stops.filter(s=>prayerTimes.some(pr=>{
-      const t=new Date(s.start).getHours()*60+new Date(s.start).getMinutes();
-      return Math.abs(t-pr.minute)<=90&&((s.end-s.start)>=300000);
-    }));
-  }
-  function drawSunArc(ctx,x,y,w,virtualTime){
-    const d=new Date(virtualTime),minute=d.getHours()*60+d.getMinutes();
-    const daylight=(minute-360)/(18*60-360),p=clamp(daylight,0,1);
-    const cx=x+w/2,base=y+36,rx=w*.43,ry=26;
-    ctx.save();ctx.strokeStyle="rgba(255,224,145,.65)";ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(cx,base,rx,ry,Math.PI,Math.PI,Math.PI*2);ctx.stroke();
-    const angle=Math.PI+(1-p)*Math.PI,sx=cx+Math.cos(angle)*rx,sy=base+Math.sin(angle)*ry;
-    const g=ctx.createRadialGradient(sx,sy,1,sx,sy,12);g.addColorStop(0,"#fff6b2");g.addColorStop(1,"rgba(255,177,45,0)");
-    ctx.fillStyle=g;ctx.beginPath();ctx.arc(sx,sy,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffd35b";ctx.beginPath();ctx.arc(sx,sy,5,0,Math.PI*2);ctx.fill();ctx.restore();
-  }
-  function drawPrayerPose(ctx,x,y,scale=1){
-    ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
-    ctx.fillStyle="rgba(4,14,28,.9)";ctx.beginPath();ctx.ellipse(0,0,22,7,0,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle="#162d45";ctx.lineWidth=9;ctx.lineCap="round";
-    ctx.beginPath();ctx.moveTo(-5,-8);ctx.lineTo(-17,-2);ctx.lineTo(-24,-2);ctx.stroke();
-    ctx.beginPath();ctx.moveTo(5,-8);ctx.lineTo(16,-2);ctx.lineTo(23,-2);ctx.stroke();
-    ctx.fillStyle="#159fc4";ctx.beginPath();ctx.roundRect(-11,-34,22,25,7);ctx.fill();
-    ctx.fillStyle="#b98568";ctx.beginPath();ctx.arc(0,-42,8,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle="#858e96";ctx.beginPath();ctx.ellipse(0,-49,9,4,0,Math.PI,Math.PI*2);ctx.fill();
-    ctx.restore();
-  }
-  function distanceMeters(a,b){
-    const R=6371000,rad=v=>v*Math.PI/180,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon);
-    const q=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
-    return 2*R*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
-  }
   function timestamp(p){const t=new Date(p?.at||p?.timestamp||"").getTime();return Number.isFinite(t)?t:null;}
 
-  window.downloadRouteVideo=async function downloadRouteVideoV27(){
+  window.downloadRouteVideo=async function downloadRouteVideoV26(){
     const button=document.getElementById("quickVideoDownloadBtn");
     if(button){button.disabled=true;button.textContent="⏳ Menyiapkan Wide Journey…";}
     let stream=null,photoUrls=[];
@@ -243,9 +179,6 @@
       const allTimes=[...segments.flatMap(s=>s.map(p=>p.time)),...pins.map(p=>p.at)].filter(Number.isFinite);
       const minTime=Math.min(...allTimes),maxTime=Math.max(...allTimes);
       if(!(maxTime>minTime))throw new Error("Rentang waktu GPS dan realisasi terlalu pendek untuk membuat video.");
-      const firstGps=sessions.flatMap(s=>s.points).sort((a,b)=>a.time-b.time)[0];
-      const environment=await loadJourneyEnvironment(firstGps?.lat,firstGps?.lon,v13SelectedDate());
-      const prayerStops=detectPrayerStops(sessions,environment.prayer);
       const fps=24;stream=canvas.captureStream(fps);
       const candidates=["video/mp4;codecs=avc1.42E01E","video/mp4","video/webm;codecs=vp9","video/webm"];
       const mime=candidates.find(t=>MediaRecorder.isTypeSupported?.(t))||"";
@@ -272,8 +205,7 @@
         if(chosen.length===1)return {...chosen[0],segmentIndex:chosenSeg,dirX:1,dirY:0};
         let i=0;while(i<chosen.length-2&&chosen[i+1].time<t)i++;
         const a=chosen[i],b=chosen[i+1],f=clamp((t-a.time)/Math.max(1,b.time-a.time),0,1),e=smooth(f);
-        const dt=Math.max(1,(b.time-a.time)/1000),speed=distanceMeters(a,b)/dt;
-        return {...a,x:lerp(a.x,b.x,e),y:lerp(a.y,b.y,e),time:t,segmentIndex:chosenSeg,dirX:b.x-a.x,dirY:b.y-a.y,speed};
+        return {...a,x:lerp(a.x,b.x,e),y:lerp(a.y,b.y,e),time:t,segmentIndex:chosenSeg,dirX:b.x-a.x,dirY:b.y-a.y};
       };
       const nearestCustomer=t=>{let best=null,dt=Infinity;for(const p of pins){const d=Math.abs(p.at-t);if(d<dt){dt=d;best=p;}}return dt<Math.max(120000,(maxTime-minTime)*.025)?best:null;};
       const distanceAtTime=t=>{
@@ -368,18 +300,6 @@
         ctx.fillStyle="#fff";ctx.font="bold 15px Arial";ctx.fillText(`${(travelled/1000).toFixed(2).replace(".",",")} km`,hx+220,statsY);
         ctx.fillStyle="#dce8f5";ctx.font="bold 14px Arial";ctx.fillText(`◷ ${formatOriginalElapsed(virtualTime-minTime)}`,hx+365,statsY);
         ctx.fillStyle="#a9c6df";ctx.font="bold 10px Arial";ctx.textAlign="right";ctx.fillText(phaseLabel,W-34,hy+48);ctx.textAlign="left";
-        // Environmental cinematic overlays: solar arc and local weather.
-        drawSunArc(ctx,W-166,132,130,virtualTime);
-        ctx.fillStyle="rgba(7,25,44,.88)";ctx.beginPath();ctx.roundRect(W-190,174,172,42,10);ctx.fill();
-        ctx.fillStyle="#fff";ctx.font="bold 11px Arial";ctx.textAlign="left";
-        ctx.fillText(`${environment.weather} • ${environment.temp==null?"--":Math.round(environment.temp)+"°C"}`,W-180,190);
-        ctx.fillStyle="#b9d5eb";ctx.font="10px Arial";ctx.fillText(`Awan ${environment.cloud==null?"--":Math.round(environment.cloud)+"%"}`,W-180,205);
-        // Corner technician animation follows GPS speed, independently from the map marker.
-        const cornerX=W-62,cornerY=H-102;
-        const speed=worker?.speed||0,cornerPhase=((virtualTime-minTime)/1000*(speed>.7?2.2:speed>.15?1.1:.25))%1;
-        const prayerStop=prayerStops.find(s=>virtualTime>=s.start&&virtualTime<=s.end);
-        if(prayerStop){drawPrayerPose(ctx,cornerX,cornerY,.9);ctx.fillStyle="rgba(5,20,39,.9)";ctx.beginPath();ctx.roundRect(W-174,H-160,156,25,8);ctx.fill();ctx.fillStyle="#fff";ctx.font="bold 11px Arial";ctx.fillText("Waktu istirahat Dhuhur/Asar",W-166,H-143);}
-        else if(workerFrames?.length){drawAnimatedWorker(ctx,cornerX,cornerY,worker?.dirX||1,cornerPhase,true,workerFrames);}
         if(currentPhoto){
           const x=18,y=H-302,w=310,ph=194;
           ctx.fillStyle="rgba(9,27,47,.96)";ctx.beginPath();ctx.roundRect(x,y,w,270,14);ctx.fill();
@@ -401,8 +321,8 @@
       a.href=url;a.download=`OYONID_WIDE_JOURNEY_${v13SelectedDate()}_${Math.round(durationSeconds)}detik.${ext}`;
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
       showToast(`Wide Journey berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
-    }catch(err){console.error("[OYONID] Wide Journey V13.1.27 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
+    }catch(err){console.error("[OYONID] Wide Journey V13.1.26 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
     finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}}
   };
-  console.info("[OYONID] Local First Video V13.1.27 loaded.");
+  console.info("[OYONID] 3D Follow Cinematic V13.1.25 loaded.");
 })();
