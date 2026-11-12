@@ -3,7 +3,7 @@
   
 
 <head>
-  <link rel="stylesheet" href="./css/app.css?v=13.1.27">
+  <link rel="stylesheet" href="./css/app.css?v=13.1.26">
   <title>OyonID Map V13.1.17</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -129,11 +129,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <div id="historyPanel" style="display:none;">
   <div class="history-header"><div style="font-weight:bold;">📋 Riwayat Dibaca</div><button class="close-history" onclick="closeHistory()" aria-label="Tutup riwayat">✕</button></div>
-  <div class="history-filter" style="padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <label for="historyDate" style="font-weight:600;font-size:13px">Tanggal</label>
-    <input id="historyDate" type="date" style="padding:7px;border:1px solid #cbd5e1;border-radius:8px">
-    <strong id="historyDayCount" style="font-size:13px;color:#0f766e">0 pelanggan selesai</strong>
-  </div>
   <div id="historyList"></div>
 </div>
 
@@ -153,14 +148,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       </div>
       <div id="realizationAvailableDates" class="realization-calendar-grid"></div>
       <div class="realization-calendar-legend"><span><i></i> Ada realisasi</span><span><b></b> Tanggal dipilih</span></div>
-    </div>
-    <div class="v13-realization-search" style="margin:10px 0;padding:10px;border:1px solid rgba(148,163,184,.35);border-radius:12px;background:rgba(255,255,255,.06)">
-      <label class="v13-label" for="realizationSearchInput">Cari pelanggan selesai (4 digit IDPEL / Nomor Meter)</label>
-      <div style="display:flex;gap:6px">
-        <input id="realizationSearchInput" type="search" inputmode="numeric" maxlength="20" placeholder="Masukkan minimal 4 digit" style="flex:1;min-width:0;padding:10px;border-radius:9px;border:1px solid #94a3b8">
-        <button id="realizationSearchBtn" type="button" style="padding:8px 14px;border:0;border-radius:9px;background:#1769d2;color:white;font-weight:700">Cari</button>
-      </div>
-      <div id="realizationSearchResults" style="max-height:150px;overflow:auto"></div>
     </div>
     <div class="oyon-stats-row">
       <div class="oyon-stat stat-blue"><strong id="statReadCount">0</strong><span>Dibaca (Sheet 1)</span></div>
@@ -266,7 +253,8 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.27"></script>
-<script src="./js/oyonid-video-engine-v2.js?v=13.1.27"></script>
+<script src="./js/app.js?v=13.1.26"></script>
+<script src="./js/oyonid-backup-restore.js?v=1.0.0"></script>
+<script src="./js/oyonid-video-engine-v2.js?v=13.1.26"></script>
 </body>
 </html>

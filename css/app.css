@@ -1813,10 +1813,3 @@ body.oyon-realization-active #playbackPhotoBox {
   object-fit:contain !important; object-position:center center !important;
   background:#101b2a !important;
 }
-
-/* V13.1.27: persistent date-filtered history and Realisasi search */
-#historyDate{font:inherit;color:#0f172a;background:#fff;max-width:170px}
-#historyDayCount{padding:6px 9px;border-radius:999px;background:#dcfce7;color:#166534}
-#realizationSearchResults button:active{background:rgba(37,99,235,.12)!important}
-#routeRecordFloatBtn{z-index:24010!important;transition:bottom .18s ease,transform .18s ease}
-body.oyon-realization-active #routeRecordFloatBtn{display:none!important}

@@ -488,10 +488,23 @@ function renderMarker(m, map) {
 const STORAGE_KEY = "RBM_WORKING_STATE";
 
 
-// Riwayat bersifat kumulatif lintas tanggal. Tidak dihapus saat hari berganti.
+// Reset history setiap hari
+const today = new Date().toDateString();
+const savedDate = localStorage.getItem("oyon_history_date");
+
 function closeHistory() {
   const panel = document.getElementById("historyPanel");
-  if (panel) panel.style.display = "none";
+  if (panel) {
+    panel.style.display = "none";
+  }
+}
+
+if (savedDate !== today) {
+  history = [];
+  localStorage.setItem("oyon_history", "[]");
+  localStorage.setItem("oyon_history_date", today);
+  renderHistory();
+
 }
 
 /* ======================
@@ -2171,20 +2184,17 @@ zoomBtn.onclick = () => {
    DETAIL PANEL
 ====================== */
 function positionRouteRecordButton() {
-  const btn=document.getElementById("routeRecordFloatBtn");
-  const panel=document.getElementById("detailPanel");
-  if(!btn)return;
-  const gap=12;
-  let bottom=16;
-  if(panel&&panel.classList.contains("open")){
-    bottom=Math.max(16,window.innerHeight-panel.getBoundingClientRect().top+gap);
-  }else{
-    const nav=document.getElementById("oyonBottomNav");
-    if(nav&&getComputedStyle(nav).display!=="none"){
-      bottom=Math.max(16,window.innerHeight-nav.getBoundingClientRect().top+gap);
-    }
+  const btn = document.getElementById("routeRecordFloatBtn");
+  const panel = document.getElementById("detailPanel");
+  if (!btn) return;
+  if (panel && panel.classList.contains("open")) {
+    const rect = panel.getBoundingClientRect();
+    const gap = 12;
+    const bottom = Math.max(12, window.innerHeight - rect.top + gap);
+    btn.style.setProperty("bottom", `calc(${bottom}px + env(safe-area-inset-bottom, 0px))`, "important");
+  } else {
+    btn.style.setProperty("bottom", "calc(16px + env(safe-area-inset-bottom, 0px))", "important");
   }
-  btn.style.setProperty("bottom",`calc(${bottom}px + env(safe-area-inset-bottom, 0px))`,"important");
 }
 window.addEventListener("resize", () => requestAnimationFrame(positionRouteRecordButton));
 window.addEventListener("load", () => {
@@ -2750,14 +2760,26 @@ function historySortTimestamp(item) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 function renderHistory() {
-  const el=document.getElementById("historyList");if(!el)return;
-  const dateInput=document.getElementById("historyDate");
-  if(dateInput&&!dateInput.value){const dates=(history||[]).map(h=>h.dayKey||(h.completedAt?localDateTimeParts(new Date(h.completedAt)).dayKey:"")).filter(Boolean).sort();dateInput.value=dates[dates.length-1]||localDateTimeParts().dayKey;}
-  const selected=dateInput?.value||localDateTimeParts().dayKey;
-  const rows=(history||[]).map((item,originalIndex)=>({item,originalIndex})).filter(x=>(x.item.dayKey||(x.item.completedAt?localDateTimeParts(new Date(x.item.completedAt)).dayKey:""))===selected).sort((a,b)=>historySortTimestamp(b.item)-historySortTimestamp(a.item));
-  const count=document.getElementById("historyDayCount");if(count)count.textContent=`${rows.length} pelanggan selesai`;
-  if(!rows.length){el.innerHTML='<div style="padding:12px;color:#64748b;text-align:center">📭 Belum ada pelanggan selesai pada tanggal ini</div>';return;}
-  el.innerHTML=rows.map(({item,originalIndex})=>`<div style="border-bottom:1px solid #e5e7eb;padding:9px;display:flex;justify-content:space-between;align-items:center;gap:8px"><div><strong>${String(item.row?.NAMA||"-").replace(/[<>]/g,"")}</strong><br>IDPEL: ${String(item.row?.IDPEL||"-").replace(/[<>]/g,"")}<br>NOMET: ${String(getNoMeter(item.row)||"-").replace(/[<>]/g,"")}<br><small>${String(item.time||"-")}</small></div><button onclick="undoHistory(${originalIndex})" style="background:#2563eb;color:white;border:0;padding:7px 10px;border-radius:8px;font-size:12px">Undo</button></div>`).join("");
+  const el = document.getElementById("historyList");
+  if (!el) return;
+  if (!history || history.length === 0) {
+    el.innerHTML = `<div style="padding:10px;color:#666;text-align:center">📭 Belum ada pelanggan selesai hari ini</div>`;
+    return;
+  }
+  const newestFirst = history.map((item, originalIndex) => ({ item, originalIndex }))
+    .sort((a, b) => historySortTimestamp(b.item) - historySortTimestamp(a.item));
+  el.innerHTML = newestFirst.map(({ item, originalIndex }) => `
+    <div style="border-bottom:1px solid #eee;padding:8px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <strong>${String(item.row?.NAMA || "-").replace(/[<>]/g, "")}</strong><br>
+        NOMET: ${String(getNoMeter(item.row) || "-").replace(/[<>]/g, "")}<br>
+        MERK: ${String(getMerkMeter(item.row) || "-").replace(/[<>]/g, "")}<br>
+        HARI BACA: ${String(getHariBaca(item.row) || "-").replace(/[<>]/g, "")}<br>
+        <small>${String(item.time || "-")}</small>
+      </div>
+      <button onclick="undoHistory(${originalIndex})" style="background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:8px;font-size:12px;">Undo</button>
+    </div>
+  `).join("");
 }
 
 
@@ -3622,14 +3644,6 @@ function v13AttachCustomerPhotosToPopup(marker,item){
   });
 }
 
-function searchRealizationCustomers(){
-  const input=document.getElementById("realizationSearchInput"),host=document.getElementById("realizationSearchResults");if(!input||!host)return;
-  const key=String(input.value||"").replace(/\\D/g,"");if(key.length<4){showToast("Masukkan minimal 4 digit IDPEL atau nomor meter");return;}
-  const rows=v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()).filter(x=>{const row=x.row||{};const id=String(getMappedValue(row,"IDPEL")||row.IDPEL||"").replace(/\\D/g,""),meter=String(getNoMeter(row)||"").replace(/\\D/g,"");return id.endsWith(key)||meter.endsWith(key)||id.includes(key)||meter.includes(key);});
-  if(!rows.length){host.innerHTML='<div style="padding:8px;color:#64748b">Tidak ditemukan pada tanggal ini.</div>';return;}
-  host.innerHTML=rows.slice(0,20).map((x,i)=>`<button type="button" data-real-index="${i}" style="display:block;width:100%;text-align:left;padding:8px;border:0;border-bottom:1px solid #dbe3ec;background:transparent;color:inherit"><b>${String(getMappedValue(x.row||{},"NAMA")||x.row?.NAMA||"Pelanggan").replace(/[<>]/g,"")}</b><br><small>IDPEL ${String(x.row?.IDPEL||"-").replace(/[<>]/g,"")} • Meter ${String(getNoMeter(x.row||{})||"-").replace(/[<>]/g,"")}</small></button>`).join("");
-  host.querySelectorAll("[data-real-index]").forEach(btn=>btn.addEventListener("click",()=>{const item=rows[Number(btn.dataset.realIndex)],lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);if(Number.isFinite(lat)&&Number.isFinite(lon)){map.flyTo([lat,lon],19,{duration:.7});setTimeout(()=>v13RealizationLayer?.eachLayer(layer=>{const ll=layer.getLatLng?.();if(ll&&Math.abs(ll.lat-lat)<1e-7&&Math.abs(ll.lng-lon)<1e-7)layer.openPopup?.();}),750);}}));
-}
 function showRealizationOnMap(){
   if(typeof map==="undefined"||typeof L==="undefined")return;
   pauseRouteHistory();
@@ -4164,9 +4178,6 @@ document.addEventListener("DOMContentLoaded",()=>{
   updateRealizationSummary();
 
   // V13.1.2: explicit event wiring; no inline onclick dependency.
-  document.getElementById("historyDate")?.addEventListener("change",renderHistory);
-  document.getElementById("realizationSearchBtn")?.addEventListener("click",searchRealizationCustomers);
-  document.getElementById("realizationSearchInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchRealizationCustomers();});
   document.getElementById("realizationOpenBtn")?.addEventListener("click", openRealizationPanel);
   document.getElementById("realizationCloseBtn")?.addEventListener("click", closeRealizationPanel);
   document.getElementById("realizationMinimizeBtn")?.addEventListener("click", () => {
