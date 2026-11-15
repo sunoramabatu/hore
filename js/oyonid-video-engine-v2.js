@@ -395,7 +395,16 @@
         const worker=pointAtTime(virtualTime),phase=phaseAt(progress);
         pins.forEach(pin=>{const key=`${pin.index}|${pin.identity||""}`;if(pin.at<=virtualTime&&!revealed.has(key)){revealed.add(key);reached++;}});
         const arrival=nearestCustomer(virtualTime);
-        if(arrival){const photo=photoAssets.find(p=>p.identity&&p.identity===arrival.identity)||oyonNearestPlaybackPhoto({lat:arrival.item.actualLat,lon:arrival.item.actualLon,at:new Date(arrival.originalAt||arrival.at).toISOString(),identity:arrival.identity},photoAssets);if(photo)currentPhoto=photo;}
+        if(arrival){
+          // Prefer the actual customer house photo over a GPS/location snapshot.
+          // Meter photo is the second choice; location photos are only fallback.
+          const customerPhotos=photoAssets.filter(p=>p.identity&&p.identity===arrival.identity);
+          const photo=customerPhotos.find(p=>p.type==="Foto Rumah")
+            ||customerPhotos.find(p=>p.type==="Foto Meteran")
+            ||customerPhotos[0]
+            ||oyonNearestPlaybackPhoto({lat:arrival.item.actualLat,lon:arrival.item.actualLon,at:new Date(arrival.originalAt||arrival.at).toISOString(),identity:arrival.identity},photoAssets);
+          if(photo)currentPhoto=photo;
+        }
         const activePoint=worker||lastWorker;
         if(worker)lastWorker=worker;
         travelled=distanceAtTime(virtualTime);

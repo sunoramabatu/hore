@@ -1118,7 +1118,11 @@ async function v13HandleLocationPhoto(file) {
 function v13PlaybackPhotoMetadata() {
   const result=v13PhotoMetadata().map(photo=>({...photo,type:"Foto Lokasi"}));
   const customerMeta=oyonCustomerPhotoMeta();
-  const completed=v13CompletedForDate();
+  // Video multi-date must resolve customer photos against every completed day,
+  // not only the currently selected calendar date.
+  const completed=typeof v131AllCompletedRecords==="function"
+    ? v131AllCompletedRecords()
+    : v13CompletedForDate();
   Object.entries(customerMeta||{}).forEach(([key,meta])=>{
     const match=completed.find(item=>item.identity===meta.identity ||
       (item.row && oyonCustomerPhotoIdentity(item.row)===meta.identity));
