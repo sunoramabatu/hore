@@ -1,4 +1,4 @@
-/* OYONID MAP V13.1.26 — Animated Worker & Satellite Journey
+/* OYONID MAP V13.1.32 — Stationary Technician Video Phase
  * GPS sessions remain separate; customer arrival events are independent and never create blue route segments.
  * Four cinematic angles are sequenced in one video: Wide, Follow, Oblique, Arrival.
  */
@@ -125,10 +125,11 @@
     for(const session of sessions){
       const pts=session.points||[];let start=null,anchor=null,last=null;
       for(const p of pts){
-        if(!start){start=p.time;anchor=p;last=p;continue;}
-        const dist=distanceMeters(anchor,p),elapsed=p.time-start;
-        if(dist<=20&&elapsed>=300000){stops.push({start,end:p.time,lat:p.lat,lon:p.lon});}
-        if(dist>20){start=p.time;anchor=p;}
+        const pointTime=p.originalTime??p.time;
+        if(!start){start=pointTime;anchor=p;last=p;continue;}
+        const dist=distanceMeters(anchor,p),elapsed=pointTime-start;
+        if(dist<=20&&elapsed>=300000){stops.push({start,end:pointTime,lat:p.lat,lon:p.lon,dayKey:session.dayKey});}
+        if(dist>20){start=pointTime;anchor=p;}
         last=p;
       }
     }
@@ -165,7 +166,7 @@
   function timestamp(p){const t=new Date(p?.at||p?.timestamp||"").getTime();return Number.isFinite(t)?t:null;}
 
   function drawClosingScreen(ctx,assets,progress,stats){
-    const {mapShot,segments,pins,workerFrames,travelled,durationText,dateText}=assets;
+    const {mapShot,segments,pins,workerFrames,travelled,durationText,dateText,daysText}=assets;
     const {positive,pending,target,percent}=stats;
     const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#06172c");bg.addColorStop(.58,"#092b4d");bg.addColorStop(1,"#031426");
     ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
@@ -174,7 +175,7 @@
     ctx.beginPath();ctx.roundRect(12,12,W-24,H-24,28);ctx.stroke();ctx.restore();
     ctx.fillStyle="#f4f9ff";ctx.font="bold 34px Arial";ctx.textAlign="left";ctx.fillText("📍 OYONID MAP",28,58);
     ctx.fillStyle="#5fc5ff";ctx.font="bold 15px Arial";ctx.fillText("WIDE JOURNEY  •  REALISASI",31,83);
-    ctx.fillStyle="rgba(20,65,105,.8)";ctx.beginPath();ctx.roundRect(W-174,30,145,36,18);ctx.fill();ctx.fillStyle="#eaf6ff";ctx.font="bold 13px Arial";ctx.textAlign="center";ctx.fillText(dateText,W-101,53);
+    ctx.fillStyle="rgba(20,65,105,.8)";ctx.beginPath();ctx.roundRect(W-300,30,270,36,18);ctx.fill();ctx.fillStyle="#eaf6ff";ctx.font="bold 11px Arial";ctx.textAlign="center";ctx.fillText(dateText,W-165,53);
     // Left satellite route board, framed; all GPS sessions remain disconnected.
     const mx=24,my=112,mw=432,mh=672;
     ctx.save();ctx.shadowColor="rgba(0,137,255,.4)";ctx.shadowBlur=16;
@@ -212,6 +213,7 @@
     ctx.fillStyle=panel;ctx.beginPath();ctx.roundRect(bx,by,bw,bh,24);ctx.fill();
     ctx.strokeStyle="#168fe8";ctx.lineWidth=2;ctx.shadowColor="#078cff";ctx.shadowBlur=16;ctx.stroke();ctx.shadowBlur=0;
     ctx.fillStyle="#dff3ff";ctx.font="bold 25px Arial";ctx.textAlign="left";ctx.fillText("▣  REALISASI PEKERJAAN",42,855);
+    ctx.fillStyle="#9fc8e8";ctx.font="bold 12px Arial";ctx.fillText(`${daysText||"1 HARI"} • REKAP GABUNGAN`,44,881);
     ctx.fillStyle="#00c879";ctx.beginPath();ctx.roundRect(W-210,826,168,43,22);ctx.fill();
     ctx.fillStyle="#fff";ctx.font="bold 22px Arial";ctx.textAlign="center";ctx.fillText(pending===0?"✓ SELESAI":"◷ REKAP",W-126,855);
     // Main metrics grid
@@ -239,25 +241,45 @@
     try{
       if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw new Error("Browser belum mendukung ekspor video. Gunakan Chrome terbaru.");
       if(typeof html2canvas!=="function")throw new Error("Modul peta belum termuat.");
-      const sessions=(v13RoutesForDate()||[]).map((s,i)=>{
-        const pts=(s.points||[]).map((p,j)=>({lat:Number(p.lat),lon:Number(p.lon),time:timestamp(p),sourceIndex:j}))
+      const selectedDate=String(v13SelectedDate()||"");
+      const startInput=document.getElementById("quickVideoStartDate"),endInput=document.getElementById("quickVideoEndDate");
+      const startDate=String(startInput?.value||selectedDate),endDate=String(endInput?.value||startDate);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate))throw new Error("Pilih tanggal awal dan akhir video.");
+      const rangeStart=startDate<=endDate?startDate:endDate,rangeEnd=startDate<=endDate?endDate:startDate;
+      if(startInput)startInput.value=rangeStart;if(endInput)endInput.value=rangeEnd;
+      const allSessions=Array.isArray(v13RouteSessions)?v13RouteSessions:[];
+      const sessions=allSessions.filter(s=>{const day=String(s.dayKey||(typeof v131MonitoringDayKey==="function"?v131MonitoringDayKey(s):"")||"");return day>=rangeStart&&day<=rangeEnd;}).map((s,i)=>{
+        const dayKey=String(s.dayKey||(typeof v131MonitoringDayKey==="function"?v131MonitoringDayKey(s):"")||"");
+        const pts=(s.points||[]).map((p,j)=>({lat:Number(p.lat),lon:Number(p.lon),time:timestamp(p),sourceIndex:j,originalTime:timestamp(p),dayKey}))
           .filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.time!==null)
           .sort((a,b)=>a.time-b.time);
-        return {id:String(s.id||`session_${i}`),points:pts};
+        return {id:String(s.id||`session_${i}`),dayKey,points:pts};
       }).filter(s=>s.points.length);
-      if(!sessions.length)throw new Error("Tidak ditemukan rekaman GPS petugas untuk tanggal ini. Periksa backup GPS dan tanggal yang dipilih.");
-      const customerRows=v13CompletedForDate();
-      if(!customerRows.length)throw new Error("Tidak ada pelanggan selesai pada tanggal ini.");
+      if(!sessions.length)throw new Error("Tidak ditemukan rekaman GPS pada rentang tanggal video ini.");
+      const customerRows=(typeof v131AllCompletedRecords==="function"?v131AllCompletedRecords():[])
+        .filter(x=>String(x.dayKey||"")>=rangeStart&&String(x.dayKey||"")<=rangeEnd&&v13ValidActual(x));
+      if(!customerRows.length)throw new Error("Tidak ada pelanggan selesai pada rentang tanggal ini.");
       const customers=customerRows.map((item,index)=>{
         let at=timestamp({at:item.completedAt});
         if(item.dayKey){
           const time=String(item.time||"").trim().replace(/\./g,":");
-          if(/^\d{1,2}:\d{2}(?::\d{2})?$/.test(time)){const d=new Date(`${item.dayKey}T${time}`);if(!Number.isNaN(d.getTime()))at=d.getTime();}
+          if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(time)){const d=new Date(`${item.dayKey}T${time}`);if(!Number.isNaN(d.getTime()))at=d.getTime();}
         }
-        if(at===null)at=Date.parse(`${item.dayKey||v13SelectedDate()}T12:00:00`);
-        return {item,index,at:Number.isFinite(at)?at:null,identity:item.identity||completionIdentity(item.row||{})};
+        if(at===null)at=Date.parse(`${item.dayKey||selectedDate}T12:00:00`);
+        return {item,index,at:Number.isFinite(at)?at:null,originalAt:Number.isFinite(at)?at:null,identity:item.identity||completionIdentity(item.row||{})};
       }).filter(c=>c.at!==null);
       if(!customers.length)throw new Error("Tanggal/jam penyelesaian pelanggan tidak valid.");
+      // Compress each calendar day onto a continuous video timeline; original sessions remain separate segments.
+      const dayKeys=[...new Set([...sessions.map(s=>s.dayKey),...customers.map(c=>String(c.item.dayKey||""))])].filter(Boolean).sort();
+      const dailyCounts=new Map();customers.forEach(c=>dailyCounts.set(String(c.item.dayKey||""),(dailyCounts.get(String(c.item.dayKey||""))||0)+1));
+      let timelineCursor=0;const dayTimeline=new Map();
+      dayKeys.forEach(day=>{
+        const raw=[...sessions.filter(s=>s.dayKey===day).flatMap(s=>s.points.map(p=>p.originalTime)),...customers.filter(c=>c.item.dayKey===day).map(c=>c.originalAt)].filter(Number.isFinite);
+        if(!raw.length)return;const min=Math.min(...raw),max=Math.max(...raw),span=Math.max(60000,max-min);
+        dayTimeline.set(day,{min,max,base:timelineCursor,span});timelineCursor+=span+8000;
+      });
+      sessions.forEach(s=>s.points.forEach(p=>{const t=dayTimeline.get(s.dayKey);if(t)p.time=t.base+(p.originalTime-t.min);}));
+      customers.forEach(c=>{const t=dayTimeline.get(String(c.item.dayKey||""));if(t)c.at=t.base+(c.originalAt-t.min);});
       const trackBounds=sessions.flatMap(s=>s.points.map(p=>[p.lat,p.lon]));
       const customerBounds=customers.map(c=>[parseCoordinate(c.item.actualLat),parseCoordinate(c.item.actualLon)]).filter(p=>p.every(Number.isFinite));
       const allBounds=[...trackBounds,...customerBounds];
@@ -306,7 +328,7 @@
       const toScreen=p=>({x:p.x*fit+ox,y:p.y*fit+oy});
       segments=segments.map(seg=>seg.map(p=>({...p,...toScreen(p)})));
       pins=pins.map(p=>({...p,...toScreen(p)}));
-      const photoMetas=v13PlaybackPhotoMetadata().filter(p=>p.dayKey===v13SelectedDate());
+      const photoMetas=v13PlaybackPhotoMetadata().filter(p=>String(p.dayKey||"")>=rangeStart&&String(p.dayKey||"")<=rangeEnd);
       const photoAssets=[];for(const meta of photoMetas){const a=await loadPhoto(meta);if(a)photoAssets.push(a);}
       const workerFrames=await loadWorkerWalkFrames();
       photoUrls=photoAssets.map(p=>p.url);
@@ -315,8 +337,8 @@
       const minTime=Math.min(...allTimes),maxTime=Math.max(...allTimes);
       if(!(maxTime>minTime))throw new Error("Rentang waktu GPS dan realisasi terlalu pendek untuk membuat video.");
       const firstGps=sessions.flatMap(s=>s.points).sort((a,b)=>a.time-b.time)[0];
-      const environment=await loadJourneyEnvironment(firstGps?.lat,firstGps?.lon,v13SelectedDate());
-      const prayerStops=detectPrayerStops(sessions,environment.prayer);
+      const environment=await loadJourneyEnvironment(firstGps?.lat,firstGps?.lon,rangeStart);
+      const prayerStops=detectPrayerStops(sessions,environment.prayer).map(stop=>{const t=dayTimeline.get(stop.dayKey);return t?{...stop,start:t.base+(stop.start-t.min),end:t.base+(stop.end-t.min)}:stop;});
       const fps=24;stream=canvas.captureStream(fps);
       const candidates=["video/mp4;codecs=avc1.42E01E","video/mp4","video/webm;codecs=vp9","video/webm"];
       const mime=candidates.find(t=>MediaRecorder.isTypeSupported?.(t))||"";
@@ -373,7 +395,7 @@
         const worker=pointAtTime(virtualTime),phase=phaseAt(progress);
         pins.forEach(pin=>{const key=`${pin.index}|${pin.identity||""}`;if(pin.at<=virtualTime&&!revealed.has(key)){revealed.add(key);reached++;}});
         const arrival=nearestCustomer(virtualTime);
-        if(arrival){const photo=photoAssets.find(p=>p.identity&&p.identity===arrival.identity)||oyonNearestPlaybackPhoto({lat:arrival.item.actualLat,lon:arrival.item.actualLon,at:new Date(arrival.at).toISOString(),identity:arrival.identity},photoAssets);if(photo)currentPhoto=photo;}
+        if(arrival){const photo=photoAssets.find(p=>p.identity&&p.identity===arrival.identity)||oyonNearestPlaybackPhoto({lat:arrival.item.actualLat,lon:arrival.item.actualLon,at:new Date(arrival.originalAt||arrival.at).toISOString(),identity:arrival.identity},photoAssets);if(photo)currentPhoto=photo;}
         const activePoint=worker||lastWorker;
         if(worker)lastWorker=worker;
         travelled=distanceAtTime(virtualTime);
@@ -412,16 +434,9 @@
         });
         ctx.restore();
 
-        // Project the moving technician from the exact interpolated GPS point onto the transformed map.
-        // Character stays upright on screen; its feet are anchored to the route line.
-        if(activePoint){
-          const projected=worldToScreen(activePoint);
-          const vx=activePoint.dirX||1,vy=activePoint.dirY||0;
-          const facing=(Math.abs(vx)>=Math.abs(vy)?(vx<0?-1:1):1);
-          const walking=!!worker&&(!arrival||Math.abs(arrival.at-virtualTime)>18000);
-          const walkPhase=worker?((worker.time-minTime)/1000*1.65)%1:(now/650)%1;
-          drawAnimatedWorker(ctx,projected.x,projected.y,facing,walkPhase,walking,workerFrames);
-        }
+        // The technician is intentionally NOT projected onto GPS coordinates.
+        // The route remains the only geographic representation; the technician
+        // is rendered in the fixed HUD area below and performs an in-place walk cycle.
         // Premium compact HUD: brand, selected date, progress, distance and original elapsed time.
         const hx=18,hy=16,hw=W-36,hh=112;
         const hg=ctx.createLinearGradient(hx,hy,hx,hy+hh);hg.addColorStop(0,"rgba(10,39,68,.97)");hg.addColorStop(1,"rgba(5,20,39,.96)");
@@ -430,10 +445,13 @@
         ctx.fillStyle="#ff9b35";ctx.beginPath();ctx.arc(hx+23,hy+25,8,0,Math.PI*2);ctx.fill();
         ctx.fillStyle="#fff";ctx.font="bold 18px Arial";ctx.textAlign="left";ctx.fillText("OYONID MAP",hx+40,hy+29);
         ctx.fillStyle="#9fc8e8";ctx.font="bold 11px Arial";ctx.fillText("WIDE JOURNEY • REALISASI",hx+40,hy+45);
-        const rawDate=String(v13SelectedDate()||"");
-        const dateText=rawDate.replace(/^(\d{4})-(\d{2})-(\d{2})$/,"$3/$2/$1");
+        let activeDay=dayKeys.find(day=>{const t=dayTimeline.get(day);return t&&virtualTime>=t.base&&virtualTime<=t.base+t.span;});
+        if(!activeDay){activeDay=dayKeys.reduce((best,day)=>{const t=dayTimeline.get(day);if(!t)return best;const d=Math.min(Math.abs(virtualTime-t.base),Math.abs(virtualTime-(t.base+t.span)));return !best||d<best.d?{day,d}:best;},null)?.day||rangeStart;}
+        const activeDayIndex=Math.max(0,dayKeys.indexOf(activeDay));
+        const dateText=String(activeDay).replace(/^(\d{4})-(\d{2})-(\d{2})$/,"$3/$2/$1");
         ctx.fillStyle="rgba(255,255,255,.12)";ctx.beginPath();ctx.roundRect(W-170,hy+12,132,28,14);ctx.fill();
         ctx.fillStyle="#e7f2ff";ctx.font="bold 12px Arial";ctx.textAlign="center";ctx.fillText(dateText,W-104,hy+30);
+        if(dayKeys.length>1){ctx.fillStyle="#9fc8e8";ctx.font="bold 9px Arial";ctx.fillText(`HARI ${activeDayIndex+1}/${dayKeys.length} • ${dailyCounts.get(activeDay)||0} PELANGGAN`,W-104,hy+51);}
         ctx.textAlign="left";
         const statsY=hy+78;
         ctx.fillStyle="#5be39b";ctx.font="bold 16px Arial";ctx.fillText(`✓ ${reached}/${pins.length} selesai`,hx+16,statsY);
@@ -464,8 +482,7 @@
         }
         ctx.fillStyle="rgba(9,27,47,.9)";ctx.fillRect(18,H-14,W-36,5);ctx.fillStyle="#19b66d";ctx.fillRect(18,H-14,(W-36)*progress,5);
       };
-      const allCompletedForDay=(typeof v131AllCompletedRecords==="function"?v131AllCompletedRecords():[])
-        .filter(x=>x.dayKey===v13SelectedDate());
+      const allCompletedForDay=customerRows;
       const positiveCount=allCompletedForDay.length;
       const totalTarget=Math.max(positiveCount,
         (Array.isArray(originalRows)?originalRows.length:0),
@@ -473,8 +490,8 @@
       const pendingCount=Math.max(0,totalTarget-positiveCount);
       const completionPercent=totalTarget?positiveCount/totalTarget*100:0;
       const originalDurationText=formatOriginalElapsed(maxTime-minTime);
-      const dateLabel=String(v13SelectedDate()||"").replace(/^(\d{4})-(\d{2})-(\d{2})$/,"$3/$2/$1");
-      const closingAssets={mapShot,segments:closingSegments,pins:closingPins,workerFrames,travelled:distanceAtTime(maxTime),durationText:originalDurationText,dateText:dateLabel};
+      const dateLabel=rangeStart===rangeEnd?rangeStart:rangeStart+" — "+rangeEnd;
+      const closingAssets={mapShot,segments:closingSegments,pins:closingPins,workerFrames,travelled:distanceAtTime(maxTime),durationText:originalDurationText,dateText:dateLabel,daysText:`${dayKeys.length} HARI`};
       const animate=now=>{
         const elapsed=now-started;
         if(elapsed<durationMs){draw(now);requestAnimationFrame(animate);return;}
@@ -491,11 +508,11 @@
       photoUrls.forEach(u=>URL.revokeObjectURL(u));photoUrls=[];
       if(!blob.size)throw new Error("Video kosong. Coba ulangi.");
       const url=URL.createObjectURL(blob),a=document.createElement("a"),ext=blob.type.includes("mp4")?"mp4":"webm";
-      a.href=url;a.download=`OYONID_WIDE_JOURNEY_${v13SelectedDate()}_${Math.round(durationSeconds)}detik.${ext}`;
+      a.href=url;a.download=`OYONID_WIDE_JOURNEY_${rangeStart}_${rangeEnd}_${Math.round(durationSeconds)}detik.${ext}`;
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
-      showToast(`Wide Journey berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
+      showToast(`Wide Journey ${rangeStart===rangeEnd?rangeStart:rangeStart+" s.d. "+rangeEnd} berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
     }catch(err){console.error("[OYONID] Wide Journey V13.1.28 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
     finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}}
   };
-  console.info("[OYONID] Final Closing Screen V13.1.28 loaded.");
+  console.info("[OYONID] Multi-Date Wide Journey Video Phase V13.1.33 loaded.");
 })();

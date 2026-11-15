@@ -2172,35 +2172,88 @@ zoomBtn.onclick = () => {
 ====================== */
 function positionRouteRecordButton() {
   const btn=document.getElementById("routeRecordFloatBtn");
-  const panel=document.getElementById("detailPanel");
   if(!btn)return;
+  const viewport=window.visualViewport;
+  const viewportHeight=viewport?.height||window.innerHeight;
+  const viewportTop=viewport?.offsetTop||0;
   const gap=12;
-  let bottom=16;
-  if(panel&&panel.classList.contains("open")){
-    bottom=Math.max(16,window.innerHeight-panel.getBoundingClientRect().top+gap);
-  }else{
-    const nav=document.getElementById("oyonBottomNav");
-    if(nav&&getComputedStyle(nav).display!=="none"){
-      bottom=Math.max(16,window.innerHeight-nav.getBoundingClientRect().top+gap);
+  // Place the recording control above whichever visible bottom panel reaches highest.
+  // This is recalculated as soon as the first customer detail card opens/resizes.
+  const blockers=[
+    document.getElementById("detailPanel"),
+    document.getElementById("oyonBottomNav"),
+    document.getElementById("bottomBar"),
+    document.querySelector(".bottom-bar"),
+    document.querySelector(".bottom-nav")
+  ].filter(Boolean);
+  let topEdge=viewportTop+viewportHeight;
+  blockers.forEach(el=>{
+    const style=getComputedStyle(el),rect=el.getBoundingClientRect();
+    if(style.display!=="none"&&style.visibility!=="hidden"&&rect.height>0&&rect.top<viewportTop+viewportHeight&&rect.bottom>viewportTop){
+      // Detail panel only blocks when it is actually open.
+      if(el.id==="detailPanel"&&!el.classList.contains("open"))return;
+      topEdge=Math.min(topEdge,rect.top);
     }
-  }
+  });
+  const bottom=Math.max(16,viewportTop+viewportHeight-topEdge+gap);
   btn.style.setProperty("bottom",`calc(${bottom}px + env(safe-area-inset-bottom, 0px))`,"important");
 }
-window.addEventListener("resize", () => requestAnimationFrame(positionRouteRecordButton));
-window.addEventListener("load", () => {
-  const panel = document.getElementById("detailPanel");
-  if (panel && "ResizeObserver" in window) {
-    const observer = new ResizeObserver(() => requestAnimationFrame(positionRouteRecordButton));
-    observer.observe(panel);
-    window.oyonDetailPanelObserver = observer;
+function observeRouteRecordLayout(){
+  const update=()=>requestAnimationFrame(positionRouteRecordButton);
+  window.addEventListener("resize",update,{passive:true});
+  window.visualViewport?.addEventListener("resize",update,{passive:true});
+  window.visualViewport?.addEventListener("scroll",update,{passive:true});
+  if("ResizeObserver" in window){
+    const observer=new ResizeObserver(update);
+    ["detailPanel","oyonBottomNav","bottomBar"].forEach(id=>{const el=document.getElementById(id);if(el)observer.observe(el);});
+    document.querySelectorAll(".bottom-bar,.bottom-nav").forEach(el=>observer.observe(el));
+    window.oyonDetailPanelObserver=observer;
   }
-});
+  update();
+}
+window.addEventListener("load",observeRouteRecordLayout,{once:true});
+document.addEventListener("DOMContentLoaded",observeRouteRecordLayout,{once:true});
+
+// V13.1.30: kartu pelanggan mengambang, dapat dipindah/minimize/maximize.
+const OYON_DETAIL_POS_KEY = "oyon_detail_card_position_v1";
+let oyonDetailPhotoUrl = null;
+function oyonInitDetailCardControls(){
+  const panel=document.getElementById("detailPanel"),header=document.getElementById("detailPanelHeader");
+  const minBtn=document.getElementById("detailCardMinBtn"),maxBtn=document.getElementById("detailCardMaxBtn");
+  if(!panel||panel.dataset.controlsReady)return;
+  panel.dataset.controlsReady="1";
+  try{const pos=JSON.parse(localStorage.getItem(OYON_DETAIL_POS_KEY)||"null");if(pos&&Number.isFinite(pos.left)&&Number.isFinite(pos.top)){panel.style.left=pos.left+"px";panel.style.top=pos.top+"px";panel.style.right="auto";panel.style.bottom="auto";}}catch(e){}
+  minBtn?.addEventListener("click",()=>{panel.classList.toggle("is-minimized");minBtn.textContent=panel.classList.contains("is-minimized")?"＋":"−";requestAnimationFrame(positionRouteRecordButton);});
+  maxBtn?.addEventListener("click",()=>{panel.classList.toggle("is-maximized");maxBtn.textContent=panel.classList.contains("is-maximized")?"❐":"□";});
+  let drag=null;
+  header?.addEventListener("pointerdown",e=>{if(e.target.closest("button,label,input"))return;const r=panel.getBoundingClientRect();drag={x:e.clientX-r.left,y:e.clientY-r.top};panel.classList.add("is-dragging");header.setPointerCapture?.(e.pointerId);});
+  header?.addEventListener("pointermove",e=>{if(!drag)return;const w=panel.offsetWidth,h=panel.offsetHeight;const left=Math.max(4,Math.min(innerWidth-w,e.clientX-drag.x));const top=Math.max(8,Math.min(innerHeight-h-8,e.clientY-drag.y));panel.style.left=left+"px";panel.style.top=top+"px";panel.style.right="auto";panel.style.bottom="auto";});
+  const endDrag=()=>{if(!drag)return;drag=null;panel.classList.remove("is-dragging");const r=panel.getBoundingClientRect();try{localStorage.setItem(OYON_DETAIL_POS_KEY,JSON.stringify({left:Math.round(r.left),top:Math.round(r.top)}));}catch(e){}requestAnimationFrame(positionRouteRecordButton);};
+  header?.addEventListener("pointerup",endDrag);header?.addEventListener("pointercancel",endDrag);
+}
+async function oyonShowDetailCustomerPhoto(row){
+  const box=document.getElementById("detailCustomerPhoto"),img=document.getElementById("detailCustomerPhotoImage"),cap=document.getElementById("detailCustomerPhotoCaption");
+  if(!box||!img)return;
+  box.hidden=true;
+  if(oyonDetailPhotoUrl){URL.revokeObjectURL(oyonDetailPhotoUrl);oyonDetailPhotoUrl=null;}
+  const identity=oyonCustomerPhotoIdentity(row);
+  const key=oyonCustomerPhotoKey(identity,"house");
+  try{
+    let blob=await v13GetPhotoBlob(key);let label="Foto rumah pelanggan";
+    if(!blob){const meterKey=oyonCustomerPhotoKey(identity,"meter");blob=await v13GetPhotoBlob(meterKey);label="Foto meter pelanggan";}
+    if(!blob)return;
+    oyonDetailPhotoUrl=URL.createObjectURL(blob);img.src=oyonDetailPhotoUrl;cap.textContent=label;box.hidden=false;
+  }catch(err){console.warn("Foto kartu pelanggan tidak dapat dimuat",err);}
+}
 
 function openDetail(r){
   hasSelectedCustomer = true;
   // Simpan baris yang benar-benar dipilih agar IDPEL/NOMET duplikat tidak ikut terhapus bersamaan.
   window.currentDetailRow = r;
   const panel = document.getElementById("detailPanel");
+  oyonInitDetailCardControls();
+  panel?.classList.remove("is-minimized");
+  const minControl=document.getElementById("detailCardMinBtn");if(minControl)minControl.textContent="−";
   const left = document.getElementById("detailLeft");
   const right = document.getElementById("detailRight");
 
@@ -2432,7 +2485,8 @@ function openDetail(r){
         }
 
     panel.classList.add("open");
-    requestAnimationFrame(positionRouteRecordButton);
+    oyonShowDetailCustomerPhoto(r);
+    requestAnimationFrame(()=>{positionRouteRecordButton();requestAnimationFrame(positionRouteRecordButton);});
   }
 
 
@@ -3499,6 +3553,7 @@ function openRealizationPanel(){
   if(d && (!d.value || !availableDays.includes(d.value))) d.value=availableDays[availableDays.length-1]||localDateTimeParts().dayKey;
   v13CalendarMonth=(d?.value||localDateTimeParts().dayKey).slice(0,7);
   updateRealizationSummary();
+  v131InitMonitoringRange();
   resetRoutePlayback();
   showRealizationOnMap();
 }
@@ -3527,6 +3582,77 @@ function v13ValidActual(item){
 }
 function v13CompletedForDate(){return v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()&&v13ValidActual(x));}
 function v13RoutesForDate(){return (v13RouteSessions||[]).filter(x=>x.dayKey===v13SelectedDate());}
+
+/* V13.1.31 — read-only monitoring aggregation; original GPS sessions and completion records remain untouched. */
+function v131MonitoringDayKey(item){
+  if(/^\d{4}-\d{2}-\d{2}$/.test(String(item?.dayKey||"")))return item.dayKey;
+  const raw=item?.startedAt||item?.start||item?.points?.[0]?.at||item?.points?.[0]?.timestamp;
+  const d=raw?new Date(raw):null;
+  return d&&!Number.isNaN(d.getTime())?localDateTimeParts(d).dayKey:"";
+}
+function v131MonitoringPointTime(point){
+  const raw=point?.at??point?.timestamp??point?.time;
+  if(typeof raw==="number")return raw>1e12?raw:raw>1e9?raw*1000:null;
+  const parsed=Date.parse(raw||"");return Number.isFinite(parsed)?parsed:null;
+}
+function v131MonitoringDistance(points){
+  let total=0;
+  for(let i=1;i<points.length;i++){
+    const a=points[i-1],b=points[i];
+    const lat1=parseCoordinate(a?.lat),lon1=parseCoordinate(a?.lon),lat2=parseCoordinate(b?.lat),lon2=parseCoordinate(b?.lon);
+    if(![lat1,lon1,lat2,lon2].every(Number.isFinite))continue;
+    const rad=v=>v*Math.PI/180,dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);
+    const q=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+    const meters=6371000*2*Math.atan2(Math.sqrt(q),Math.sqrt(Math.max(0,1-q)));
+    // Sum only the recorded adjacent-point segments; never invent a connector across sessions.
+    if(Number.isFinite(meters))total+=meters;
+  }
+  return total;
+}
+function v131MonitoringSessionStats(session){
+  const points=Array.isArray(session?.points)?session.points:[];
+  const times=points.map(v131MonitoringPointTime).filter(Number.isFinite).sort((a,b)=>a-b);
+  const start=Date.parse(session?.startedAt||"");
+  const end=Date.parse(session?.endedAt||"");
+  const duration=times.length>1?Math.max(0,times[times.length-1]-times[0]):(Number.isFinite(start)&&Number.isFinite(end)?Math.max(0,end-start):0);
+  return {distance:v131MonitoringDistance(points),duration,points:points.length};
+}
+function v131FormatDuration(ms){
+  const sec=Math.max(0,Math.floor((Number(ms)||0)/1000)),h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60;
+  return [h,m,s].map(v=>String(v).padStart(2,"0")).join(":");
+}
+function v131FormatDistance(m){return m>=1000?`${(m/1000).toFixed(2).replace(".",",")} km`:`${Math.round(m)} m`;}
+function v131RenderMonitoring(){
+  const startEl=document.getElementById("monitoringStartDate"),endEl=document.getElementById("monitoringEndDate");
+  if(!startEl||!endEl)return;
+  let start=startEl.value,end=endEl.value;
+  if(!start||!end)return;
+  if(start>end){const swap=start;start=end;end=swap;startEl.value=start;endEl.value=end;}
+  const records=v131AllCompletedRecords().filter(x=>x.dayKey>=start&&x.dayKey<=end);
+  const routes=(Array.isArray(v13RouteSessions)?v13RouteSessions:[]).filter(x=>{const day=v131MonitoringDayKey(x);return day&&day>=start&&day<=end;});
+  const byDay=new Map();
+  const ensure=day=>{if(!byDay.has(day))byDay.set(day,{done:new Set(),distance:0,duration:0,sessions:0});return byDay.get(day);};
+  records.forEach(item=>{const day=String(item.dayKey||"");if(!day)return;const id=item.completionId||item.identity||completionIdentity(item.row||{});ensure(day).done.add(String(id));});
+  routes.forEach(session=>{const day=v131MonitoringDayKey(session);if(!day)return;const stats=v131MonitoringSessionStats(session),row=ensure(day);row.distance+=stats.distance;row.duration+=stats.duration;row.sessions++;});
+  const days=[...byDay.keys()].sort();
+  const doneIds=new Set(records.map(x=>String(x.completionId||x.identity||completionIdentity(x.row||{}))));
+  const done=doneIds.size,distance=routes.reduce((sum,x)=>sum+v131MonitoringSessionStats(x).distance,0),duration=routes.reduce((sum,x)=>sum+v131MonitoringSessionStats(x).duration,0);
+  const target=Array.isArray(originalRows)?originalRows.length:0;
+  const pending=Math.max(0,target-done),percent=target?Math.min(100,done/target*100):0;
+  const put=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
+  put("monitoringDone",String(done));put("monitoringPercent",`${percent.toFixed(1).replace(".",",")}%`);
+  put("monitoringDistance",v131FormatDistance(distance));put("monitoringDuration",v131FormatDuration(duration));
+  put("monitoringPending",`Tersisa dari target aktif: ${pending}`);put("monitoringDays",`${days.length} hari dengan data`);put("monitoringSessions",`${routes.length} sesi GPS`);
+  const body=document.getElementById("monitoringDailyRows");
+  if(body){body.innerHTML=days.length?days.map(day=>{const d=byDay.get(day);const date=new Date(`${day}T12:00:00`).toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});return `<tr><td>${date}</td><td>${d.done.size}</td><td>${v131FormatDistance(d.distance)}</td><td>${v131FormatDuration(d.duration)}</td><td>${d.sessions}</td></tr>`;}).join(""):'<tr><td colspan="5">Tidak ada data pada rentang ini.</td></tr>';}
+}
+function v131InitMonitoringRange(){
+  const startEl=document.getElementById("monitoringStartDate"),endEl=document.getElementById("monitoringEndDate");if(!startEl||!endEl)return;
+  const keys=[...v131AllCompletedRecords().map(x=>x.dayKey),...(v13RouteSessions||[]).map(v131MonitoringDayKey)].filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(String(x))).sort();
+  const first=keys[0]||v13SelectedDate(),last=keys[keys.length-1]||v13SelectedDate();
+  if(!startEl.value)startEl.value=first;if(!endEl.value)endEl.value=last;
+  v131RenderMonitoring();
+}
 let v13CalendarMonth = "";
 function v13RenderAvailableRealizationDates(){
   const host=document.getElementById("realizationAvailableDates");
@@ -4161,7 +4287,11 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
   document.getElementById("realizationMonthPrev")?.addEventListener("click",()=>v13ShiftCalendarMonth(-1));
   document.getElementById("realizationMonthNext")?.addEventListener("click",()=>v13ShiftCalendarMonth(1));
+  document.getElementById("monitoringApplyBtn")?.addEventListener("click",v131RenderMonitoring);
+  document.getElementById("monitoringStartDate")?.addEventListener("change",v131RenderMonitoring);
+  document.getElementById("monitoringEndDate")?.addEventListener("change",v131RenderMonitoring);
   updateRealizationSummary();
+  v131InitMonitoringRange();
 
   // V13.1.2: explicit event wiring; no inline onclick dependency.
   document.getElementById("historyDate")?.addEventListener("change",renderHistory);

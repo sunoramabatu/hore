@@ -3,8 +3,8 @@
   
 
 <head>
-  <link rel="stylesheet" href="./css/app.css?v=13.1.28">
-  <title>OyonID Map V13.1.17</title>
+  <link rel="stylesheet" href="./css/app.css?v=13.1.31">
+  <title>OyonID Map V13.1.29</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -168,6 +168,23 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       <div class="oyon-stat stat-slate"><strong id="statLeftCount">0</strong><span>Tersisa</span></div>
     </div>
     <div id="realizationSummary" class="v13-summary" aria-live="polite">Pilih tanggal untuk melihat titik realisasi.</div>
+    <section id="monitoringRangePanel" class="monitoring-range-panel" aria-label="Monitoring rentang tanggal">
+      <div class="monitoring-range-title"><strong>📊 Monitoring Pekerjaan</strong><span>Harian / Rentang Tanggal</span></div>
+      <div class="monitoring-range-fields">
+        <label>Tanggal mulai<input id="monitoringStartDate" type="date"></label>
+        <label>Tanggal selesai<input id="monitoringEndDate" type="date"></label>
+        <button id="monitoringApplyBtn" type="button">Tampilkan</button>
+      </div>
+      <div class="monitoring-metrics" aria-live="polite">
+        <div><b id="monitoringDone">0</b><small>Pelanggan selesai</small></div>
+        <div><b id="monitoringPercent">0%</b><small>Realisasi dari target</small></div>
+        <div><b id="monitoringDistance">0 m</b><small>Jarak GPS</small></div>
+        <div><b id="monitoringDuration">00:00:00</b><small>Durasi GPS</small></div>
+      </div>
+      <div class="monitoring-submetrics"><span id="monitoringPending">Tersisa: —</span><span id="monitoringDays">0 hari data</span><span id="monitoringSessions">0 sesi GPS</span></div>
+      <div class="monitoring-table-wrap"><table class="monitoring-table"><thead><tr><th>Tanggal</th><th>Selesai</th><th>Jarak</th><th>Durasi</th><th>Sesi</th></tr></thead><tbody id="monitoringDailyRows"><tr><td colspan="5">Pilih rentang tanggal.</td></tr></tbody></table></div>
+      <p class="monitoring-note">Jarak dan durasi dihitung dari titik GPS yang tersimpan. Sesi GPS antarhari tidak disambungkan.</p>
+    </section>
     <div class="gps-recovery-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
       <button class="ui-btn small-btn" id="gpsBackupExportBtn" type="button">⬇ Backup GPS Petugas</button>
       <button class="ui-btn small-btn" id="gpsBackupImportBtn" type="button">⬆ Pulihkan GPS</button>
@@ -195,6 +212,12 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
     <button id="quickRouteResetBtn" type="button" aria-label="Ulangi perjalanan">↺ Ulang</button>
     <button id="quickVideoDownloadBtn" type="button">⬇ Buat Video</button>
   </div>
+  <div class="realization-speed-row" style="gap:8px;flex-wrap:wrap">
+    <label for="quickVideoStartDate">Video tanggal</label>
+    <input id="quickVideoStartDate" type="date" aria-label="Tanggal awal video" />
+    <label for="quickVideoEndDate">sampai</label>
+    <input id="quickVideoEndDate" type="date" aria-label="Tanggal akhir video" />
+  </div>
   <div class="realization-speed-row">
     <label for="quickVideoDuration">Durasi video</label>
     <select id="quickVideoDuration" aria-label="Pilih durasi video">
@@ -220,33 +243,25 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
   </div>
 </div>
 
-<div id="detailPanel" class="detail-panel">
-  <div style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px;">
-
-  <!-- Kiri -->
-  <b>Detail Pelanggan</b>
-
-  <!-- Tengah -->
-  <label style="display:flex; justify-content:center; align-items:center; gap:6px; font-size:14px; font-weight:600;">
-    <input type="checkbox" onchange="toggleCompare(this)">
-    Bandingkan
-  </label>
-
-  <!-- Kanan -->
-  <button onclick="closeDetail()" style="
-    background:#eee;
-    border:none;
-    border-radius:8px;
-    padding:6px 10px;
-    font-size:16px;
-    cursor:pointer;
-  ">❌</button>
-
-</div>
-
-  <div id="detailSplit" style="display:flex; gap:12px; margin-top:10px;">
-    <div id="detailLeft" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
-    <div id="detailRight" style="flex:1; border:1px solid #eee; padding:10px; border-radius:12px;"></div>
+<div id="detailPanel" class="detail-panel" aria-label="Kartu informasi pelanggan">
+  <div id="detailPanelHeader" class="detail-card-header">
+    <b id="detailCardTitle">📍 Detail Pelanggan</b>
+    <label class="detail-compare-toggle"><input type="checkbox" onchange="toggleCompare(this)"> Bandingkan</label>
+    <div class="detail-card-actions">
+      <button type="button" id="detailCardMinBtn" aria-label="Minimize kartu" title="Minimize">−</button>
+      <button type="button" id="detailCardMaxBtn" aria-label="Maximize kartu" title="Maximize">□</button>
+      <button type="button" onclick="closeDetail()" aria-label="Tutup kartu" title="Tutup">×</button>
+    </div>
+  </div>
+  <div id="detailCardContent" class="detail-card-content">
+    <div id="detailSplit" style="display:flex; gap:12px; margin-top:10px;">
+      <div id="detailLeft" style="flex:1; border:1px solid rgba(148,163,184,.25); padding:10px; border-radius:12px;"></div>
+      <div id="detailRight" style="flex:1; border:1px solid rgba(148,163,184,.25); padding:10px; border-radius:12px;"></div>
+    </div>
+    <div id="detailCustomerPhoto" class="detail-customer-photo" hidden>
+      <img id="detailCustomerPhotoImage" alt="Foto rumah pelanggan" />
+      <small id="detailCustomerPhotoCaption">Foto pelanggan</small>
+    </div>
   </div>
 </div>
 
@@ -266,7 +281,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.28"></script>
-<script src="./js/oyonid-video-engine-v2.js?v=13.1.28"></script>
+<script src="./js/app.js?v=13.1.31"></script>
+<script src="./js/oyonid-video-engine-v2.js?v=13.1.33"></script>
 </body>
 </html>
