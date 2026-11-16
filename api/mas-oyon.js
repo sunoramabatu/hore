@@ -165,9 +165,16 @@ module.exports = async function handler(req, res) {
     });
     const data = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
-      console.error("Mas OYON Gemini error", upstream.status, data?.error?.status || "unknown");
-      const status = upstream.status === 429 ? 429 : upstream.status >= 500 ? 503 : 502;
-      return sendJson(res, status, { error: upstream.status === 429 ? "Kuota Mas OYON sedang penuh. Coba lagi sebentar." : "Mas OYON lagi kesulitan menghubungi otak Gemini. Coba lagi sebentar." });
+      const googleStatus = String(data?.error?.status || "");
+      const googleMessage = String(data?.error?.message || "").slice(0, 240);
+      console.error("Mas OYON Gemini error", upstream.status, googleStatus, googleMessage);
+      let userMessage = "Gemini belum bisa memproses pesan. Coba lagi sebentar.";
+      if (upstream.status === 400) userMessage = "Format permintaan Gemini ditolak. Admin perlu memeriksa konfigurasi model/API.";
+      else if (upstream.status === 401 || upstream.status === 403) userMessage = "API key Gemini tidak valid atau akses API belum diizinkan. Admin perlu memeriksa API key dan akses Gemini API di Google AI Studio.";
+      else if (upstream.status === 404) userMessage = "Model Gemini tidak ditemukan atau belum tersedia untuk API key ini. Admin perlu memeriksa GEMINI_MODEL.";
+      else if (upstream.status === 429) userMessage = "Kuota atau batas permintaan Gemini sedang tercapai. Periksa kuota dan billing Google AI Studio.";
+      else if (upstream.status >= 500) userMessage = "Layanan Gemini sedang bermasalah. Coba lagi beberapa saat.";
+      return sendJson(res, upstream.status === 429 ? 429 : 502, { error: userMessage, code: googleStatus || `HTTP_${upstream.status}` });
     }
     const answer = (data.candidates || []).flatMap(c => c.content?.parts || []).map(p => p.text || "").join("\n").trim();
     if (!answer) return sendJson(res, 502, { error: "Jawaban belum berhasil dibuat. Coba tanyakan dengan kalimat lebih sederhana." });

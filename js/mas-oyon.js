@@ -77,6 +77,8 @@
     addBubble("user", message);
     busy = true; sendBtn.disabled = true; sendBtn.textContent = "Mengirim…";
     setStatus("Mas OYON lagi mikir. Sekedap nggih…");
+    const thinking = addBubble("model", "Sedang menyusun jawaban…");
+    thinking.classList.add("mas-oyon-thinking");
     const prior = history.slice(-8);
     try {
       const response = await fetch("/api/mas-oyon", {
@@ -84,17 +86,24 @@
         body: JSON.stringify({ message, history: prior })
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `Permintaan gagal (${response.status}).`);
+      if (!response.ok) {
+        const detail = data.error || `Permintaan gagal (${response.status}).`;
+        const code = data.code ? ` [${data.code}]` : "";
+        throw new Error(detail + code);
+      }
       const answer = String(data.answer || "").trim();
       if (!answer) throw new Error("Mas OYON belum memberi jawaban. Coba lagi.");
+      thinking.remove();
       history.push({ role: "user", text: message }, { role: "model", text: answer });
       if (history.length > 12) history.splice(0, history.length - 12);
       addBubble("model", answer, true);
       if ($("masOyonAutoSpeak")?.checked) speak(answer);
       else setStatus("Jawaban diterima. Tekan Putar suara bila ingin mendengarkan.");
     } catch (error) {
+      const pending = messages.querySelector(".mas-oyon-thinking");
+      pending?.remove();
       addBubble("model", error.message || "Koneksine lagi rewel. Coba maneh sedhela nggih.");
-      setStatus("Belum tersambung · Periksa internet atau konfigurasi admin.");
+      setStatus("Koneksi AI gagal. Baca pesan error di atas; bila berulang, admin periksa Vercel Function Logs.");
     } finally {
       busy = false; sendBtn.disabled = false; sendBtn.textContent = "Kirim ➤"; input.focus();
     }
