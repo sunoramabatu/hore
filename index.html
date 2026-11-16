@@ -3,8 +3,8 @@
   
 
 <head>
-  <link rel="stylesheet" href="./css/app.css?v=14.0.3">
-  <title>OyonID Map V14.0.0</title>
+  <link rel="stylesheet" href="./css/app.css?v=14.0.7">
+  <title>OyonID Map V14.0.7</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -175,8 +175,8 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <div id="monitoringPage" class="oyon-page-panel" style="display:none" aria-label="Halaman Monitoring">
   <div class="oyon-page-head">
-    <strong>📊 MONITORING OYONID</strong>
-    <button id="monitoringBackBtn" type="button">← Kembali ke Tagging</button>
+    <strong>📊 OYONID MONITORING</strong>
+    <div class="monitoring-head-actions"><button id="monitoringFullMapBtn" type="button">🗺️ Full Map</button><button id="monitoringBackBtn" type="button">← Kembali ke Tagging</button></div>
   </div>
   <div class="oyon-page-body">
     <div class="oyon-monitoring-search" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
@@ -189,7 +189,9 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       <label><input type="checkbox" id="monitorShowActual" checked> Lokasi Realisasi</label>
       <label><input type="checkbox" id="monitorShowOrder" checked> Urutan Baca</label>
       <label>Hari Baca <select id="monitorHariSelect"><option value="ALL">ALL</option></select></label>
+      <label>Selisih lokasi <select id="monitorDistanceFilter"><option value="ALL">Semua</option><option value="near">Sangat dekat (0–10 m)</option><option value="close">Dekat (11–30 m)</option><option value="medium">Sedang (31–100 m)</option><option value="far">Jauh (101–300 m)</option><option value="veryfar">Sangat jauh (&gt;300 m)</option><option value="missing">Koordinat tidak lengkap</option></select></label>
     </div>
+    <section class="monitoring-compare-summary"><strong>📍 Evaluasi DIJ vs Realisasi</strong><div class="monitoring-compare-metrics"><span id="monitorCompareCount">0 pelanggan dibandingkan</span><span id="monitorCompareAverage">Rata-rata selisih: —</span><span id="monitorCompareFar">Jauh: 0</span></div><div id="monitorCompareList" class="monitoring-compare-list">Pilih rentang tanggal untuk melihat hasil perbandingan.</div></section>
     <section id="monitoringRangePanel" class="monitoring-range-panel" aria-label="Monitoring rentang tanggal">
       <div class="monitoring-range-title"><strong>📊 Monitoring Pekerjaan</strong><span>Harian / Rentang Tanggal</span></div>
       <div class="monitoring-range-fields">
@@ -209,11 +211,10 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
     </section>
   </div>
 </div>
+<button id="monitoringRestoreBtn" type="button" aria-label="Tampilkan panel Monitoring" style="display:none;position:fixed;right:12px;top:12px;z-index:12050;padding:11px 14px;border:0;border-radius:12px;background:#0b2945;color:#fff;font-weight:700;box-shadow:0 4px 18px #0005">📋 Tampilkan Monitoring</button>
 
 <div id="floatingControls">
-  <button id="fullMapBtn" class="float-btn">
-    🗺️ Full Map
-  </button>
+  <button id="fullMapBtn" class="float-btn">🗺️ Full Map</button>
 </div>
 
 

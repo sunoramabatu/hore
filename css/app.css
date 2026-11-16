@@ -1933,3 +1933,42 @@ body.oyon-realization-active #routeRecordFloatBtn{display:none!important}
 .realization-range-hint{display:block;margin:2px 0 8px;color:#64748b;font-size:11px;line-height:1.4}
 .realization-calendar-day.is-in-range{background:#e8f2ff;border-color:#bfdbfe;color:#1d4ed8}
 .realization-calendar-day.is-selected{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important}
+
+/* V14.0.7 — Monitoring benar-benar mandiri dan peta tetap menjadi area utama */
+body.oyon-monitoring-active #uiBar{display:none!important}
+body.oyon-monitoring-active #routeRecordFloatBtn,
+body.oyon-monitoring-active #locationPhotoBtn,
+body.oyon-monitoring-active #floatingControls{display:none!important}
+body.oyon-monitoring-active #map{z-index:1!important}
+.oyon-page-panel{top:12px!important;left:12px!important;width:min(440px,calc(100vw - 24px))!important;max-height:64dvh!important;z-index:8600!important}
+.oyon-page-head{background:linear-gradient(120deg,#0b1b2e,#173452)!important;color:#fff!important;padding:11px 12px!important;min-height:48px}
+.monitoring-head-actions{display:flex;align-items:center;gap:6px}
+.oyon-page-head .monitoring-head-actions button{font-size:11px!important;padding:8px 9px!important}
+.oyon-page-head #monitoringFullMapBtn{background:#087dbb!important}
+.oyon-page-head #monitoringBackBtn{background:#b91c1c!important}
+.oyon-page-body{max-height:calc(64dvh - 54px)!important;overflow-y:auto!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.oyon-monitoring-map-controls{font-size:12px!important;gap:7px!important}
+.oyon-monitoring-map-controls input,.oyon-monitoring-map-controls select{accent-color:#1479d2}
+.monitoring-compare-summary{border:1px solid #cbd5e1;border-radius:11px;padding:9px;background:#f8fafc;display:grid;gap:7px;font-size:12px}
+.monitoring-compare-summary>strong{color:#12304b;font-size:13px}
+.monitoring-compare-metrics{display:flex;flex-wrap:wrap;gap:6px}
+.monitoring-compare-metrics span{background:#e2e8f0;border-radius:7px;padding:5px 7px;font-weight:700;color:#24364b}
+.monitoring-compare-list{display:grid;gap:4px;max-height:150px;overflow:auto}
+.monitoring-compare-list button{display:flex;justify-content:space-between;gap:8px;text-align:left;border:1px solid #dbe3ec;border-radius:7px;background:#fff;padding:7px;color:#172033;font-size:11px}
+.monitoring-compare-list button span{white-space:nowrap;color:#b45309;font-weight:800}
+.oyon-page-panel.monitoring-full-map{display:none!important}
+@media(max-width:600px){
+ .oyon-page-panel{top:8px!important;left:8px!important;width:calc(100vw - 16px)!important;max-height:52dvh!important}
+ .oyon-page-body{max-height:calc(52dvh - 54px)!important;padding:8px!important}
+ .oyon-page-head{font-size:12px!important;padding:8px!important}
+ .oyon-page-head .monitoring-head-actions button{font-size:10px!important;padding:7px 7px!important}
+}
+body.oyon-monitoring-active #floatingControls{display:none!important}
+body.oyon-monitoring-active.oyon-monitoring-full-map #floatingControls{display:block!important}
+
+/* V14.0.9 — reliable Monitoring full-map restore and page isolation */
+#monitoringRestoreBtn{touch-action:manipulation;cursor:pointer}
+body.oyon-monitoring-active #monitoringRestoreBtn{display:none}
+body.oyon-monitoring-active.oyon-monitoring-full-map #monitoringRestoreBtn{display:block!important}
+body.oyon-monitoring-active #routeRecordFloatBtn{display:none!important}
+body.oyon-monitoring-active #locationPhotoBtn{display:none!important}

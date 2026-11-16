@@ -2465,32 +2465,26 @@ function closeDetail(){
 }
 
 function toggleFullMap() {
-  const uiBar = document.getElementById("uiBar");
-  const detailPanel = document.getElementById("detailPanel");
-  const btn = document.getElementById("fullMapBtn");
-
-  isFullMap = !isFullMap;
-
-  if (isFullMap) {
-    // 🔥 MASUK MODE FULL MAP
-    if (uiBar) uiBar.style.display = "none";
-    if (detailPanel) detailPanel.classList.remove("open");
-
-    btn.innerText = "📋 SHOW MENU";
-    showToast("🗺️ Mode peta penuh");
-
-  } else {
-    // 🔥 KELUAR DARI FULL MAP
-    if (uiBar) uiBar.style.display = "block";
-
-    // hanya tampilkan bottom bar jika ada pelanggan aktif
-    if (hasSelectedCustomer && detailPanel) {
-      detailPanel.classList.add("open");
-    }
-
-    btn.innerText = "🗺️ FULL MAP";
-    showToast("📍 Mode normal");
+  const uiBar=document.getElementById("uiBar");
+  const detailPanel=document.getElementById("detailPanel");
+  const monitoring=document.getElementById("monitoringPage");
+  const btn=document.getElementById("fullMapBtn");
+  const monitorBtn=document.getElementById("monitoringFullMapBtn");
+  const inMonitoring=document.body.classList.contains("oyon-monitoring-active");
+  if(inMonitoring && monitoring){
+    const full=monitoring.classList.toggle("monitoring-full-map");
+    document.body.classList.toggle("oyon-monitoring-full-map",full);
+    const restore=document.getElementById("monitoringRestoreBtn");
+    if(restore)restore.style.display=full?"block":"none";
+    if(monitorBtn)monitorBtn.textContent=full?"🗺️ Full Map":"▣ Peta Penuh";
+    if(btn)btn.textContent="🗺️ Full Map";
+    setTimeout(()=>map?.invalidateSize?.({animate:false}),220);
+    return;
   }
+  isFullMap=!isFullMap;
+  if(isFullMap){if(uiBar)uiBar.style.display="none";if(detailPanel)detailPanel.classList.remove("open");if(btn)btn.innerText="📋 SHOW MENU";showToast("🗺️ Mode peta penuh");}
+  else{if(uiBar)uiBar.style.display="block";if(hasSelectedCustomer&&detailPanel)detailPanel.classList.add("open");if(btn)btn.innerText="🗺️ FULL MAP";showToast("📍 Mode normal");}
+  setTimeout(()=>map?.invalidateSize?.({animate:false}),180);
 }
 
 
@@ -3521,7 +3515,9 @@ function v14SetPage(page){
   if(quick)quick.style.display=isRealization?"flex":"none";
   document.body.classList.toggle("oyon-realization-active",isRealization);
   document.body.classList.toggle("oyon-monitoring-active",isMonitoring);
-  if(uiBar){uiBar.classList.toggle("minimized",isRealization||isMonitoring);const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent=(isRealization||isMonitoring)?"＋":"−";}
+  if(uiBar){uiBar.style.display=isMonitoring?"none":"block";uiBar.classList.toggle("minimized",isRealization);const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent=isRealization?"＋":"−";}
+  const floatBtn=document.getElementById("fullMapBtn");if(floatBtn)floatBtn.style.display=isMonitoring?"none":"";
+  if(!isMonitoring&&monitoring){monitoring.classList.remove("monitoring-full-map");document.body.classList.remove("oyon-monitoring-full-map");const restore=document.getElementById("monitoringRestoreBtn");if(restore)restore.style.display="none";}
   if(isMonitoring){pauseRouteHistory();v131InitMonitoringRange();}
   if(isRealization){v131InitMonitoringRange();updateRealizationSummary();}
   setTimeout(()=>map?.invalidateSize?.({animate:false}),180);
@@ -3533,33 +3529,47 @@ function v14MonitoringDateRange(){
   const end=document.getElementById("monitoringEndDate")?.value||"9999-12-31";
   return start<=end?{start,end}:{start:end,end:start};
 }
+function v14DistanceMeters(a,b){const R=6371000,rad=x=>x*Math.PI/180;const dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon);const q=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
+function v14CompareRecord(item){const row=item.row||{};const lat=parseCoordinate(getMappedValue(row,"LAT DIJ")??row["LAT DIJ"]??row.LAT_DIJ),lon=parseCoordinate(getMappedValue(row,"LON DIJ")??row["LON DIJ"]??row.LON_DIJ);const alat=parseCoordinate(item.actualLat),alon=parseCoordinate(item.actualLon);if(!validCoordinatePair(lat,lon)||!validCoordinatePair(alat,alon))return {...item,distance:null};return {...item,distance:v14DistanceMeters({lat,lon},{lat:alat,lon:alon})};}
+function v14DistanceBucket(d){if(d===null)return "missing";if(d<=10)return "near";if(d<=30)return "close";if(d<=100)return "medium";if(d<=300)return "far";return "veryfar";}
+function v14RenderCompareSummary(records){const host=document.getElementById("monitorCompareList");const count=document.getElementById("monitorCompareCount"),avg=document.getElementById("monitorCompareAverage"),far=document.getElementById("monitorCompareFar");const compared=records.filter(x=>x.distance!==null),farCount=compared.filter(x=>x.distance>100).length; if(count)count.textContent=`${compared.length} pelanggan dibandingkan`;if(avg)avg.textContent=`Rata-rata selisih: ${compared.length?(compared.reduce((a,x)=>a+x.distance,0)/compared.length).toFixed(1)+" m":"—"}`;if(far)far.textContent=`Jauh (>100 m): ${farCount}`;if(host){const sorted=[...records].sort((a,b)=>(b.distance??-1)-(a.distance??-1)).slice(0,8);host.innerHTML=sorted.length?sorted.map(x=>{const r=x.row||{},name=String(getMappedValue(r,"NAMA")||r.NAMA||"Pelanggan").replace(/[<>]/g,"");const id=String(getMappedValue(r,"IDPEL")||r.IDPEL||"-").replace(/[<>]/g,"");return `<button type="button" data-compare-id="${id}"><b>${name}</b> · ${id}<span>${x.distance===null?"Koordinat belum lengkap":Math.round(x.distance)+" m"}</span></button>`}).join(""):"Tidak ada pelanggan pada rentang ini.";host.querySelectorAll("[data-compare-id]").forEach(b=>b.addEventListener("click",()=>{const x=records.find(v=>String(getMappedValue(v.row||{},"IDPEL")||v.row?.IDPEL||"")===b.dataset.compareId);if(x)openDetail(x.row);}));}}
 function v14RenderMonitoringMarkers(){
   if(typeof map==="undefined"||typeof L==="undefined")return;
   if(v14MonitoringActualLayer)map.removeLayer(v14MonitoringActualLayer);
   v14MonitoringActualLayer=L.layerGroup().addTo(map);
-  const range=v14MonitoringDateRange();
-  const showActual=document.getElementById("monitorShowActual")?.checked!==false;
+  const range=v14MonitoringDateRange(),showActual=document.getElementById("monitorShowActual")?.checked!==false;
+  const filter=document.getElementById("monitorDistanceFilter")?.value||"ALL";
+  const records=v131AllCompletedRecords().filter(item=>item.dayKey>=range.start&&item.dayKey<=range.end).map(v14CompareRecord);
+  v14RenderCompareSummary(records);
+  const visible=records.filter(item=>(filter==="ALL"||v14DistanceBucket(item.distance)===filter)&&(!filterHariBacaAktif||getHariBaca(item.row||{})===daftarHariBaca[indexHariBaca]));
   if(!showActual)return;
-  const records=v131AllCompletedRecords().filter(item=>item.dayKey>=range.start&&item.dayKey<=range.end&&v13ValidActual(item));
   const seen=new Set();
-  records.forEach((item,index)=>{
-    const lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);
-    if(!validCoordinatePair(lat,lon))return;
-    const row=item.row||{},identity=String(item.completionId||item.identity||completionIdentity(row));
-    const key=identity+"|"+item.dayKey; if(seen.has(key))return; seen.add(key);
-    const name=String(getMappedValue(row,"NAMA")||row.NAMA||"Pelanggan").replace(/[<>]/g,"");
-    const id=String(getMappedValue(row,"IDPEL")||row.IDPEL||"-").replace(/[<>]/g,"");
+  visible.forEach(item=>{
+    if(!v13ValidActual(item))return;
+    const lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);if(!validCoordinatePair(lat,lon))return;
+    const row=item.row||{},identity=String(item.completionId||item.identity||completionIdentity(row)),key=identity+"|"+item.dayKey;if(seen.has(key))return;seen.add(key);
+    const name=String(getMappedValue(row,"NAMA")||row.NAMA||"Pelanggan").replace(/[<>]/g,"");const id=String(getMappedValue(row,"IDPEL")||row.IDPEL||"-").replace(/[<>]/g,"");
+    const dijLat=parseCoordinate(getMappedValue(row,"LAT DIJ")??row["LAT DIJ"]??row.LAT_DIJ),dijLon=parseCoordinate(getMappedValue(row,"LON DIJ")??row["LON DIJ"]??row.LON_DIJ);
+    const hasDIJ=validCoordinatePair(dijLat,dijLon),delta=item.distance===null?"Koordinat DIJ tidak tersedia":`Selisih DIJ–Realisasi: ${Math.round(item.distance)} m`;
+    if(hasDIJ){
+      const connector=L.polyline([[dijLat,dijLon],[lat,lon]],{color:"#f59e0b",weight:2,dashArray:"5 6",opacity:.9,interactive:false});
+      connector.addTo(v14MonitoringActualLayer);
+    }
     const marker=L.circleMarker([lat,lon],{radius:8,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.95});
-    marker.bindPopup(`<b>${name}</b><br>IDPEL: ${id}<br>Tanggal: ${item.dayKey}<br>GPS Realisasi: ${lat}, ${lon}`);
-    marker.on("click",()=>openDetail(row));
-    marker.addTo(v14MonitoringActualLayer);
+    marker.bindPopup(`<b>${name}</b><br>IDPEL: ${id}<br>Tanggal: ${item.dayKey}<br>DIJ: ${hasDIJ?dijLat+", "+dijLon:"Tidak tersedia"}<br>Realisasi: ${lat}, ${lon}<br>${delta}`);
+    marker.on("click",()=>openDetail(row));marker.addTo(v14MonitoringActualLayer);
   });
 }
+
 function v14SetMonitoringDijVisibility(){
   const visible=document.getElementById("monitorShowDIJ")?.checked!==false;
+  const filter=document.getElementById("monitorDistanceFilter")?.value||"ALL";
+  const range=v14MonitoringDateRange();
+  const eligible=new Set(v131AllCompletedRecords().filter(x=>x.dayKey>=range.start&&x.dayKey<=range.end).map(v14CompareRecord).filter(x=>filter==="ALL"||v14DistanceBucket(x.distance)===filter).map(x=>String(getMappedValue(x.row||{},"IDPEL")||x.row?.IDPEL||"")));
   if(!Array.isArray(markers))return;
   markers.filter(m=>m.type==="DIJ"||m.type==="DIL").forEach(m=>{
-    const allowed=m.type==="DIJ" && visible && (!filterHariBacaAktif || getHariBaca(m.row)===daftarHariBaca[indexHariBaca]);
+    const id=String(getMappedValue(m.row||{},"IDPEL")||m.row?.IDPEL||"");
+    const allowed=m.type==="DIJ" && visible && (filter==="ALL"||eligible.has(id)) && (!filterHariBacaAktif || getHariBaca(m.row)===daftarHariBaca[indexHariBaca]);
     if(allowed){if(!clusterGroup.hasLayer(m.marker))clusterGroup.addLayer(m.marker);}
     else if(clusterGroup.hasLayer(m.marker))clusterGroup.removeLayer(m.marker);
   });
@@ -3707,9 +3717,9 @@ function v131RenderMonitoring(){
   const target=Array.isArray(originalRows)?originalRows.length:0;
   const pending=Math.max(0,target-done),percent=target?Math.min(100,done/target*100):0;
   const put=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value;};
-  put("monitoringDone",String(done));put("monitoringPercent",`${percent.toFixed(1).replace(".",",")}%`);
+  put("monitoringDone",String(done));put("monitoringPercent",target?`${percent.toFixed(1).replace(".",",")}%`:"—");
   put("monitoringDistance",v131FormatDistance(distance));put("monitoringDuration",v131FormatDuration(duration));
-  put("monitoringPending",`Tersisa dari target aktif: ${pending}`);put("monitoringDays",`${days.length} hari dengan data`);put("monitoringSessions",`${routes.length} sesi GPS`);
+  put("monitoringPending",target?`Tersisa dari target aktif: ${pending}`:"Target belum tersedia — persentase belum dapat dihitung");put("monitoringDays",`${days.length} hari dengan data`);put("monitoringSessions",`${routes.length} sesi GPS`);
   const body=document.getElementById("monitoringDailyRows");
   if(body){body.innerHTML=days.length?days.map(day=>{const d=byDay.get(day);const date=new Date(`${day}T12:00:00`).toLocaleDateString("id-ID",{day:"2-digit",month:"short",year:"numeric"});return `<tr><td>${date}</td><td>${d.done.size}</td><td>${v131FormatDistance(d.distance)}</td><td>${v131FormatDuration(d.duration)}</td><td>${d.sessions}</td></tr>`;}).join(""):'<tr><td colspan="5">Tidak ada data pada rentang ini.</td></tr>';}
 }
@@ -4378,13 +4388,16 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("realizationOpenBtn")?.addEventListener("click", openRealizationPanel);
   document.getElementById("monitoringOpenBtn")?.addEventListener("click", openMonitoringPage);
   document.getElementById("monitoringBackBtn")?.addEventListener("click", closeMonitoringPage);
+  document.getElementById("monitoringFullMapBtn")?.addEventListener("click",toggleFullMap);
+  document.getElementById("monitoringRestoreBtn")?.addEventListener("click",toggleFullMap);
+  document.getElementById("monitorDistanceFilter")?.addEventListener("change",()=>{v14SetMonitoringDijVisibility();v14RenderMonitoringMarkers();});
   document.getElementById("monitorShowDIJ")?.addEventListener("change",v14SetMonitoringDijVisibility);
   document.getElementById("monitorShowActual")?.addEventListener("change",v14RenderMonitoringMarkers);
   document.getElementById("monitorShowOrder")?.addEventListener("change",()=>{showOrderNumbers=!!document.getElementById("monitorShowOrder")?.checked;markers.filter(m=>m.type==="DIJ").forEach(m=>{const color=getColor(getHariBaca(m.row));const size=[35,35];m.marker.setIcon(L.divIcon({html:makeUrutanMarkerHTML(m.row,color),iconSize:size,iconAnchor:[17.5,17.5],className:"urutan-baca-marker"}));});});
-  document.getElementById("monitorHariSelect")?.addEventListener("change",e=>{const value=e.target.value;filterHariBacaAktif=value!=="ALL";indexHariBaca=Math.max(0,daftarHariBaca.indexOf(value));v14SetMonitoringDijVisibility();});
+  document.getElementById("monitorHariSelect")?.addEventListener("change",e=>{const value=e.target.value;filterHariBacaAktif=value!=="ALL";indexHariBaca=Math.max(0,daftarHariBaca.indexOf(value));v14SetMonitoringDijVisibility();v14RenderMonitoringMarkers();});
   document.getElementById("monitoringApplyBtn")?.addEventListener("click",()=>{v131RenderMonitoring();v14RenderMonitoringMarkers();});
-  document.getElementById("monitoringStartDate")?.addEventListener("change",v14RenderMonitoringMarkers);
-  document.getElementById("monitoringEndDate")?.addEventListener("change",v14RenderMonitoringMarkers);
+  document.getElementById("monitoringStartDate")?.addEventListener("change",()=>{v14SetMonitoringDijVisibility();v14RenderMonitoringMarkers();});
+  document.getElementById("monitoringEndDate")?.addEventListener("change",()=>{v14SetMonitoringDijVisibility();v14RenderMonitoringMarkers();});
   document.getElementById("monitorSearchBtn")?.addEventListener("click",v14MonitoringSearch);
   document.getElementById("monitorSearchInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")v14MonitoringSearch();});
   document.getElementById("realizationToMonitoringBtn")?.addEventListener("click", openMonitoringPage);
