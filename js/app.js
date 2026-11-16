@@ -1169,7 +1169,7 @@ async function v13ShowPhotosAtPlayback(entry) {
   const playbackTime = new Date(point.at).getTime();
   if (!Number.isFinite(playbackTime)) return;
   const photos = v13PlaybackPhotoMetadata().filter(photo => {
-    if (photo.dayKey !== v13SelectedDate()) return false;
+    if (!v14IsDateInRealizationRange(photo.dayKey)) return false;
     if (point.identity && photo.identity && point.identity === photo.identity) return true;
     const photoTime = new Date(photo.at).getTime();
     if (!Number.isFinite(photoTime) || photoTime > playbackTime + 5000) return false;
@@ -1515,45 +1515,7 @@ function zoomToAllMarkers() {
   const group = L.featureGroup(markers.map(m => m.marker));
   map.fitBounds(group.getBounds(), { padding: [40, 40] });
 }
-/* ======================
-   FUNGSI FILTER MARKER HARI BACA
-====================== */
-function applyHariBacaFilter() {
-
-  const showDIJ = document.getElementById("chkDIJ")?.checked ?? true;
-  const showDIL  = document.getElementById("chkDIL")?.checked ?? true;
-
-  markers.forEach(m => {
-
-    let visible = true;
-
-    // filter jenis marker
-    if (m.type === "DIJ" && !showDIJ) visible = false;
-    if (m.type === "DIL"  && !showDIL)  visible = false;
-
-    // filter 1 hari baca
-    if (filterHariBacaAktif) {
-      const hari = getHariBaca(m.row);
-      if (hari !== daftarHariBaca[indexHariBaca]) {
-        visible = false;
-      }
-    }
-
-    if (visible) {
-      if (!clusterGroup.hasLayer(m.marker)) clusterGroup.addLayer(m.marker);
-    } else {
-      if (clusterGroup.hasLayer(m.marker)) clusterGroup.removeLayer(m.marker);
-    }
-  });
-
-  document.getElementById("hariBacaLabel").innerText =
-    filterHariBacaAktif
-      ? `HARI BACA: ${daftarHariBaca[indexHariBaca]}`
-      :"HARI BACA: ALL"
-
-  renderVisibleMarkers();
-}
-
+/* Implementasi filter kanonis berada pada applyMarkerFilter() di bawah. */
 function showNormalMarkers() {
   markers.forEach(m => {
     if (!clusterGroup.hasLayer(m.marker)) {
@@ -1910,6 +1872,8 @@ if (!filterHariBacaAktif) {
 }
 
 updateHariBacaLabel();
+const monitorHari=document.getElementById("monitorHariSelect");
+if(monitorHari){const selected=monitorHari.value;monitorHari.innerHTML='<option value="ALL">ALL</option>'+daftarHariBaca.map(day=>`<option value="${String(day).replace(/[<>]/g,"")}">${String(day).replace(/[<>]/g,"")}</option>`).join("");if(daftarHariBaca.includes(selected))monitorHari.value=selected;}
 applyHariBacaFilter();
 renderVisibleMarkers();
 
@@ -3545,7 +3509,86 @@ function stopRouteRecording(){
   v13ActiveRoute=null;const saved=v13SaveRoutes();v13SetRecordingUI(false);
   showToast(saved?`Rekaman rute disimpan: ${count} titik GPS.`:"Rekaman dihentikan; periksa penyimpanan lokal.");
 }
+function v14SetPage(page){
+  const monitoring=document.getElementById("monitoringPage");
+  const realization=document.getElementById("realizationPanel");
+  const quick=document.getElementById("realizationQuickBar");
+  const uiBar=document.getElementById("uiBar");
+  const isMonitoring=page==="monitoring";
+  const isRealization=page==="realization";
+  if(monitoring)monitoring.style.display=isMonitoring?"block":"none";
+  if(realization)realization.style.display=isRealization?"block":"none";
+  if(quick)quick.style.display=isRealization?"flex":"none";
+  document.body.classList.toggle("oyon-realization-active",isRealization);
+  document.body.classList.toggle("oyon-monitoring-active",isMonitoring);
+  if(uiBar){uiBar.classList.toggle("minimized",isRealization||isMonitoring);const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent=(isRealization||isMonitoring)?"＋":"−";}
+  if(isMonitoring){pauseRouteHistory();v131InitMonitoringRange();}
+  if(isRealization){v131InitMonitoringRange();updateRealizationSummary();}
+  setTimeout(()=>map?.invalidateSize?.({animate:false}),180);
+}
+let v14MonitoringActualLayer = null;
+let v14MonitoringPreviousState = null;
+function v14MonitoringDateRange(){
+  const start=document.getElementById("monitoringStartDate")?.value||"0000-01-01";
+  const end=document.getElementById("monitoringEndDate")?.value||"9999-12-31";
+  return start<=end?{start,end}:{start:end,end:start};
+}
+function v14RenderMonitoringMarkers(){
+  if(typeof map==="undefined"||typeof L==="undefined")return;
+  if(v14MonitoringActualLayer)map.removeLayer(v14MonitoringActualLayer);
+  v14MonitoringActualLayer=L.layerGroup().addTo(map);
+  const range=v14MonitoringDateRange();
+  const showActual=document.getElementById("monitorShowActual")?.checked!==false;
+  if(!showActual)return;
+  const records=v131AllCompletedRecords().filter(item=>item.dayKey>=range.start&&item.dayKey<=range.end&&v13ValidActual(item));
+  const seen=new Set();
+  records.forEach((item,index)=>{
+    const lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);
+    if(!validCoordinatePair(lat,lon))return;
+    const row=item.row||{},identity=String(item.completionId||item.identity||completionIdentity(row));
+    const key=identity+"|"+item.dayKey; if(seen.has(key))return; seen.add(key);
+    const name=String(getMappedValue(row,"NAMA")||row.NAMA||"Pelanggan").replace(/[<>]/g,"");
+    const id=String(getMappedValue(row,"IDPEL")||row.IDPEL||"-").replace(/[<>]/g,"");
+    const marker=L.circleMarker([lat,lon],{radius:8,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.95});
+    marker.bindPopup(`<b>${name}</b><br>IDPEL: ${id}<br>Tanggal: ${item.dayKey}<br>GPS Realisasi: ${lat}, ${lon}`);
+    marker.on("click",()=>openDetail(row));
+    marker.addTo(v14MonitoringActualLayer);
+  });
+}
+function v14SetMonitoringDijVisibility(){
+  const visible=document.getElementById("monitorShowDIJ")?.checked!==false;
+  if(!Array.isArray(markers))return;
+  markers.filter(m=>m.type==="DIJ"||m.type==="DIL").forEach(m=>{
+    const allowed=m.type==="DIJ" && visible && (!filterHariBacaAktif || getHariBaca(m.row)===daftarHariBaca[indexHariBaca]);
+    if(allowed){if(!clusterGroup.hasLayer(m.marker))clusterGroup.addLayer(m.marker);}
+    else if(clusterGroup.hasLayer(m.marker))clusterGroup.removeLayer(m.marker);
+  });
+}
+function v14MonitoringSearch(){
+  const input=document.getElementById("monitorSearchInput"),host=document.getElementById("monitorSearchResults");if(!input||!host)return;
+  const key=String(input.value||"").replace(/\D/g,"");if(key.length<4){showToast("Masukkan minimal 4 digit IDPEL atau nomor meter");return;}
+  const found=(searchIndex||[]).filter(x=>x.idpel.endsWith(key)||x.meter.endsWith(key)||x.idpel.includes(key)||x.meter.includes(key));
+  if(!found.length){host.textContent="Pelanggan tidak ditemukan.";return;}
+  host.innerHTML=found.slice(0,15).map((x,i)=>`<button type="button" data-monitor-result="${i}" style="display:block;width:100%;text-align:left;padding:8px;border:0;border-bottom:1px solid #dbe3ec;background:#fff;color:#172033">${String(getMappedValue(x.row,"NAMA")||x.row.NAMA||"Pelanggan").replace(/[<>]/g,"")} · ${x.idpel||x.meter}</button>`).join("");
+  host.querySelectorAll("[data-monitor-result]").forEach(btn=>btn.addEventListener("click",()=>{const item=found[Number(btn.dataset.monitorResult)];if(!item)return;const dij=markers.find(m=>m.type==="DIJ"&&m.row===item.row)?.marker;if(dij){if(!clusterGroup.hasLayer(dij))clusterGroup.addLayer(dij);map.flyTo(dij.getLatLng(),19,{duration:.6});setTimeout(()=>{dij.openTooltip?.();openDetail(item.row);},650);}else openDetail(item.row);}));
+}
+function openMonitoringPage(){
+  if(!v14MonitoringPreviousState)v14MonitoringPreviousState={filterHariBacaAktif,indexHariBaca,showOrderNumbers};
+  v14SetPage("monitoring");
+  const order=document.getElementById("monitorShowOrder");if(order)order.checked=showOrderNumbers;
+  const day=document.getElementById("monitorHariSelect");if(day)day.value=filterHariBacaAktif?(daftarHariBaca[indexHariBaca]||"ALL"):"ALL";
+  v14SetMonitoringDijVisibility();v14RenderMonitoringMarkers();
+  if(typeof v131RenderMonitoring==="function")v131RenderMonitoring();
+}
+function closeMonitoringPage(){
+  if(v14MonitoringActualLayer){map.removeLayer(v14MonitoringActualLayer);v14MonitoringActualLayer=null;}
+  if(v14MonitoringPreviousState){filterHariBacaAktif=v14MonitoringPreviousState.filterHariBacaAktif;indexHariBaca=v14MonitoringPreviousState.indexHariBaca;showOrderNumbers=v14MonitoringPreviousState.showOrderNumbers;v14MonitoringPreviousState=null;}
+  v14SetPage("tagging");
+  if(typeof applyHariBacaFilter==="function" && markers?.length)applyHariBacaFilter();
+}
+
 function openRealizationPanel(){
+  v14SetPage("realization");
   document.body.classList.add("oyon-realization-active");
   const uiBar=document.getElementById("uiBar");
   if(uiBar){uiBar.classList.add("minimized");const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent="＋";}
@@ -3555,6 +3598,7 @@ function openRealizationPanel(){
   const d=document.getElementById("realizationDate");
   const availableDays=v131AllCompletedRecords().map(x=>x.dayKey).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort();
   if(d && (!d.value || !availableDays.includes(d.value))) d.value=availableDays[availableDays.length-1]||localDateTimeParts().dayKey;
+  v14SetRealizationRange(d?.value||localDateTimeParts().dayKey,d?.value||localDateTimeParts().dayKey);
   v13CalendarMonth=(d?.value||localDateTimeParts().dayKey).slice(0,7);
   updateRealizationSummary();
   v131InitMonitoringRange();
@@ -3562,6 +3606,7 @@ function openRealizationPanel(){
   showRealizationOnMap();
 }
 function closeRealizationPanel(){
+  v14SetPage("tagging");
   document.body.classList.remove("oyon-realization-active");
   const uiBar=document.getElementById("uiBar");
   if(uiBar){uiBar.classList.remove("minimized");const toggle=document.getElementById("toggleBtn");if(toggle)toggle.textContent="−";}
@@ -3579,13 +3624,31 @@ function closeRealizationPanel(){
   if (typeof zoomToAllMarkers === "function" && markers.length) zoomToAllMarkers();
   showToast("Kembali ke mode Tagging.");
 }
-function v13SelectedDate(){return document.getElementById("realizationDate")?.value||localDateTimeParts().dayKey;}
+let v14RealizationRangeStart = "";
+let v14RealizationRangeEnd = "";
+function v13SelectedDate(){return v14RealizationRangeStart||document.getElementById("realizationDate")?.value||localDateTimeParts().dayKey;}
+function v14RealizationDateRange(){
+  const fallback=v13SelectedDate();
+  const start=v14RealizationRangeStart||fallback;
+  const end=v14RealizationRangeEnd||start;
+  return start<=end?{start,end}:{start:end,end:start};
+}
+function v14IsDateInRealizationRange(dayKey){
+  const range=v14RealizationDateRange();
+  return !!dayKey && dayKey>=range.start && dayKey<=range.end;
+}
+function v14SetRealizationRange(start,end){
+  v14RealizationRangeStart=start||"";
+  v14RealizationRangeEnd=end||start||"";
+  const dateInput=document.getElementById("realizationDate");
+  if(dateInput)dateInput.value=v14RealizationRangeStart||localDateTimeParts().dayKey;
+}
 function v13ValidActual(item){
   const lat=parseCoordinate(item?.actualLat),lon=parseCoordinate(item?.actualLon);
   return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180&&!(lat===0&&lon===0)&&item.actualLat!==""&&item.actualLon!==""&&item.actualLat!=null&&item.actualLon!=null;
 }
-function v13CompletedForDate(){return v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()&&v13ValidActual(x));}
-function v13RoutesForDate(){return (v13RouteSessions||[]).filter(x=>x.dayKey===v13SelectedDate());}
+function v13CompletedForDate(){return v131AllCompletedRecords().filter(x=>v14IsDateInRealizationRange(x.dayKey)&&v13ValidActual(x));}
+function v13RoutesForDate(){return (v13RouteSessions||[]).filter(x=>v14IsDateInRealizationRange(x.dayKey));}
 
 /* V13.1.31 — read-only monitoring aggregation; original GPS sessions and completion records remain untouched. */
 function v131MonitoringDayKey(item){
@@ -3669,6 +3732,7 @@ function v13RenderAvailableRealizationDates(){
     if(item?.dayKey && /^\d{4}-\d{2}-\d{2}$/.test(item.dayKey) && !counts.has(item.dayKey))counts.set(item.dayKey,0);
   });
   const selected=v13SelectedDate();
+  const range=v14RealizationDateRange();
   const monthKey=v13CalendarMonth||selected.slice(0,7);
   const [year,month]=monthKey.split("-").map(Number);
   if(!year||!month)return;
@@ -3682,8 +3746,8 @@ function v13RenderAvailableRealizationDates(){
   for(let i=0;i<offset;i++)html+='<span class="calendar-empty" aria-hidden="true"></span>';
   for(let day=1;day<=daysInMonth;day++){
     const key=`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    const count=counts.get(key)||0,hasData=counts.has(key),active=key===selected;
-    html+=`<button type="button" class="realization-calendar-day${hasData?' has-data':''}${active?' is-selected':''}" data-realization-date="${key}" ${hasData?'':'disabled'} aria-label="${day} ${label}${hasData?`, ${count} data selesai`:', tidak ada data'}" aria-pressed="${active?'true':'false'}"><strong>${day}</strong>${hasData?`<small>${count||'R'}</small>`:'<i></i>'}</button>`;
+    const count=counts.get(key)||0,hasData=counts.has(key),active=key===range.start||key===range.end,inRange=key>=range.start&&key<=range.end;
+    html+=`<button type="button" class="realization-calendar-day${hasData?' has-data':''}${active?' is-selected':''}${inRange?' is-in-range':''}" data-realization-date="${key}" ${hasData?'':'disabled'} aria-label="${day} ${label}${hasData?`, ${count} data selesai`:', tidak ada data'}" aria-pressed="${active?'true':'false'}"><strong>${day}</strong>${hasData?`<small>${count||'R'}</small>`:'<i></i>'}</button>`;
   }
   const trailing=(7-((offset+daysInMonth)%7))%7;
   for(let i=0;i<trailing;i++)html+='<span class="calendar-empty" aria-hidden="true"></span>';
@@ -3698,8 +3762,9 @@ function v13ShiftCalendarMonth(delta){
   v13RenderAvailableRealizationDates();
 }
 function updateRealizationSummary(){
-  const all=v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()),done=all.filter(v13ValidActual),routes=v13RoutesForDate(),points=routes.reduce((n,r)=>n+(r.points?.length||0),0);
-  const el=document.getElementById("realizationSummary");if(el)el.textContent=`${done.length} pelanggan selesai dengan GPS • ${all.length} selesai total • ${routes.length} sesi rute • ${points} titik GPS.`;
+  const range=v14RealizationDateRange();
+  const all=v131AllCompletedRecords().filter(x=>v14IsDateInRealizationRange(x.dayKey)),done=all.filter(v13ValidActual),routes=v13RoutesForDate(),points=routes.reduce((n,r)=>n+(r.points?.length||0),0);
+  const el=document.getElementById("realizationSummary");if(el)el.textContent=`${range.start===range.end?range.start:`${range.start} sampai ${range.end}`} • ${done.length} pelanggan selesai dengan GPS • ${all.length} selesai total • ${routes.length} sesi rute • ${points} titik GPS.`;
   const readEl=document.getElementById("statReadCount");
   const doneEl=document.getElementById("statDoneCount");
   const leftEl=document.getElementById("statLeftCount");
@@ -3789,7 +3854,7 @@ function v13RouteSegments(){
     (session.points||[]).forEach((point,pointIndex)=>{
       const lat=Number(point.lat),lon=Number(point.lon);
       if(!Number.isFinite(lat)||!Number.isFinite(lon)||!point.at)return;
-      raw.push({...point,lat,lon,kind:"track",sessionKey,sourceOrder:pointIndex});
+      raw.push({...point,lat,lon,kind:"track",sessionKey,dayKey:session.dayKey||"",sourceOrder:pointIndex});
     });
   });
   v13CompletedForDate().forEach((item,index)=>{
@@ -3804,7 +3869,7 @@ function v13RouteSegments(){
       }
     }
     if(!at)return;
-    raw.push({lat,lon,at,kind:"customer",completionId:item.completionId,
+    raw.push({lat,lon,at,kind:"customer",dayKey:item.dayKey||"",completionId:item.completionId,
       identity:item.identity||completionIdentity(item.row||{}),sourceOrder:index});
   });
   raw.sort((a,b)=>new Date(a.at)-new Date(b.at));
@@ -3826,7 +3891,7 @@ function v13RouteSegments(){
     const gapMs=Math.max(0,new Date(point.at)-new Date(last.at));
     const gapMeters=v13Distance(last,point);
     const sameManualSession=point.kind==="track"&&last.kind==="track"&&point.sessionKey===last.sessionKey;
-    const sameJourney=sameManualSession||(point.kind==="customer"&&last.kind==="customer"&&gapMs<=30*60*1000&&gapMeters<=2000);
+    const sameJourney=sameManualSession||(point.kind==="customer"&&last.kind==="customer"&&point.dayKey===last.dayKey&&gapMs<=30*60*1000&&gapMeters<=2000);
     if(sameJourney)previousJourney.points.push(point);
     else journeys.push({key:`journey_${journeys.length+1}`,points:[point]});
   }
@@ -4037,8 +4102,9 @@ function downloadRouteBackup() {
   showToast(`Cadangan GPS diunduh • ${(payload.sessions || []).length} sesi.`);
 }
 
-async function oyonLoadPlaybackPhotosForVideo(dayKey) {
-  const metas=v13PlaybackPhotoMetadata().filter(p=>p.dayKey===dayKey);
+async function oyonLoadPlaybackPhotosForVideo(dateRange) {
+  const range=typeof dateRange==="string"?{start:dateRange,end:dateRange}:dateRange;
+  const metas=v13PlaybackPhotoMetadata().filter(p=>p.dayKey>=range.start&&p.dayKey<=range.end);
   const loaded=[];
   for(const meta of metas){
     try{
@@ -4054,6 +4120,7 @@ function oyonNearestPlaybackPhoto(point, photos) {
   const t=new Date(point.at).getTime(), here={lat:Number(point.lat),lon:Number(point.lon)};
   let best=null,bestDistance=Infinity;
   for(const photo of photos){
+    if(point.dayKey && photo.dayKey!==point.dayKey)continue;
     const pt={lat:Number(photo.lat),lon:Number(photo.lon)};
     if(!Number.isFinite(pt.lat)||!Number.isFinite(pt.lon))continue;
     const d=v13Distance(here,pt);
@@ -4149,7 +4216,7 @@ async function downloadRouteVideo() {
     const toWorld=p=>({x:p.x*baseScale+baseOffsetX,y:p.y*baseScale+baseOffsetY});
     world=world.map(p=>({...p,...toWorld(p)}));
     customerPins=customerPins.map(p=>({...p,...toWorld(p)}));
-    photoAssets=await oyonLoadPlaybackPhotosForVideo(v13SelectedDate());
+    photoAssets=await oyonLoadPlaybackPhotosForVideo(v14RealizationDateRange());
     const durationMs=oyonVideoDurationMs();
     const totalLegs=Math.max(1,world.length-1);
     const legDuration=durationMs/totalLegs;
@@ -4258,7 +4325,7 @@ async function downloadRouteVideo() {
     photoAssets.forEach(photo=>{if(photo.url)URL.revokeObjectURL(photo.url);});photoAssets=[];
     if(!blob.size)throw new Error("Video kosong. Coba ulangi setelah peta selesai dimuat.");
     const url=URL.createObjectURL(blob),a=document.createElement("a"),ext=blob.type.includes("mp4")?"mp4":"webm";
-    a.href=url;a.download=`OYONID_REalisasi_${v13SelectedDate()}_${Math.round(durationMs/1000)}detik.${ext}`;
+    a.href=url;a.download=`OYONID_Realisasi_${v14RealizationDateRange().start}_${v14RealizationDateRange().end}_${Math.round(durationMs/1000)}detik.${ext}`;
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
     showToast(`Video berhasil dibuat • target ${Math.round(durationMs/1000)} detik • ${reached.size} pelanggan tercapai.`);
   }catch(err){
@@ -4278,13 +4345,20 @@ document.addEventListener("DOMContentLoaded",()=>{
     oyonSelectWorkbookSheet(event.target.value);
     showToast(`Menggunakan ${event.target.options[event.target.selectedIndex]?.text || event.target.value}`);
   });
-  document.getElementById("realizationDate")?.addEventListener("change",()=>{updateRealizationSummary();resetRoutePlayback();if(v13RealizationModeActive)showRealizationOnMap();});
+  document.getElementById("realizationDate")?.addEventListener("change",e=>{v14SetRealizationRange(e.target.value,e.target.value);v13RenderAvailableRealizationDates();updateRealizationSummary();resetRoutePlayback();if(v13RealizationModeActive)showRealizationOnMap();});
   document.getElementById("realizationAvailableDates")?.addEventListener("click",event=>{
     const dayButton=event.target.closest("[data-realization-date]");
     if(!dayButton || dayButton.disabled)return;
-    const dateInput=document.getElementById("realizationDate");
-    if(dateInput)dateInput.value=dayButton.dataset.realizationDate;
-    v13CalendarMonth=dayButton.dataset.realizationDate.slice(0,7);
+    const picked=dayButton.dataset.realizationDate;
+    if(!v14RealizationRangeStart||v14RealizationRangeEnd!==v14RealizationRangeStart){
+      v14SetRealizationRange(picked,picked);
+    }else if(picked<v14RealizationRangeStart){
+      v14SetRealizationRange(picked,v14RealizationRangeStart);
+    }else{
+      v14SetRealizationRange(v14RealizationRangeStart,picked);
+    }
+    v13CalendarMonth=picked.slice(0,7);
+    v13RenderAvailableRealizationDates();
     updateRealizationSummary();
     resetRoutePlayback();
     if(v13RealizationModeActive)showRealizationOnMap();
@@ -4302,6 +4376,18 @@ document.addEventListener("DOMContentLoaded",()=>{
   document.getElementById("realizationSearchBtn")?.addEventListener("click",searchRealizationCustomers);
   document.getElementById("realizationSearchInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")searchRealizationCustomers();});
   document.getElementById("realizationOpenBtn")?.addEventListener("click", openRealizationPanel);
+  document.getElementById("monitoringOpenBtn")?.addEventListener("click", openMonitoringPage);
+  document.getElementById("monitoringBackBtn")?.addEventListener("click", closeMonitoringPage);
+  document.getElementById("monitorShowDIJ")?.addEventListener("change",v14SetMonitoringDijVisibility);
+  document.getElementById("monitorShowActual")?.addEventListener("change",v14RenderMonitoringMarkers);
+  document.getElementById("monitorShowOrder")?.addEventListener("change",()=>{showOrderNumbers=!!document.getElementById("monitorShowOrder")?.checked;markers.filter(m=>m.type==="DIJ").forEach(m=>{const color=getColor(getHariBaca(m.row));const size=[35,35];m.marker.setIcon(L.divIcon({html:makeUrutanMarkerHTML(m.row,color),iconSize:size,iconAnchor:[17.5,17.5],className:"urutan-baca-marker"}));});});
+  document.getElementById("monitorHariSelect")?.addEventListener("change",e=>{const value=e.target.value;filterHariBacaAktif=value!=="ALL";indexHariBaca=Math.max(0,daftarHariBaca.indexOf(value));v14SetMonitoringDijVisibility();});
+  document.getElementById("monitoringApplyBtn")?.addEventListener("click",()=>{v131RenderMonitoring();v14RenderMonitoringMarkers();});
+  document.getElementById("monitoringStartDate")?.addEventListener("change",v14RenderMonitoringMarkers);
+  document.getElementById("monitoringEndDate")?.addEventListener("change",v14RenderMonitoringMarkers);
+  document.getElementById("monitorSearchBtn")?.addEventListener("click",v14MonitoringSearch);
+  document.getElementById("monitorSearchInput")?.addEventListener("keydown",e=>{if(e.key==="Enter")v14MonitoringSearch();});
+  document.getElementById("realizationToMonitoringBtn")?.addEventListener("click", openMonitoringPage);
   document.getElementById("realizationCloseBtn")?.addEventListener("click", closeRealizationPanel);
   document.getElementById("realizationMinimizeBtn")?.addEventListener("click", () => {
     const panel=document.getElementById("realizationPanel"); if(!panel)return;

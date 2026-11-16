@@ -3,8 +3,8 @@
   
 
 <head>
-  <link rel="stylesheet" href="./css/app.css?v=13.1.31">
-  <title>OyonID Map V13.1.29</title>
+  <link rel="stylesheet" href="./css/app.css?v=14.0.3">
+  <title>OyonID Map V14.0.0</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -120,7 +120,8 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       Download Excel Update
     </button>
     <div class="v13-tools">
-      <button class="ui-btn small-btn" id="realizationOpenBtn" type="button">📍 Lihat Realisasi</button>
+      <button class="ui-btn small-btn" id="realizationOpenBtn" type="button">📍 REALISASI</button>
+      <button class="ui-btn small-btn" id="monitoringOpenBtn" type="button">📊 MONITORING</button>
       <div id="routeRecordStatus" class="route-record-status">Rute belum direkam</div>
     </div>
     
@@ -138,9 +139,9 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 </div>
 
 <div id="realizationPanel" class="v13-panel" style="display:none">
-  <div class="v13-panel-head"><strong>📍 Mode Realisasi &amp; Rute</strong><div class="realization-head-actions"><button id="realizationCloseBtn" type="button" aria-label="Kembali ke Tagging">← Kembali ke Tagging</button><button id="realizationMinimizeBtn" type="button" aria-label="Minimize kalender" aria-expanded="true">−</button></div></div>
+  <div class="v13-panel-head"><strong>📍 Mode Realisasi &amp; Rute</strong><div class="realization-head-actions"><button id="realizationToMonitoringBtn" type="button">📊 Monitoring</button><button id="realizationCloseBtn" type="button" aria-label="Kembali ke Tagging">← Kembali ke Tagging</button><button id="realizationMinimizeBtn" type="button" aria-label="Minimize kalender" aria-expanded="true">−</button></div></div>
   <div class="v13-panel-body">
-    <label class="v13-label">Tanggal realisasi</label>
+    <label class="v13-label">Rentang tanggal realisasi</label><small class="realization-range-hint">Pilih tanggal pertama, lalu pilih tanggal akhir. Pilih lagi untuk memulai rentang baru.</small>
     <input id="realizationDate" type="date" hidden />
     <div class="realization-calendar" aria-label="Kalender tanggal realisasi">
       <div class="realization-calendar-head">
@@ -154,20 +155,41 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       <div id="realizationAvailableDates" class="realization-calendar-grid"></div>
       <div class="realization-calendar-legend"><span><i></i> Ada realisasi</span><span><b></b> Tanggal dipilih</span></div>
     </div>
-    <div class="v13-realization-search" style="margin:10px 0;padding:10px;border:1px solid rgba(148,163,184,.35);border-radius:12px;background:rgba(255,255,255,.06)">
-      <label class="v13-label" for="realizationSearchInput">Cari pelanggan selesai (4 digit IDPEL / Nomor Meter)</label>
-      <div style="display:flex;gap:6px">
-        <input id="realizationSearchInput" type="search" inputmode="numeric" maxlength="20" placeholder="Masukkan minimal 4 digit" style="flex:1;min-width:0;padding:10px;border-radius:9px;border:1px solid #94a3b8">
-        <button id="realizationSearchBtn" type="button" style="padding:8px 14px;border:0;border-radius:9px;background:#1769d2;color:white;font-weight:700">Cari</button>
-      </div>
-      <div id="realizationSearchResults" style="max-height:150px;overflow:auto"></div>
-    </div>
+
     <div class="oyon-stats-row">
       <div class="oyon-stat stat-blue"><strong id="statReadCount">0</strong><span>Dibaca (Sheet 1)</span></div>
       <div class="oyon-stat stat-green"><strong id="statDoneCount">0</strong><span>Selesai (Sheet 2)</span></div>
       <div class="oyon-stat stat-slate"><strong id="statLeftCount">0</strong><span>Tersisa</span></div>
     </div>
     <div id="realizationSummary" class="v13-summary" aria-live="polite">Pilih tanggal untuk melihat titik realisasi.</div>
+
+    <div class="gps-recovery-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
+      <button class="ui-btn small-btn" id="gpsBackupExportBtn" type="button">⬇ Backup GPS Petugas</button>
+      <button class="ui-btn small-btn" id="gpsBackupImportBtn" type="button">⬆ Pulihkan GPS</button>
+      <input id="gpsBackupFileInput" type="file" accept="application/json,.json" hidden />
+    </div>
+    <button class="ui-btn realization-refresh-compact" id="realizationRefreshBtn" type="button">Tampilkan pelanggan selesai di peta</button>
+  </div>
+</div>
+
+
+<div id="monitoringPage" class="oyon-page-panel" style="display:none" aria-label="Halaman Monitoring">
+  <div class="oyon-page-head">
+    <strong>📊 MONITORING OYONID</strong>
+    <button id="monitoringBackBtn" type="button">← Kembali ke Tagging</button>
+  </div>
+  <div class="oyon-page-body">
+    <div class="oyon-monitoring-search" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
+      <input id="monitorSearchInput" type="search" inputmode="numeric" placeholder="Cari IDPEL / nomor meter (4 digit terakhir)" aria-label="Cari pelanggan Monitoring" style="flex:1;min-width:180px;padding:10px;border:1px solid #cbd5e1;border-radius:9px;">
+      <button id="monitorSearchBtn" type="button" class="ui-btn small-btn">Cari</button>
+      <div id="monitorSearchResults" style="flex-basis:100%;"></div>
+    </div>
+    <div class="oyon-monitoring-map-controls">
+      <label><input type="checkbox" id="monitorShowDIJ" checked> Marker DIJ</label>
+      <label><input type="checkbox" id="monitorShowActual" checked> Lokasi Realisasi</label>
+      <label><input type="checkbox" id="monitorShowOrder" checked> Urutan Baca</label>
+      <label>Hari Baca <select id="monitorHariSelect"><option value="ALL">ALL</option></select></label>
+    </div>
     <section id="monitoringRangePanel" class="monitoring-range-panel" aria-label="Monitoring rentang tanggal">
       <div class="monitoring-range-title"><strong>📊 Monitoring Pekerjaan</strong><span>Harian / Rentang Tanggal</span></div>
       <div class="monitoring-range-fields">
@@ -185,12 +207,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       <div class="monitoring-table-wrap"><table class="monitoring-table"><thead><tr><th>Tanggal</th><th>Selesai</th><th>Jarak</th><th>Durasi</th><th>Sesi</th></tr></thead><tbody id="monitoringDailyRows"><tr><td colspan="5">Pilih rentang tanggal.</td></tr></tbody></table></div>
       <p class="monitoring-note">Jarak dan durasi dihitung dari titik GPS yang tersimpan. Sesi GPS antarhari tidak disambungkan.</p>
     </section>
-    <div class="gps-recovery-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
-      <button class="ui-btn small-btn" id="gpsBackupExportBtn" type="button">⬇ Backup GPS Petugas</button>
-      <button class="ui-btn small-btn" id="gpsBackupImportBtn" type="button">⬆ Pulihkan GPS</button>
-      <input id="gpsBackupFileInput" type="file" accept="application/json,.json" hidden />
-    </div>
-    <button class="ui-btn realization-refresh-compact" id="realizationRefreshBtn" type="button">Tampilkan pelanggan selesai di peta</button>
   </div>
 </div>
 
@@ -213,10 +229,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
     <button id="quickVideoDownloadBtn" type="button">⬇ Buat Video</button>
   </div>
   <div class="realization-speed-row" style="gap:8px;flex-wrap:wrap">
-    <label for="quickVideoStartDate">Video tanggal</label>
-    <input id="quickVideoStartDate" type="date" aria-label="Tanggal awal video" />
-    <label for="quickVideoEndDate">sampai</label>
-    <input id="quickVideoEndDate" type="date" aria-label="Tanggal akhir video" />
+    <small>Rentang video mengikuti tanggal awal dan akhir yang dipilih pada kalender Realisasi.</small>
   </div>
   <div class="realization-speed-row">
     <label for="quickVideoDuration">Durasi video</label>
@@ -281,7 +294,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=13.1.31"></script>
+<script src="./js/app.js?v=14.0.3"></script>
 <script src="./js/oyonid-video-engine-v2.js?v=13.1.33"></script>
 </body>
 </html>

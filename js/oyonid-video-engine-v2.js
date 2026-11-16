@@ -166,7 +166,7 @@
   function timestamp(p){const t=new Date(p?.at||p?.timestamp||"").getTime();return Number.isFinite(t)?t:null;}
 
   function drawClosingScreen(ctx,assets,progress,stats){
-    const {mapShot,segments,pins,workerFrames,travelled,durationText,dateText,daysText}=assets;
+    const {mapShot,segments,pins,workerFrames,travelled,durationText,dateText,daysText,dailyRecap=[]}=assets;
     const {positive,pending,target,percent}=stats;
     const bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0,"#06172c");bg.addColorStop(.58,"#092b4d");bg.addColorStop(1,"#031426");
     ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
@@ -214,15 +214,19 @@
     ctx.strokeStyle="#168fe8";ctx.lineWidth=2;ctx.shadowColor="#078cff";ctx.shadowBlur=16;ctx.stroke();ctx.shadowBlur=0;
     ctx.fillStyle="#dff3ff";ctx.font="bold 25px Arial";ctx.textAlign="left";ctx.fillText("▣  REALISASI PEKERJAAN",42,855);
     ctx.fillStyle="#9fc8e8";ctx.font="bold 12px Arial";ctx.fillText(`${daysText||"1 HARI"} • REKAP GABUNGAN`,44,881);
+    // Daily recap: each calendar day is represented separately.
+    const recapItems=dailyRecap.slice(0,4),recapW=Math.min(154,(W-80)/Math.max(1,recapItems.length));
+    recapItems.forEach((d,i)=>{const x=40+i*(recapW+8);ctx.fillStyle="rgba(19,73,112,.82)";ctx.beginPath();ctx.roundRect(x,890,recapW,38,9);ctx.fill();ctx.fillStyle="#b9dcf6";ctx.font="bold 9px Arial";ctx.textAlign="left";ctx.fillText(d.day,x+8,904);ctx.fillStyle="#fff";ctx.font="bold 11px Arial";ctx.fillText(`${d.count} selesai • ${d.km.toFixed(2)} km`,x+8,920);});
+    if(dailyRecap.length>4){ctx.fillStyle="#9fc8e8";ctx.font="bold 9px Arial";ctx.textAlign="right";ctx.fillText(`+${dailyRecap.length-4} hari`,W-42,943);}
     ctx.fillStyle="#00c879";ctx.beginPath();ctx.roundRect(W-210,826,168,43,22);ctx.fill();
     ctx.fillStyle="#fff";ctx.font="bold 22px Arial";ctx.textAlign="center";ctx.fillText(pending===0?"✓ SELESAI":"◷ REKAP",W-126,855);
     // Main metrics grid
-    ctx.strokeStyle="rgba(112,190,240,.35)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(40,974);ctx.lineTo(W-40,974);ctx.moveTo(W/2,880);ctx.lineTo(W/2,965);ctx.moveTo(W/2,990);ctx.lineTo(W/2,1080);ctx.stroke();
+    ctx.strokeStyle="rgba(112,190,240,.35)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(40,1000);ctx.lineTo(W-40,1000);ctx.moveTo(W/2,880);ctx.lineTo(W/2,965);ctx.moveTo(W/2,1008);ctx.lineTo(W/2,1080);ctx.stroke();
     const metric=(x,y,big,label,align="left")=>{ctx.textAlign=align;ctx.fillStyle="#fff";ctx.font="bold 42px Arial";ctx.fillText(big,x,y);ctx.fillStyle="#d6e8f8";ctx.font="18px Arial";ctx.fillText(label,x,y+25);};
-    metric(48,925,`${positive}/${target}`,"Pelanggan selesai");
-    metric(390,925,`${percent.toFixed(1).replace(".",",")}%`,"Persentase realisasi");
-    metric(48,1040,`${(travelled/1000).toFixed(2).replace(".",",")} km`,"Total perjalanan");
-    metric(390,1040,durationText,"Durasi pekerjaan");
+    metric(48,960,`${positive}/${target}`,"Pelanggan selesai");
+    metric(390,960,`${percent.toFixed(1).replace(".",",")}%`,"Persentase realisasi");
+    metric(48,1060,`${(travelled/1000).toFixed(2).replace(".",",")} km`,"Total perjalanan");
+    metric(390,1060,durationText,"Durasi pekerjaan");
     ctx.fillStyle="#fff";ctx.font="bold 21px Arial";ctx.textAlign="center";ctx.fillText("RINGKASAN HASIL",W/2,1115);
     const cards=[{x:38,w:200,color:"#087b55",big:String(positive),label:"Positif",stroke:"#21d99a"},
       {x:260,w:200,color:"#80500b",big:String(pending),label:"Belum selesai",stroke:"#ffb52e"},
@@ -242,11 +246,10 @@
       if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw new Error("Browser belum mendukung ekspor video. Gunakan Chrome terbaru.");
       if(typeof html2canvas!=="function")throw new Error("Modul peta belum termuat.");
       const selectedDate=String(v13SelectedDate()||"");
-      const startInput=document.getElementById("quickVideoStartDate"),endInput=document.getElementById("quickVideoEndDate");
-      const startDate=String(startInput?.value||selectedDate),endDate=String(endInput?.value||startDate);
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate))throw new Error("Pilih tanggal awal dan akhir video.");
+      const selectedRange=typeof v14RealizationDateRange==="function"?v14RealizationDateRange():{start:selectedDate,end:selectedDate};
+      const startDate=String(selectedRange.start||selectedDate),endDate=String(selectedRange.end||startDate);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(startDate)||!/^\d{4}-\d{2}-\d{2}$/.test(endDate))throw new Error("Pilih rentang tanggal pada kalender Realisasi.");
       const rangeStart=startDate<=endDate?startDate:endDate,rangeEnd=startDate<=endDate?endDate:startDate;
-      if(startInput)startInput.value=rangeStart;if(endInput)endInput.value=rangeEnd;
       const allSessions=Array.isArray(v13RouteSessions)?v13RouteSessions:[];
       const sessions=allSessions.filter(s=>{const day=String(s.dayKey||(typeof v131MonitoringDayKey==="function"?v131MonitoringDayKey(s):"")||"");return day>=rangeStart&&day<=rangeEnd;}).map((s,i)=>{
         const dayKey=String(s.dayKey||(typeof v131MonitoringDayKey==="function"?v131MonitoringDayKey(s):"")||"");
@@ -272,6 +275,9 @@
       // Compress each calendar day onto a continuous video timeline; original sessions remain separate segments.
       const dayKeys=[...new Set([...sessions.map(s=>s.dayKey),...customers.map(c=>String(c.item.dayKey||""))])].filter(Boolean).sort();
       const dailyCounts=new Map();customers.forEach(c=>dailyCounts.set(String(c.item.dayKey||""),(dailyCounts.get(String(c.item.dayKey||""))||0)+1));
+      const dailyDistance=new Map();
+      sessions.forEach(session=>{let km=0;for(let i=1;i<session.points.length;i++)km+=distanceMeters(session.points[i-1],session.points[i])/1000;dailyDistance.set(session.dayKey,(dailyDistance.get(session.dayKey)||0)+km);});
+      const dailyRecap=dayKeys.map(day=>({day,count:dailyCounts.get(day)||0,km:dailyDistance.get(day)||0}));
       let timelineCursor=0;const dayTimeline=new Map();
       dayKeys.forEach(day=>{
         const raw=[...sessions.filter(s=>s.dayKey===day).flatMap(s=>s.points.map(p=>p.originalTime)),...customers.filter(c=>c.item.dayKey===day).map(c=>c.originalAt)].filter(Number.isFinite);
@@ -332,7 +338,8 @@
       const photoAssets=[];for(const meta of photoMetas){const a=await loadPhoto(meta);if(a)photoAssets.push(a);}
       const workerFrames=await loadWorkerWalkFrames();
       photoUrls=photoAssets.map(p=>p.url);
-      const durationMs=Math.max(15000,Math.min(300000,Number(document.getElementById("quickVideoDuration")?.value||30)*1000));
+      // The selected duration is the TOTAL exported video length, including the closing recap.
+      const totalDurationMs=Math.max(15000,Math.min(300000,Number(document.getElementById("quickVideoDuration")?.value||30)*1000));
       const allTimes=[...segments.flatMap(s=>s.map(p=>p.time)),...pins.map(p=>p.at)].filter(Number.isFinite);
       const minTime=Math.min(...allTimes),maxTime=Math.max(...allTimes);
       if(!(maxTime>minTime))throw new Error("Rentang waktu GPS dan realisasi terlalu pendek untuk membuat video.");
@@ -346,12 +353,13 @@
       const chunks=[];const finished=new Promise((resolve,reject)=>{recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};recorder.onstop=()=>resolve(new Blob(chunks,{type:recorder.mimeType||"video/webm"}));recorder.onerror=e=>reject(e.error||new Error("Perekaman video gagal."));});
       recorder.start(250);
 
-      const durationSeconds=durationMs/1000;
-      const closingDurationMs=6500;
+      const closingDurationMs=Math.min(6500,Math.max(2500,Math.round(totalDurationMs*.22)));
+      const durationMs=totalDurationMs-closingDurationMs;
+      const durationSeconds=totalDurationMs/1000;
       // Cinematic local-area camera: short local overview, close follow, 45-degree oblique,
       // arrival close-up, then a dedicated full-route closing screen.
       const phaseAt=p=>p<.08?"AREA":p<.43?"FOLLOW":p<.70?"OBLIQUE":p<.92?"ARRIVAL":"AREA";
-      const revealed=new Set();let reached=0,travelled=0,lastWorker=null,currentPhoto=null;
+      const revealed=new Set();let reached=0,travelled=0,lastWorker=null,currentPhoto=null,lastPhotoArrivalKey="";
       let camX=W/2,camY=H/2,camZoom=.9,camAngle=0,camSquash=1,phaseLabel="AREA";
       const pointAtTime=t=>{
         let chosen=null,chosenSeg=-1;
@@ -389,6 +397,9 @@
         const ss=String(total%60).padStart(2,"0");
         return `${hh}:${mm}:${ss}`;
       };
+      // Exclude the synthetic 8-second separators inserted between calendar days.
+      const workElapsedAt=virtualTime=>[...dayTimeline.values()].reduce((sum,day)=>
+        sum+clamp(virtualTime-day.base,0,day.span),0);
       const started=performance.now();
       const draw=(now)=>{
         const elapsed=now-started,progress=clamp(elapsed/durationMs,0,1),virtualTime=lerp(minTime,maxTime,smooth(progress));
@@ -396,13 +407,15 @@
         pins.forEach(pin=>{const key=`${pin.index}|${pin.identity||""}`;if(pin.at<=virtualTime&&!revealed.has(key)){revealed.add(key);reached++;}});
         const arrival=nearestCustomer(virtualTime);
         if(arrival){
-          // Prefer the actual customer house photo over a GPS/location snapshot.
-          // Meter photo is the second choice; location photos are only fallback.
-          const customerPhotos=photoAssets.filter(p=>p.identity&&p.identity===arrival.identity);
+          // House photo wins; meter photo is second; same-day location photo is fallback.
+          const arrivalDay=String(arrival.item.dayKey||"");
+          const arrivalKey=`${arrivalDay}|${arrival.identity||arrival.index}`;
+          if(arrivalKey!==lastPhotoArrivalKey){currentPhoto=null;lastPhotoArrivalKey=arrivalKey;}
+          const customerPhotos=photoAssets.filter(p=>p.identity&&p.identity===arrival.identity&&String(p.dayKey||"")===arrivalDay);
           const photo=customerPhotos.find(p=>p.type==="Foto Rumah")
             ||customerPhotos.find(p=>p.type==="Foto Meteran")
             ||customerPhotos[0]
-            ||oyonNearestPlaybackPhoto({lat:arrival.item.actualLat,lon:arrival.item.actualLon,at:new Date(arrival.originalAt||arrival.at).toISOString(),identity:arrival.identity},photoAssets);
+            ||oyonNearestPlaybackPhoto({lat:arrival.item.actualLat,lon:arrival.item.actualLon,at:new Date(arrival.originalAt||arrival.at).toISOString(),identity:arrival.identity,dayKey:arrivalDay},photoAssets);
           if(photo)currentPhoto=photo;
         }
         const activePoint=worker||lastWorker;
@@ -465,7 +478,7 @@
         const statsY=hy+78;
         ctx.fillStyle="#5be39b";ctx.font="bold 16px Arial";ctx.fillText(`✓ ${reached}/${pins.length} selesai`,hx+16,statsY);
         ctx.fillStyle="#fff";ctx.font="bold 15px Arial";ctx.fillText(`${(travelled/1000).toFixed(2).replace(".",",")} km`,hx+220,statsY);
-        ctx.fillStyle="#dce8f5";ctx.font="bold 14px Arial";ctx.fillText(`◷ ${formatOriginalElapsed(virtualTime-minTime)}`,hx+365,statsY);
+        ctx.fillStyle="#dce8f5";ctx.font="bold 14px Arial";ctx.fillText(`◷ ${formatOriginalElapsed(workElapsedAt(virtualTime))}`,hx+365,statsY);
         ctx.fillStyle="#a9c6df";ctx.font="bold 10px Arial";ctx.textAlign="right";ctx.fillText(phaseLabel,W-34,hy+48);ctx.textAlign="left";
         // Environmental cinematic overlays: solar arc and local weather.
         drawSunArc(ctx,W-166,132,130,virtualTime);
@@ -498,9 +511,10 @@
         positiveCount+(Array.isArray(workingRows)?workingRows.length:0));
       const pendingCount=Math.max(0,totalTarget-positiveCount);
       const completionPercent=totalTarget?positiveCount/totalTarget*100:0;
-      const originalDurationText=formatOriginalElapsed(maxTime-minTime);
+      const originalWorkMs=[...dayTimeline.values()].reduce((sum,day)=>sum+Math.max(0,day.max-day.min),0);
+      const originalDurationText=formatOriginalElapsed(originalWorkMs);
       const dateLabel=rangeStart===rangeEnd?rangeStart:rangeStart+" — "+rangeEnd;
-      const closingAssets={mapShot,segments:closingSegments,pins:closingPins,workerFrames,travelled:distanceAtTime(maxTime),durationText:originalDurationText,dateText:dateLabel,daysText:`${dayKeys.length} HARI`};
+      const closingAssets={mapShot,segments:closingSegments,pins:closingPins,workerFrames,travelled:distanceAtTime(maxTime),durationText:originalDurationText,dateText:dateLabel,daysText:`${dayKeys.length} HARI`,dailyRecap};
       const animate=now=>{
         const elapsed=now-started;
         if(elapsed<durationMs){draw(now);requestAnimationFrame(animate);return;}
@@ -520,8 +534,8 @@
       a.href=url;a.download=`OYONID_WIDE_JOURNEY_${rangeStart}_${rangeEnd}_${Math.round(durationSeconds)}detik.${ext}`;
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
       showToast(`Wide Journey ${rangeStart===rangeEnd?rangeStart:rangeStart+" s.d. "+rangeEnd} berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
-    }catch(err){console.error("[OYONID] Wide Journey V13.1.28 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
+    }catch(err){console.error("[OYONID] Wide Journey V14.0.6 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
     finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}}
   };
-  console.info("[OYONID] Multi-Date Wide Journey Video Phase V13.1.33 loaded.");
+  console.info("[OYONID] Multi-Date Wide Journey Video Phase V14.0.6 loaded.");
 })();

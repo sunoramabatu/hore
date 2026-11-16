@@ -1917,3 +1917,19 @@ body.oyon-realization-active #routeRecordFloatBtn{display:none!important}
   font-size:11px !important; font-weight:700 !important;
   color-scheme:dark;
 }
+
+/* V14: standalone Monitoring page; shares the existing Leaflet map instance. */
+.oyon-page-panel{position:fixed;z-index:8600;top:78px;left:10px;width:min(390px,calc(100vw - 20px));max-height:calc(100dvh - 100px);overflow:hidden;background:#fffdf1;border:1px solid #eadfb9;border-radius:15px;box-shadow:0 12px 36px #0003;color:#172033}
+.oyon-page-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 11px;background:#fff7d7;border-bottom:1px solid #eee2bd;font-size:13px}
+.oyon-page-head button{border:0;border-radius:8px;padding:8px 10px;background:#b91c1c;color:#fff;font-weight:700;font-size:12px;white-space:nowrap}
+.oyon-page-body{padding:10px;overflow:auto;max-height:calc(100dvh - 155px);display:grid;gap:9px}
+.oyon-monitoring-map-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#f1f5f9;font-size:12px}
+.oyon-monitoring-map-controls label{display:flex;align-items:center;gap:4px}
+#monitoringPage #monitoringRangePanel{display:grid!important;position:static!important;max-height:none!important;overflow:visible!important}
+@media(max-width:600px){.oyon-page-panel{top:70px;left:8px;width:calc(100vw - 16px);max-height:calc(100dvh - 82px)}.oyon-page-body{max-height:calc(100dvh - 137px)}}
+#realizationToMonitoringBtn{background:#1d4ed8!important;color:#fff!important;border:0!important;border-radius:8px!important;padding:6px 9px!important;font-size:12px!important;font-weight:700!important}
+
+/* V14.0.3 — selected realization date range */
+.realization-range-hint{display:block;margin:2px 0 8px;color:#64748b;font-size:11px;line-height:1.4}
+.realization-calendar-day.is-in-range{background:#e8f2ff;border-color:#bfdbfe;color:#1d4ed8}
+.realization-calendar-day.is-selected{background:#2563eb!important;border-color:#2563eb!important;color:#fff!important}
