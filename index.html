@@ -176,7 +176,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 <div id="monitoringPage" class="oyon-page-panel" style="display:none" aria-label="Halaman Monitoring">
   <div class="oyon-page-head">
     <strong>📊 OYONID MONITORING</strong>
-    <div class="monitoring-head-actions"><button id="monitoringFullMapBtn" type="button">🗺️ Full Map</button><button id="monitoringBackBtn" type="button">← Kembali ke Tagging</button></div>
+    <div class="monitoring-head-actions"><button id="monitoringMinBtn" type="button" aria-expanded="true" title="Minimize menu">−</button><button id="monitoringFullMapBtn" type="button">🗺️ Peta Penuh</button><button id="monitoringBackBtn" type="button">← Kembali ke Tagging</button></div>
   </div>
   <div class="oyon-page-body">
     <div class="oyon-monitoring-search" style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;">
@@ -189,9 +189,10 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
       <label><input type="checkbox" id="monitorShowActual" checked> Lokasi Realisasi</label>
       <label><input type="checkbox" id="monitorShowOrder" checked> Urutan Baca</label>
       <label>Hari Baca <select id="monitorHariSelect"><option value="ALL">ALL</option></select></label>
-      <label>Selisih lokasi <select id="monitorDistanceFilter"><option value="ALL">Semua</option><option value="near">Sangat dekat (0–10 m)</option><option value="close">Dekat (11–30 m)</option><option value="medium">Sedang (31–100 m)</option><option value="far">Jauh (101–300 m)</option><option value="veryfar">Sangat jauh (&gt;300 m)</option><option value="missing">Koordinat tidak lengkap</option></select></label>
+      <label>Selisih lokasi <select id="monitorDistanceFilter"><option value="ALL">Semua</option><option value="near">Sangat dekat (0–10 m)</option><option value="close">Dekat (11–30 m)</option><option value="medium">Sedang (31–100 m)</option><option value="far">Jauh (101–300 m)</option><option value="veryfar">Sangat jauh (&gt;300 m)</option><option value="missing">Koordinat tidak lengkap</option></select></label><button id="monitorDistanceApplyBtn" type="button" class="monitor-distance-apply">Tampilkan</button>
     </div>
     <section class="monitoring-compare-summary"><strong>📍 Evaluasi DIJ vs Realisasi</strong><div class="monitoring-compare-metrics"><span id="monitorCompareCount">0 pelanggan dibandingkan</span><span id="monitorCompareAverage">Rata-rata selisih: —</span><span id="monitorCompareFar">Jauh: 0</span></div><div id="monitorCompareList" class="monitoring-compare-list">Pilih rentang tanggal untuk melihat hasil perbandingan.</div></section>
+    <section class="monitoring-compare-summary" id="monitoringDataAudit" aria-live="polite"><strong>🧪 Pemeriksaan Kualitas Data</strong><div class="monitoring-compare-metrics"><span id="monitorAuditTotal">0 data</span><span id="monitorAuditMissingDIJ">DIJ kosong: 0</span><span id="monitorAuditMissingActual">Realisasi kosong: 0</span><span id="monitorAuditDuplicate">IDPEL duplikat: 0</span><span id="monitorAuditHouse">Foto rumah tersedia: —</span><span id="monitorAuditMeter">Foto meter tersedia: —</span><span id="monitorAuditPhotoMissing">Tanpa foto: —</span><span id="monitorAuditPhotoInvalid">Format foto perlu dicek: —</span></div><small id="monitorAuditNote">Pemeriksaan mengikuti rentang tanggal dan filter Hari Baca yang aktif.</small><button id="monitorAuditExportBtn" type="button" class="ui-btn small-btn" style="margin-top:5px">⬇ Unduh Laporan Audit CSV</button></section>
     <section id="monitoringRangePanel" class="monitoring-range-panel" aria-label="Monitoring rentang tanggal">
       <div class="monitoring-range-title"><strong>📊 Monitoring Pekerjaan</strong><span>Harian / Rentang Tanggal</span></div>
       <div class="monitoring-range-fields">
@@ -263,7 +264,6 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
     <label class="detail-compare-toggle"><input type="checkbox" onchange="toggleCompare(this)"> Bandingkan</label>
     <div class="detail-card-actions">
       <button type="button" id="detailCardMinBtn" aria-label="Minimize kartu" title="Minimize">−</button>
-      <button type="button" id="detailCardMaxBtn" aria-label="Maximize kartu" title="Maximize">□</button>
       <button type="button" onclick="closeDetail()" aria-label="Tutup kartu" title="Tutup">×</button>
     </div>
   </div>
@@ -293,9 +293,32 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <div id="toast" class="toast"></div>
 
+<!-- Mas OYON: assistant chat, voice input and spoken answers -->
+<button id="masOyonLauncher" class="mas-oyon-launcher" type="button" aria-label="Buka chat Mas OYON">💬 Mas OYON</button>
+<section id="masOyonPanel" class="mas-oyon-panel" aria-label="Chat Mas OYON" aria-hidden="true">
+  <header class="mas-oyon-head">
+    <div><strong>🤝 Mas OYON</strong><small>Kanca lapangan · guyon Jawa ngoko alus</small></div>
+    <div class="mas-oyon-head-actions"><button id="masOyonMinimize" type="button" aria-label="Minimalkan chat">−</button><button id="masOyonClose" type="button" aria-label="Tutup chat">×</button></div>
+  </header>
+  <div id="masOyonMessages" class="mas-oyon-messages" aria-live="polite">
+    <div class="mas-oyon-bubble mas-oyon-answer"><b>Mas OYON</b><p>Sugeng rawuh! Aku Mas OYON. Arep tak bantu apa, Pak/Bu? Monggo diketik utawa pencet mikrofon. Ojo kesusu, sing penting data lan gaweyane bener 😄</p></div>
+  </div>
+  <div id="masOyonStatus" class="mas-oyon-status">Siap membantu · Jangan kirim data pribadi pelanggan.</div>
+  <div class="mas-oyon-compose">
+    <textarea id="masOyonInput" rows="2" maxlength="1500" placeholder="Tulis pertanyaan, atau gunakan mikrofon…" aria-label="Pesan untuk Mas OYON"></textarea>
+    <div class="mas-oyon-compose-actions">
+      <button id="masOyonMic" type="button" title="Input suara" aria-label="Mulai input suara">🎙️</button>
+      <label class="mas-oyon-speak-toggle"><input id="masOyonAutoSpeak" type="checkbox" checked> 🔊 Wacanen otomatis</label>
+      <button id="masOyonSend" type="button">Kirim ➤</button>
+    </div>
+  </div>
+  <div class="mas-oyon-foot">Jawaban AI bisa keliru. Ikuti SOP resmi dan arahan atasan.</div>
+</section>
+
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=14.0.3"></script>
+<script src="./js/app.js?v=14.0.16"></script>
+<script src="./js/mas-oyon.js?v=14.0.17"></script>
 <script src="./js/oyonid-video-engine-v2.js?v=13.1.33"></script>
 </body>
 </html>

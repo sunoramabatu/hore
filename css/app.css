@@ -1972,3 +1972,50 @@ body.oyon-monitoring-active #monitoringRestoreBtn{display:none}
 body.oyon-monitoring-active.oyon-monitoring-full-map #monitoringRestoreBtn{display:block!important}
 body.oyon-monitoring-active #routeRecordFloatBtn{display:none!important}
 body.oyon-monitoring-active #locationPhotoBtn{display:none!important}
+
+/* V14.0.10 — compact two-location comparison bottom bar for Monitoring */
+.detail-panel.monitoring-compare-card{width:min(560px,calc(100vw - 20px)) !important;max-height:min(42vh,390px) !important;left:10px !important;bottom:calc(8px + env(safe-area-inset-bottom,0px)) !important}
+.detail-panel.monitoring-compare-card .detail-card-header{min-height:40px}
+.detail-panel.monitoring-compare-card .detail-card-content{max-height:calc(42vh - 42px);padding:6px 9px 9px}
+.detail-panel.monitoring-compare-card #detailSplit{display:flex !important;flex-direction:row !important;gap:7px !important;margin-top:2px !important}
+.detail-panel.monitoring-compare-card #detailSplit>div{flex:1;min-width:0;padding:8px !important;font-size:11px;overflow-wrap:anywhere}
+.detail-panel.monitoring-compare-card #detailSplit h3{font-size:12px !important;margin:0 0 5px}
+.detail-panel.monitoring-compare-card .detail-customer-photo{margin-top:6px;padding:5px}
+.detail-panel.monitoring-compare-card .detail-customer-photo img{max-height:112px;object-fit:contain;background:#101b2a}
+@media(max-width:420px){.detail-panel.monitoring-compare-card{width:calc(100vw - 16px) !important;left:8px !important}.detail-panel.monitoring-compare-card #detailSplit>div{font-size:10px}.detail-panel.monitoring-compare-card #detailSplit h3{font-size:11px !important}}
+
+
+/* V14.0.11 — Monitoring compact controls, filtered evaluation and compare dock */
+#monitoringMinBtn{background:#294866!important;color:#fff!important;border:1px solid #54799d!important;min-width:36px}
+#monitoringPage.monitoring-collapsed .oyon-page-body{display:none!important}
+#monitoringPage.monitoring-collapsed{max-height:none!important}
+.monitor-distance-apply{border:0;border-radius:8px;background:#087fbd;color:#fff;font-weight:800;padding:7px 12px;min-height:32px;white-space:nowrap}
+.detail-panel.monitoring-compare-card.is-minimized{height:48px!important;max-height:48px!important;min-height:48px!important;overflow:hidden!important}
+.detail-panel.monitoring-compare-card.is-minimized .detail-card-content{display:none!important}
+.detail-panel.monitoring-compare-card .detail-card-actions button#detailCardMaxBtn{display:none!important}
+body.oyon-monitoring-active #realizationPhotoHint,body.oyon-monitoring-active .realization-photo-hint,body.oyon-monitoring-active #customerPhotoHint{display:none!important}
+@media(max-width:600px){.monitor-distance-apply{flex:1 1 100%}.monitoring-compare-card.is-minimized{left:8px!important;right:8px!important;width:auto!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important}}
+
+body.oyon-monitoring-active #playbackPhotoBox{display:none!important}
+body.oyon-monitoring-active #detailCardMaxBtn{display:none!important}
+
+
+/* V14.0.12 — stable monitoring compare dock and explicit applied-filter UX */
+.detail-panel.monitoring-compare-card{position:fixed!important;top:auto!important;right:10px!important;left:10px!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;width:auto!important;max-width:620px!important;margin:0 auto!important;z-index:12000!important}
+.detail-panel.monitoring-compare-card.is-minimized{height:48px!important;min-height:48px!important;max-height:48px!important}
+.detail-panel.monitoring-compare-card.is-minimized .detail-card-content{display:none!important}
+.detail-panel.monitoring-compare-card .detail-card-header{touch-action:manipulation}
+#monitorDistanceApplyBtn{min-width:100px}
+#monitorDistanceApplyBtn:focus-visible{outline:3px solid #fbbf24;outline-offset:2px}
+body.oyon-monitoring-active #realizationPhotoHint,body.oyon-monitoring-active .realization-photo-hint,body.oyon-monitoring-active #customerPhotoHint,body.oyon-monitoring-active #playbackPhotoBox{display:none!important}
+@media(max-width:600px){.detail-panel.monitoring-compare-card{left:8px!important;right:8px!important;bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;width:auto!important;max-width:none!important}}
+
+
+/* V14.0.15 — Mas OYON chat assistant */
+.mas-oyon-launcher{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:12500;border:0;border-radius:999px;padding:13px 18px;background:linear-gradient(135deg,#0877d1,#06345e);color:#fff;font-weight:800;font-size:15px;box-shadow:0 7px 24px #001b3d55;cursor:pointer}
+.mas-oyon-panel{position:fixed;right:14px;bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:12510;width:min(410px,calc(100vw - 22px));height:min(650px,calc(100dvh - 115px));min-height:360px;display:none;flex-direction:column;overflow:hidden;border:1px solid #54718e;border-radius:20px;background:#f8fafc;box-shadow:0 18px 55px #00152c66;color:#172b40}
+.mas-oyon-panel.is-open{display:flex}.mas-oyon-panel.is-minimized{height:auto;min-height:0}.mas-oyon-panel.is-minimized .mas-oyon-messages,.mas-oyon-panel.is-minimized .mas-oyon-status,.mas-oyon-panel.is-minimized .mas-oyon-compose,.mas-oyon-panel.is-minimized .mas-oyon-foot{display:none}
+.mas-oyon-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 15px;background:linear-gradient(120deg,#07182c,#123c60);color:#fff}.mas-oyon-head strong{display:block;font-size:17px}.mas-oyon-head small{display:block;margin-top:2px;color:#b9d4eb;font-size:11px}.mas-oyon-head-actions{display:flex;gap:7px}.mas-oyon-head-actions button{width:34px;height:34px;border:1px solid #6c8ba8;border-radius:9px;background:#234663;color:#fff;font-size:22px;line-height:1;cursor:pointer}
+.mas-oyon-messages{flex:1;overflow:auto;padding:13px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(#f8fafc,#edf3f8)}.mas-oyon-bubble{max-width:91%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.45;overflow-wrap:anywhere;box-shadow:0 2px 7px #102b4410}.mas-oyon-bubble p{margin:5px 0 0;white-space:pre-wrap}.mas-oyon-user{align-self:flex-end;background:#dbeafe;color:#12365a;border-bottom-right-radius:4px}.mas-oyon-answer{align-self:flex-start;background:#fff;border:1px solid #d8e3ed;color:#21384d;border-bottom-left-radius:4px}.mas-oyon-bubble b{font-size:11px;letter-spacing:.03em;color:#55718a}.mas-oyon-play{margin-top:8px;border:0;border-radius:9px;padding:6px 9px;background:#e8f4ee;color:#08734d;font-weight:700;cursor:pointer}.mas-oyon-status{padding:6px 12px;background:#edf3f8;color:#61758a;font-size:11px;border-top:1px solid #dbe5ee}.mas-oyon-compose{padding:10px;background:#fff;border-top:1px solid #dce5ee}.mas-oyon-compose textarea{display:block;width:100%;resize:vertical;min-height:48px;max-height:110px;padding:10px;border:1px solid #cbd7e2;border-radius:11px;font:inherit;font-size:14px;color:#172b40;box-sizing:border-box}.mas-oyon-compose-actions{display:flex;align-items:center;gap:8px;margin-top:8px}.mas-oyon-compose-actions button{border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer}.mas-oyon-compose-actions #masOyonMic{background:#e6eef7;color:#17456b;font-size:18px}.mas-oyon-compose-actions #masOyonMic.is-listening{background:#fee2e2;color:#b91c1c;animation:masOyonPulse 1.1s infinite}.mas-oyon-compose-actions #masOyonSend{margin-left:auto;background:#0877bd;color:#fff}.mas-oyon-speak-toggle{display:flex;align-items:center;gap:4px;color:#42566b;font-size:12px;white-space:nowrap}.mas-oyon-foot{padding:7px 10px;text-align:center;background:#f3f6f9;color:#748397;font-size:10px}
+@keyframes masOyonPulse{50%{box-shadow:0 0 0 5px #ef444422}}
+@media(max-width:600px){.mas-oyon-panel{right:8px;bottom:calc(70px + env(safe-area-inset-bottom,0px));width:calc(100vw - 16px);height:min(72dvh,620px);min-height:350px}.mas-oyon-launcher{right:12px;bottom:calc(14px + env(safe-area-inset-bottom,0px));padding:12px 15px}}

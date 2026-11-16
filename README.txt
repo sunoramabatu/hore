@@ -36,3 +36,5 @@ V12 PATCH (berdasarkan V11)
 - Jika penyimpanan realisasi gagal, pelanggan tidak dihapus dari daftar tersisa.
 - Autosave tambahan saat tab disembunyikan/ditutup.
 - Penyimpanan browser terikat pada origin/domain. URL Preview Vercel berbeda bisa memiliki penyimpanan lokal yang berbeda; untuk riwayat konsisten, uji pada URL yang sama atau gunakan backend/database untuk sinkronisasi antar-URL/perangkat.
+
+V14.0.15: Mas OYON Gemini chat assistant ditambahkan. Baca README_V14.0.15_MAS_OYON.txt untuk aktivasi API key di Vercel dan aturan keamanan.
