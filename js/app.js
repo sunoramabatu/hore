@@ -1277,14 +1277,50 @@ async function oyonBlobToDataUrl(blob) {
   if (!blob) return "";
   return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=reject;r.readAsDataURL(blob);});
 }
+// Excel membatasi teks satu sel maksimal 32.767 karakter. Foto asli tetap
+// disimpan utuh di IndexedDB; yang masuk workbook hanya thumbnail kecil.
+async function oyonPhotoDataUrlForExcel(source) {
+  if (!source) return "";
+  try {
+    let blob;
+    if (source instanceof Blob) blob = source;
+    else if (typeof source === "string" && /^data:image\//i.test(source)) {
+      const response = await fetch(source);
+      blob = await response.blob();
+    } else return "";
+    const image = new Image();
+    const url = URL.createObjectURL(blob);
+    try {
+      await new Promise((resolve, reject) => { image.onload = resolve; image.onerror = reject; image.src = url; });
+      for (const side of [320, 240, 180, 140, 110]) {
+        const scale = Math.min(1, side / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        for (const quality of [.62, .48, .36, .28]) {
+          const thumb = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+          if (!thumb) continue;
+          const dataUrl = await oyonBlobToDataUrl(thumb);
+          if (dataUrl.length <= 30000) return dataUrl;
+        }
+      }
+    } finally { URL.revokeObjectURL(url); }
+  } catch (error) { console.warn("Thumbnail foto untuk Excel gagal dibuat:", error); }
+  return "";
+}
 async function oyonAttachCustomerPhotos(rows) {
   const result=[];
   for (const source of rows || []) {
     const row={...(source||{})}; const identity=oyonCustomerPhotoIdentity(row);
     for (const [type,header] of [["house","FOTO RUMAH DATA"],["meter","FOTO METER DATA"]]) {
       const key=oyonCustomerPhotoKey(identity,type);
-      try { const blob=await v13GetPhotoBlob(key); row[header]=blob ? await oyonBlobToDataUrl(blob) : (row[header]||""); }
-      catch(e) { row[header]=row[header]||""; }
+      try {
+        const blob = await v13GetPhotoBlob(key);
+        const existing = row[header] || "";
+        row[header] = await oyonPhotoDataUrlForExcel(blob || existing);
+      } catch(e) { row[header] = await oyonPhotoDataUrlForExcel(row[header] || ""); }
     }
     result.push(row);
   }
