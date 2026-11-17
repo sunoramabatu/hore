@@ -1539,10 +1539,12 @@ function renderVisibleMarkers() {
 
   const showDIJ = document.getElementById("chkDIJ")?.checked ?? true;
   const showDIL = document.getElementById("chkDIL")?.checked ?? true;
+  const monitoringPageActive = document.body.classList.contains("oyon-monitoring-active");
+  const monitoringShowDIJ = !monitoringPageActive || document.getElementById("monitorShowDIJ")?.checked === true;
 
   markers.forEach(item => {
     let visible = true;
-    if (item.type === "DIJ" && !showDIJ) visible = false;
+    if (item.type === "DIJ" && (monitoringPageActive ? !monitoringShowDIJ : !showDIJ)) visible = false;
     if (item.type === "DIL" && !showDIL) visible = false;
     if (filterHariBacaAktif && getHariBaca(item.row) !== daftarHariBaca[indexHariBaca]) {
       visible = false;
@@ -1593,6 +1595,8 @@ function applyMarkerFilter() {
 
   const showDIL =
     document.getElementById("chkDIL")?.checked ?? true;
+  const monitoringPageActive = document.body.classList.contains("oyon-monitoring-active");
+  const monitoringShowDIJ = !monitoringPageActive || document.getElementById("monitorShowDIJ")?.checked === true;
 
   const hariAktif =
     filterHariBacaAktif
@@ -1605,7 +1609,7 @@ function applyMarkerFilter() {
     let visible = true;
 
     // FILTER JENIS MARKER
-    if (m.type === "DIJ" && !showDIJ) {
+    if (m.type === "DIJ" && (monitoringPageActive ? !monitoringShowDIJ : !showDIJ)) {
       visible = false;
     }
 
@@ -3522,19 +3526,30 @@ function v142EnsureGpsStatus(){
 }
 function v142GpsStatus(kind,message,detail=""){
   const el=v142EnsureGpsStatus();
+  const inRealization=document.body.classList.contains("oyon-realization-active");
+  const inMonitoring=document.body.classList.contains("oyon-monitoring-active");
+  const headerStatus=document.getElementById("v142GpsHeaderStatus");
   const styles={
-    recording:["🔴 REKAMAN GPS AKTIF","#b42318"],
-    stopped:["GPS TIDAK DIREKAM","#475569"],
-    failed:["⚠️ GPS GAGAL","#b42318"],
-    interrupted:["⚠️ REKAMAN TERPUTUS","#b45309"],
-    starting:["⌛ MENYIAPKAN GPS","#1d4ed8"]
+    recording:["● GPS MEREKAM","#16a34a"],
+    stopped:["● GPS TIDAK DIREKAM","#64748b"],
+    failed:["● GPS GAGAL","#dc2626"],
+    interrupted:["● REKAMAN TERPUTUS","#d97706"],
+    starting:["● MENYIAPKAN GPS","#2563eb"]
   };
-  const s=styles[kind]||styles.stopped;
+  const item=styles[kind]||styles.stopped;
+  if(headerStatus){
+    headerStatus.textContent=item[0]+(message?` · ${message}`:"");
+    headerStatus.style.color=item[1];
+    headerStatus.title=[message,detail].filter(Boolean).join(" ");
+  }
+  // GPS state is a compact subtitle in the TAGGING header only. Never overlay
+  // the Realisasi video controls or Monitoring map/cards.
+  el.hidden=!!(inRealization||inMonitoring);
+  el.style.display=(inRealization||inMonitoring)?"none":"none";
   el.dataset.state=kind;
-  el.innerHTML=`<div class="v142-gps-title" style="color:${s[1]}">${s[0]}</div><div class="v142-gps-message"></div><div class="v142-gps-detail"></div>`;
+  el.innerHTML=`<div class="v142-gps-title" style="color:${item[1]}">${item[0]}</div><div class="v142-gps-message"></div><div class="v142-gps-detail"></div>`;
   el.querySelector(".v142-gps-message").textContent=message||"";
   el.querySelector(".v142-gps-detail").textContent=detail||"";
-  el.hidden=false;
 }
 function v142ClearInterruptedFlag(){try{localStorage.removeItem("oyon_v142_interrupted_route");}catch(e){}}
 function v142RecoverInterruptedRoute(){
@@ -3783,7 +3798,11 @@ function v14DownloadMonitoringAudit(){
   const lines=[header.map(quote).join(",")];
   records.forEach(item=>{const r=item.row||{},get=h=>getMappedValue(r,h)??r[h]??"",lat=get("LAT DIJ"),lon=get("LON DIJ"),hasDij=validCoordinatePair(parseCoordinate(lat),parseCoordinate(lon)),hasReal=validCoordinatePair(parseCoordinate(item.actualLat),parseCoordinate(item.actualLon));
     const identity=item.identity||oyonCustomerPhotoIdentity(r),hasHouse=!!String(get("FOTO RUMAH DATA")||"").startsWith("data:image/"),hasMeter=!!String(get("FOTO METER DATA")||"").startsWith("data:image/");
-    lines.push([item.dayKey,get("IDPEL"),get("NAMA"),getHariBaca(r),lat,lon,item.actualLat,item.actualLon,item.distance==null?"":item.distance.toFixed(1),v14DistanceBucket(item.distance),hasDij&&hasReal?"Lengkap":!hasDij&&!hasReal?"DIJ & Realisasi kosong":!hasDij?"DIJ kosong":"Realisasi kosong",hasHouse?"Ada di Excel":"Perlu cek IndexedDB",hasMeter?"Ada di Excel":"Perlu cek IndexedDB"].map(quote).join(","));
+    // Excel often converts a long numeric-looking CSV field to scientific notation.
+    // IDPEL is digits-only and exported as a text formula to preserve every digit.
+    const idpelText=String(get("IDPEL")??"").trim();
+    const idpelCsv=/^\d+$/.test(idpelText)?`="${idpelText}"`:idpelText;
+    lines.push([item.dayKey,idpelCsv,get("NAMA"),getHariBaca(r),lat,lon,item.actualLat,item.actualLon,item.distance==null?"":item.distance.toFixed(1),v14DistanceBucket(item.distance),hasDij&&hasReal?"Lengkap":!hasDij&&!hasReal?"DIJ & Realisasi kosong":!hasDij?"DIJ kosong":"Realisasi kosong",hasHouse?"Ada di Excel":"Perlu cek IndexedDB",hasMeter?"Ada di Excel":"Perlu cek IndexedDB"].map(quote).join(","));
   });
   const blob=new Blob(["\ufeff"+lines.join("\r\n")],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");
   a.href=url;a.download=`OYONID_Audit_Monitoring_${range.start}_${range.end}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
@@ -3817,6 +3836,8 @@ function v14RenderMonitoringMarkers(){
     const marker=L.circleMarker([lat,lon],{radius:8,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.95});
     marker.on("click",()=>v14ShowMonitoringCompare(item));marker.addTo(v14MonitoringActualLayer);
   });
+  // Re-apply the DIJ checkbox after every render, including map pan/zoom.
+  v14SetMonitoringDijVisibility();
 }
 
 function v14SetMonitoringDijVisibility(){
@@ -4108,8 +4129,25 @@ function searchRealizationCustomers(){
   const rows=v131AllCompletedRecords().filter(x=>x.dayKey===v13SelectedDate()).filter(x=>{const row=x.row||{};const id=String(getMappedValue(row,"IDPEL")||row.IDPEL||"").replace(/\\D/g,""),meter=String(getNoMeter(row)||"").replace(/\\D/g,"");return id.endsWith(key)||meter.endsWith(key)||id.includes(key)||meter.includes(key);});
   if(!rows.length){host.innerHTML='<div style="padding:8px;color:#64748b">Tidak ditemukan pada tanggal ini.</div>';return;}
   host.innerHTML=rows.slice(0,20).map((x,i)=>`<button type="button" data-real-index="${i}" style="display:block;width:100%;text-align:left;padding:8px;border:0;border-bottom:1px solid #dbe3ec;background:transparent;color:inherit"><b>${String(getMappedValue(x.row||{},"NAMA")||x.row?.NAMA||"Pelanggan").replace(/[<>]/g,"")}</b><br><small>IDPEL ${String(x.row?.IDPEL||"-").replace(/[<>]/g,"")} • Meter ${String(getNoMeter(x.row||{})||"-").replace(/[<>]/g,"")}</small></button>`).join("");
-  host.querySelectorAll("[data-real-index]").forEach(btn=>btn.addEventListener("click",()=>{const item=rows[Number(btn.dataset.realIndex)],lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);if(Number.isFinite(lat)&&Number.isFinite(lon)){map.flyTo([lat,lon],19,{duration:.7});setTimeout(()=>v13RealizationLayer?.eachLayer(layer=>{const ll=layer.getLatLng?.();if(ll&&Math.abs(ll.lat-lat)<1e-7&&Math.abs(ll.lng-lon)<1e-7)layer.openPopup?.();}),750);}}));
+  host.querySelectorAll("[data-real-index]").forEach(btn=>btn.addEventListener("click",()=>{const item=rows[Number(btn.dataset.realIndex)],lat=parseCoordinate(item.actualLat),lon=parseCoordinate(item.actualLon);if(Number.isFinite(lat)&&Number.isFinite(lon)){map.flyTo([lat,lon],19,{duration:.7});v142ShowPlaybackCustomerCard(item);}}));
 }
+async function v142ShowPlaybackCustomerCard(item){
+  const box=document.getElementById("playbackPhotoBox"),img=document.getElementById("playbackPhotoImage"),caption=document.getElementById("playbackPhotoCaption"),data=document.getElementById("playbackPhotoData");
+  if(!box||!item)return;
+  const row=item.row||{},name=String(getMappedValue(row,"NAMA")||row.NAMA||"Pelanggan"),id=String(getMappedValue(row,"IDPEL")||row.IDPEL||"-"),meter=String(getNoMeter(row)||"-");
+  if(data){data.hidden=false;data.textContent=`${name} · IDPEL ${id} · Meter ${meter}`;}
+  if(img){img.style.display="none";img.removeAttribute("src");}
+  if(caption)caption.textContent="Memuat foto pelanggan…";
+  box.classList.add("is-visible");
+  try{
+    const identity=oyonCustomerPhotoIdentity(row);
+    let blob=await v13GetPhotoBlob(oyonCustomerPhotoKey(identity,"house"));let label="Foto rumah pelanggan";
+    if(!blob){blob=await v13GetPhotoBlob(oyonCustomerPhotoKey(identity,"meter"));label="Foto meter pelanggan";}
+    if(blob&&img){if(v13PlaybackPhotoObjectUrl)URL.revokeObjectURL(v13PlaybackPhotoObjectUrl);v13PlaybackPhotoObjectUrl=URL.createObjectURL(blob);img.src=v13PlaybackPhotoObjectUrl;img.style.display="block";if(caption)caption.textContent=label;}
+    else if(caption)caption.textContent="Foto pelanggan belum tersedia";
+  }catch(err){console.warn("Foto pelanggan gagal dimuat ke kartu playback",err);if(caption)caption.textContent="Foto pelanggan tidak dapat dibaca";}
+}
+
 function showRealizationOnMap(){
   if(typeof map==="undefined"||typeof L==="undefined")return;
   pauseRouteHistory();
@@ -4122,8 +4160,7 @@ function showRealizationOnMap(){
     const name=String(getMappedValue(row,"NAMA")||row.NAMA||row.nama||"Pelanggan");
     const idpel=String(getMappedValue(row,"IDPEL")||row.IDPEL||""),meter=String(getNoMeter(row)||"");
     const m=L.circleMarker([lat,lon],{radius:9,color:"#fff",weight:2,fillColor:"#16a34a",fillOpacity:.96}).addTo(v13RealizationLayer);
-    m.bindPopup(`<b>${i+1}. ${name.replace(/[<>]/g,"")}</b><br>IDPEL: ${idpel.replace(/[<>]/g,"")}<br>Nomor meter: ${meter.replace(/[<>]/g,"")}<br>Selesai: ${item.time||"-"}<br>GPS realisasi: ${lat}, ${lon}`);
-    v13AttachCustomerPhotosToPopup(m,item);
+    m.on("click",()=>v142ShowPlaybackCustomerCard(item));
     bounds.push([lat,lon]);
   });
   if(bounds.length){map.fitBounds(L.latLngBounds(bounds).pad(.15));showToast(`${bounds.length} pelanggan selesai ditampilkan. Yang belum selesai disembunyikan.`);}
@@ -4209,7 +4246,8 @@ function v13PlaybackClearDrawing() {
     const img=document.getElementById("playbackPhotoImage");
     const caption=document.getElementById("playbackPhotoCaption");
     if(img){img.removeAttribute("src");img.style.display="none";}
-    if(caption)caption.textContent="Foto pelanggan akan muncul saat perjalanan mencapai titiknya";
+    if(caption)caption.textContent="Pilih marker pelanggan untuk melihat foto dan data";
+    const data=document.getElementById("playbackPhotoData");if(data){data.hidden=true;data.textContent="";}
   }
   v13PlaybackLayer = L.layerGroup().addTo(map);
   // Keep every completed customer location visible while the route marker moves.
@@ -4222,7 +4260,7 @@ function v13PlaybackClearDrawing() {
     const row=item.row||{};
     const idpel=String(getMappedValue(row,"IDPEL")||row.IDPEL||"");
     const name=String(getMappedValue(row,"NAMA")||row.NAMA||"Pelanggan");
-    pin.bindPopup(`<b>${index+1}. ${name.replace(/[<>]/g,"")}</b><br>IDPEL: ${idpel.replace(/[<>]/g,"")}<br>GPS realisasi`);
+    pin.on("click",()=>v142ShowPlaybackCustomerCard(item));
   });
   v13PlaybackMarker = null;
   v13PlaybackCurrentPosition = null;

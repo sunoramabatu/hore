@@ -1,0 +1,48 @@
+OYONID MAP V14.0.21 — MONITORING VISIBILITY, CUSTOMER CARD, MAS DINO VOICE
+
+FIXES / CHANGES
+1. TAGGING visual baseline
+- No TAGGING menu layout, search, marker design, or workflow intentionally changed.
+- GPS recording state is now a compact subtitle under the OyonID Map title in the TAGGING header.
+
+2. GPS status placement
+- Removed the floating "GPS TIDAK DIREKAM" status card from Realisasi and Monitoring.
+- Recording/failed/interrupted status is retained in the compact TAGGING header only.
+- Actual GPS session recovery and saved points remain preserved.
+
+3. Monitoring DIJ checkbox
+- DIJ visibility is now checked again by viewport marker rendering and the canonical marker filter.
+- Re-applies the checkbox after Monitoring marker render, pan/zoom and filter updates.
+- Intended behavior: unchecked DIJ markers stay hidden after map interaction; DIL remains governed by its own existing checkbox.
+
+4. Realisasi customer card
+- Removed the map popup above completed-customer markers.
+- Clicking a completed customer marker displays customer identity and photo in the lower photo card.
+- House photo is preferred; meter photo is fallback; missing photo is stated explicitly.
+- Search result selection also opens the same lower customer card instead of a marker popup.
+- Playback markers use the same card interaction and do not open popup balloons.
+
+5. Mas Dino
+- Kept automatic speech checked by default.
+- Added speech chunking for longer answers, Indonesian voice preference, speech stop control, and first-interaction audio priming.
+- Added automatic floating launcher repositioning to avoid visible map panels/cards and common bottom controls.
+- Speech still depends on Android/browser speech synthesis and available device voices; no live Android test was possible here.
+
+6. Existing V14.0.20 functions retained
+- Video progress stages/percentage display.
+- GPS interruption recovery with separate sessions; no connecting across refresh/session boundaries.
+- Two-sheet Excel export and IDPEL text formatting.
+- Existing Realisasi calendar range, playback, video engine, offline storage, photos, barcode and Monitoring data functions.
+
+MODEL NOTE
+- Backend default remains gemini-3.5-flash-lite, which Google's current model catalogue lists as a stable, fastest/cost-effective Flash-Lite option for high-throughput tasks.
+- This is a reasonable lightweight assistant trial, not a measured latency guarantee. API capacity, network, quotas, prompt size and Vercel runtime still affect response time.
+- GEMINI_MODEL can override the default; GEMINI_API_KEY remains server-side.
+
+VALIDATION
+- JavaScript syntax checks: pass.
+- ZIP integrity: to be verified after packaging.
+- Static inspection only; not tested on a live Android browser, real GPS session, live Gemini API, or full video export.
+- No GitHub push and no Vercel Production deployment.
+7. Monitoring audit CSV
+- IDPEL digit-only values are exported as Excel text formulas in CSV to avoid scientific notation/truncated display when opened directly in Excel.

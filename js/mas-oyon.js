@@ -10,6 +10,8 @@
   let recognition = null;
   let busy = false;
   let lastUtterance = null;
+  let voiceUnlocked = false;
+  let positionFrame = 0;
 
   function setStatus(text) { if (status) status.textContent = text; }
   function scrollBottom() { messages.scrollTop = messages.scrollHeight; }
@@ -25,10 +27,38 @@
       const play = document.createElement("button");
       play.type = "button"; play.className = "mas-oyon-play"; play.textContent = "🔊 Putar suara";
       play.addEventListener("click", () => speak(text));
-      bubble.append(play);
+      const stop = document.createElement("button");
+      stop.type = "button"; stop.className = "mas-oyon-play mas-oyon-stop"; stop.textContent = "■ Hentikan";
+      stop.addEventListener("click", stopSpeech);
+      bubble.append(play, stop);
     }
     messages.append(bubble); scrollBottom();
     return bubble;
+  }
+  function stopSpeech() {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setStatus("Swara dihentikan. Teks jawaban tetep ana nggih.");
+  }
+  function unlockSpeechFromGesture() {
+    if (voiceUnlocked || !window.speechSynthesis || !window.SpeechSynthesisUtterance) return;
+    try {
+      const warm = new SpeechSynthesisUtterance(" ");
+      warm.lang = "id-ID"; warm.volume = 0;
+      window.speechSynthesis.speak(warm);
+      window.speechSynthesis.cancel();
+      voiceUnlocked = true;
+    } catch (_) {}
+  }
+  function splitSpeech(text, max = 180) {
+    const words = String(text || "").replace(/\s+/g, " ").trim().split(" ");
+    const chunks = []; let part = "";
+    for (const word of words) {
+      const next = part ? part + " " + word : word;
+      if (next.length > max && part) { chunks.push(part); part = word; }
+      else part = next;
+    }
+    if (part) chunks.push(part);
+    return chunks;
   }
   function speak(text) {
     if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
@@ -36,23 +66,68 @@
     }
     const synth = window.speechSynthesis;
     synth.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "id-ID";
-    utterance.rate = 0.92;
-    utterance.pitch = 1.0;
-    utterance.volume = 1;
-    const chooseIndonesianVoice = () => {
-      const voices = synth.getVoices();
-      return voices.find(v => /^id(-|_)/i.test(v.lang)) || voices.find(v => /bahasa indonesia|indonesian/i.test(v.name)) || null;
+    const chunks = splitSpeech(text);
+    const voices = synth.getVoices();
+    const voice = voices.find(v => /^id(-|_)/i.test(v.lang)) || voices.find(v => /bahasa indonesia|indonesian/i.test(v.name)) || null;
+    if (!chunks.length) return;
+    let index = 0;
+    const next = () => {
+      if (index >= chunks.length) { setStatus("Wis rampung. Ana pitakon liyane? 😊"); return; }
+      const utterance = new SpeechSynthesisUtterance(chunks[index++]);
+      utterance.lang = "id-ID"; utterance.rate = 0.92; utterance.pitch = 1.0; utterance.volume = 1;
+      if (voice) utterance.voice = voice;
+      utterance.onstart = () => setStatus("Mas Dino lagi ngomong. Dirungokna sek nggih…");
+      utterance.onend = next;
+      utterance.onerror = event => {
+        setStatus(event?.error === "interrupted" ? "Swara dihentikan." : "Swara ora bisa diputer. Priksa setelan suara HP; jawaban teks tetep ana.");
+      };
+      lastUtterance = utterance;
+      synth.speak(utterance);
+      // Android Chrome can leave speech paused after tab visibility changes.
+      if (synth.paused) synth.resume();
     };
-    const voice = chooseIndonesianVoice();
-    if (voice) utterance.voice = voice;
-    utterance.onstart = () => setStatus("Mas Dino lagi ngomong. Dirungokna sek nggih…");
-    utterance.onend = () => setStatus("Wis rampung. Ana pitakon liyane? 😊");
-    utterance.onerror = () => setStatus("Swara ora bisa diputer ing HP iki. Jawaban teks tetep isa diwaca.");
-    lastUtterance = utterance;
-    synth.speak(utterance);
+    next();
   }
+  function positionLauncher() {
+    if (!launcher || !launcher.isConnected) return;
+    const w = launcher.offsetWidth || 160, h = launcher.offsetHeight || 48;
+    const vw = window.innerWidth, vh = window.innerHeight, gap = 10;
+    const selectors = ["#realizationQuickBar", "#detailPanel.open", "#monitoringPage:not(.monitoring-collapsed)", "#realizationPanel:not(.is-minimized)", "#playbackPhotoBox.is-visible", "#routeRecordFloatBtn", "#locationPhotoBtn"];
+    const obstacles = selectors.map(sel => document.querySelector(sel)).filter(el => el && el.getClientRects().length).map(el => el.getBoundingClientRect());
+    const candidates = [];
+    const xPositions = [vw - w - 12, 12];
+    for (const x of xPositions) {
+      for (let y = vh - h - 18; y >= 76; y -= 42) candidates.push({x:Math.max(6,Math.min(vw-w-6,x)),y});
+    }
+    let best = null;
+    for (const c of candidates) {
+      const r = {left:c.x,top:c.y,right:c.x+w,bottom:c.y+h};
+      let overlap = 0;
+      for (const o of obstacles) {
+        const iw = Math.max(0, Math.min(r.right,o.right)-Math.max(r.left,o.left));
+        const ih = Math.max(0, Math.min(r.bottom,o.bottom)-Math.max(r.top,o.top));
+        overlap += iw*ih;
+      }
+      const preferRight = c.x > vw/2 ? 0 : 1800;
+      const distance = Math.abs((vh-24)-(c.y+h));
+      const score = overlap*20 + preferRight + distance;
+      if (!best || score < best.score) best = {...c,score};
+      if (overlap === 0 && c.x > vw/2 && distance < 55) break;
+    }
+    if (best) { launcher.style.left = `${best.x}px`; launcher.style.top = `${best.y}px`; launcher.style.right = "auto"; launcher.style.bottom = "auto"; }
+  }
+  function schedulePosition() {
+    if (positionFrame) cancelAnimationFrame(positionFrame);
+    positionFrame = requestAnimationFrame(() => { positionFrame = 0; positionLauncher(); });
+  }
+  window.addEventListener("resize", schedulePosition, {passive:true});
+  window.addEventListener("scroll", schedulePosition, {passive:true});
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(schedulePosition);
+    ["realizationQuickBar","detailPanel","monitoringPage","realizationPanel","playbackPhotoBox"].forEach(id => { const el=$(id); if(el) ro.observe(el); });
+  }
+  document.addEventListener("transitionend", schedulePosition, true);
+  schedulePosition();
   // Browser voices often load asynchronously, especially on Android Chrome.
   if ("speechSynthesis" in window) {
     window.speechSynthesis.getVoices();
@@ -62,12 +137,14 @@
     panel.classList.toggle("is-open", open);
     panel.setAttribute("aria-hidden", String(!open));
     launcher.style.display = open ? "none" : "block";
-    if (open) { panel.classList.remove("is-minimized"); input.focus(); scrollBottom(); }
+    if (open) { panel.classList.remove("is-minimized"); input.focus(); scrollBottom(); schedulePosition(); }
     else if (window.speechSynthesis) window.speechSynthesis.cancel();
+    schedulePosition();
   }
   launcher.addEventListener("click", () => setOpen(true));
   $("masOyonClose")?.addEventListener("click", () => setOpen(false));
-  $("masOyonMinimize")?.addEventListener("click", () => panel.classList.toggle("is-minimized"));
+  $("masOyonMinimize")?.addEventListener("click", () => { panel.classList.toggle("is-minimized"); schedulePosition(); });
+  $("masOyonStopSpeak")?.addEventListener("click", stopSpeech);
 
   async function sendMessage(overrideText) {
     const message = String(overrideText ?? input.value).trim();
@@ -116,9 +193,9 @@
       busy = false; sendBtn.disabled = false; sendBtn.textContent = "Kirim ➤"; input.focus();
     }
   }
-  sendBtn.addEventListener("click", () => sendMessage());
+  sendBtn.addEventListener("click", () => { unlockSpeechFromGesture(); sendMessage(); });
   input.addEventListener("keydown", event => {
-    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); }
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); unlockSpeechFromGesture(); sendMessage(); }
   });
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;

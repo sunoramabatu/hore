@@ -2078,3 +2078,41 @@ body.oyon-monitoring-active #realizationPhotoHint,body.oyon-monitoring-active .r
 .v142-video-track i{display:block;width:0;height:100%;background:linear-gradient(90deg,#0d9b68,#62e5a7);border-radius:20px;transition:width .2s linear}
 .v142-video-progress [data-label]{font-weight:700}
 .v142-video-progress small{display:block;color:#c5d5e5;margin-top:3px}
+
+
+/* V14.0.21 — compact GPS state lives under the OyonID title in TAGGING only. */
+.ui-header-title{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0}
+.v142-gps-header-status{font-size:10px;line-height:1.15;font-weight:750;color:#64748b;max-width:min(65vw,320px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v142-gps-status{display:none!important}
+body.oyon-realization-active .v142-gps-header-status,body.oyon-monitoring-active .v142-gps-header-status{display:none!important}
+.playback-photo-data{padding:5px 8px;margin-top:5px;border-radius:8px;background:#e8eef5;color:#20364b;font-size:11px;font-weight:750;line-height:1.3;overflow-wrap:anywhere}
+.playback-photo-data[hidden]{display:none!important}
+#playbackPhotoBox{z-index:11900}
+@media(max-width:600px){.v142-gps-header-status{font-size:9px;max-width:58vw}.playback-photo-data{font-size:10px}}
+/* The launcher position is calculated against visible cards by mas-oyon.js. */
+.mas-oyon-launcher{transition:top .18s ease,left .18s ease,right .18s ease,bottom .18s ease}
+
+/* V14.0.21 — compact/correct customer card and non-obstructive minimize state. */
+body.oyon-realization-active #playbackPhotoBox{
+  width:min(280px,72vw) !important;
+  bottom:calc(112px + env(safe-area-inset-bottom,0px)) !important;
+  z-index:11850 !important;
+}
+body.oyon-realization-active #playbackPhotoBox #playbackPhotoImage{
+  height:96px !important; object-fit:contain !important; background:#142438 !important;
+}
+body.oyon-realization-active #playbackPhotoBox .photo-caption{font-size:10px !important}
+body.oyon-realization-active #playbackPhotoBox .playback-photo-data{font-size:10px !important}
+.detail-panel.is-minimized{
+  height:48px !important; min-height:48px !important; max-height:48px !important;
+  overflow:hidden !important;
+}
+.detail-panel.is-minimized .detail-card-content{display:none !important}
+.detail-panel.is-minimized .detail-card-header{min-height:48px !important;height:48px !important;border-bottom:0 !important}
+#masOyonStopSpeak{background:#e8edf3 !important;color:#334155 !important;padding:8px 10px !important;font-size:13px !important}
+@media(max-width:600px){
+ body.oyon-realization-active #playbackPhotoBox{width:min(270px,70vw) !important;bottom:calc(112px + env(safe-area-inset-bottom,0px)) !important}
+}
+@media(max-width:600px){
+  .mas-oyon-panel{bottom:calc(230px + env(safe-area-inset-bottom,0px)) !important;height:min(44dvh,400px) !important;max-height:calc(100dvh - 260px) !important}
+}

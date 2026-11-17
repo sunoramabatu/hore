@@ -4,7 +4,7 @@
 
 <head>
   <link rel="stylesheet" href="./css/app.css?v=14.0.7">
-  <title>OyonID Map V14.0.7</title>
+  <title>OyonID Map V14.0.21</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -27,7 +27,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
   <!-- HEADER (tidak pernah hilang) -->
   <div class="ui-header">
-    <b>📍 OyonID Map</b>
+    <div class="ui-header-title"><b>📍 OyonID Map</b><div id="v142GpsHeaderStatus" class="v142-gps-header-status" aria-live="polite">GPS belum merekam</div></div>
     <button id="toggleBtn">➖</button>
   </div>
 
@@ -221,7 +221,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <div id="playbackPhotoBox" aria-live="polite">
   <img id="playbackPhotoImage" alt="Foto lokasi saat playback" />
-  <div class="photo-caption"><span>📷</span><span id="playbackPhotoCaption">Foto lokasi</span></div>
+  <div class="photo-caption"><span>📷</span><span id="playbackPhotoCaption">Pilih marker untuk melihat foto pelanggan</span></div><div id="playbackPhotoData" class="playback-photo-data" hidden></div>
 </div>
 
 <div id="realizationQuickBar" aria-label="Kontrol animasi realisasi" style="display:none">
@@ -308,7 +308,7 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
     <textarea id="masOyonInput" rows="2" maxlength="1500" placeholder="Tulis pertanyaan, atau gunakan mikrofon…" aria-label="Pesan untuk Mas Dino"></textarea>
     <div class="mas-oyon-compose-actions">
       <button id="masOyonMic" type="button" title="Input suara" aria-label="Mulai input suara">🎙️</button>
-      <label class="mas-oyon-speak-toggle"><input id="masOyonAutoSpeak" type="checkbox" checked> 🔊 Wacanen otomatis</label>
+      <label class="mas-oyon-speak-toggle"><input id="masOyonAutoSpeak" type="checkbox" checked> 🔊 Wacanen otomatis</label><button id="masOyonStopSpeak" type="button" title="Hentikan suara" aria-label="Hentikan suara">■</button>
       <button id="masOyonSend" type="button">Kirim ➤</button>
     </div>
   </div>
@@ -317,8 +317,8 @@ href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.c
 
 <!-- ZXing multi-format barcode reader; BarcodeDetector tetap tersedia sebagai fallback -->
 <script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
-<script src="./js/app.js?v=14.0.20"></script>
-<script src="./js/mas-oyon.js?v=14.0.20"></script>
-<script src="./js/oyonid-video-engine-v2.js?v=14.0.20"></script>
+<script src="./js/app.js?v=14.0.21"></script>
+<script src="./js/mas-oyon.js?v=14.0.21"></script>
+<script src="./js/oyonid-video-engine-v2.js?v=14.0.21"></script>
 </body>
 </html>
