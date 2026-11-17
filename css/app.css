@@ -1885,8 +1885,13 @@ body.oyon-realization-active #routeRecordFloatBtn{display:none!important}
 .detail-customer-photo[hidden] { display:none !important; }
 .detail-customer-photo img { display:block; width:100%; max-height:180px; object-fit:cover; border-radius:9px; }
 .detail-customer-photo small { display:block; padding:5px 2px 0; color:#c8d8eb; font-size:10px; }
-.detail-panel.is-minimized { max-height:none !important; }
-.detail-panel.is-minimized .detail-card-content { display:none; }
+/* V14.0.19: collapse the whole card instead of leaving a blank overlay. */
+.detail-panel.is-minimized {
+  height:48px !important; min-height:48px !important; max-height:48px !important;
+  overflow:hidden !important; bottom:calc(8px + env(safe-area-inset-bottom,0px)) !important;
+}
+.detail-panel.is-minimized .detail-card-content { display:none !important; }
+.detail-panel.is-minimized .detail-card-header { border-bottom:0 !important; }
 .detail-panel.is-maximized { width:min(560px,calc(100vw - 24px)) !important; max-height:72vh !important; }
 .detail-panel.is-maximized .detail-card-content { max-height:calc(72vh - 48px); }
 .detail-panel.is-dragging { transition:none !important; }
@@ -2026,3 +2031,50 @@ body.oyon-monitoring-active #realizationPhotoHint,body.oyon-monitoring-active .r
   .mas-oyon-head{padding:10px 12px}
   .mas-oyon-messages{padding:10px;gap:8px}
 }
+
+/* V14.0.19 — mobile customer detail bottom-sheet sizing */
+@media(max-width:600px){
+  .detail-panel:not(.monitoring-compare-card){
+    left:8px !important; right:8px !important; bottom:calc(8px + env(safe-area-inset-bottom,0px)) !important;
+    width:auto !important; max-height:min(46dvh,480px) !important;
+  }
+  .detail-panel:not(.monitoring-compare-card) .detail-card-content{
+    max-height:calc(min(46dvh,480px) - 48px) !important;
+    overflow-y:auto !important; overscroll-behavior:contain;
+  }
+  .detail-panel:not(.monitoring-compare-card).is-minimized{
+    height:48px !important; min-height:48px !important; max-height:48px !important;
+  }
+}
+
+/* V14.0.20 — GPS state must never depend on scrolling a side panel. */
+.v142-gps-status{
+  position:fixed;z-index:1200;left:16px;bottom:calc(104px + env(safe-area-inset-bottom,0px));
+  width:min(340px,calc(100vw - 32px));padding:9px 12px;border-radius:13px;
+  background:rgba(255,255,255,.97);border:1px solid rgba(15,23,42,.16);
+  box-shadow:0 5px 20px rgba(0,0,0,.22);font:600 12px/1.35 system-ui,sans-serif;
+  color:#172033;pointer-events:none;backdrop-filter:blur(8px);
+}
+.v142-gps-title{font-weight:850;font-size:12px;letter-spacing:.25px;margin-bottom:2px}
+.v142-gps-message{font-weight:650}
+.v142-gps-detail{font-weight:450;color:#475569;margin-top:2px;font-size:11px}
+.v142-gps-status[data-state="recording"]{border-left:5px solid #dc2626}
+.v142-gps-status[data-state="failed"],.v142-gps-status[data-state="interrupted"]{border-left:5px solid #d97706}
+@media(max-width:600px){
+ .v142-gps-status{left:12px;bottom:calc(104px + env(safe-area-inset-bottom,0px));width:min(310px,calc(100vw - 24px));}
+}
+
+/* V14.0.20 — video progress is pinned above the bottom controls. */
+.v142-video-progress{
+ position:fixed;z-index:1500;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);
+ width:min(440px,calc(100vw - 28px));padding:13px 15px;border-radius:16px;
+ background:rgba(8,28,50,.97);border:1px solid rgba(125,190,235,.55);
+ color:#fff;box-shadow:0 10px 32px rgba(0,0,0,.34);font:13px/1.4 system-ui,sans-serif;
+}
+.v142-video-progress[hidden]{display:none}
+.v142-video-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:9px}
+.v142-video-head b{font-size:20px;color:#69e0a2;font-variant-numeric:tabular-nums}
+.v142-video-track{height:9px;background:rgba(255,255,255,.17);border-radius:20px;overflow:hidden;margin-bottom:8px}
+.v142-video-track i{display:block;width:0;height:100%;background:linear-gradient(90deg,#0d9b68,#62e5a7);border-radius:20px;transition:width .2s linear}
+.v142-video-progress [data-label]{font-weight:700}
+.v142-video-progress small{display:block;color:#c5d5e5;margin-top:3px}

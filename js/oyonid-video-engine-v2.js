@@ -240,9 +240,29 @@
   }
   window.downloadRouteVideo=async function downloadRouteVideoV27(){
     const button=document.getElementById("quickVideoDownloadBtn");
-    if(button){button.disabled=true;button.textContent="⏳ Menyiapkan Wide Journey…";}
+    if(button){button.disabled=true;button.textContent="⏳ Menyiapkan video…";}
+    let progressEl=null;
+    const showProgress=(percent,label,detail="")=>{
+      if(!progressEl){
+        progressEl=document.getElementById("v142VideoProgress");
+        if(!progressEl){
+          progressEl=document.createElement("div");progressEl.id="v142VideoProgress";
+          progressEl.className="v142-video-progress";
+          progressEl.innerHTML='<div class="v142-video-head"><strong>🎬 Membuat video perjalanan</strong><b data-percent>0%</b></div><div class="v142-video-track"><i data-bar></i></div><div data-label></div><small data-detail></small>';
+          document.body.appendChild(progressEl);
+        }
+      }
+      progressEl.hidden=false;
+      const p=Math.max(0,Math.min(100,Math.round(percent)));
+      progressEl.querySelector("[data-percent]").textContent=p+"%";
+      progressEl.querySelector("[data-bar]").style.width=p+"%";
+      progressEl.querySelector("[data-label]").textContent=label;
+      progressEl.querySelector("[data-detail]").textContent=detail;
+      if(button)button.textContent=`⏳ ${p}%`;
+    };
     let stream=null,photoUrls=[];
     try{
+      showProgress(2,"Memeriksa data dan kesiapan browser…");
       if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw new Error("Browser belum mendukung ekspor video. Gunakan Chrome terbaru.");
       if(typeof html2canvas!=="function")throw new Error("Modul peta belum termuat.");
       const selectedDate=String(v13SelectedDate()||"");
@@ -259,6 +279,7 @@
         return {id:String(s.id||`session_${i}`),dayKey,points:pts};
       }).filter(s=>s.points.length);
       if(!sessions.length)throw new Error("Tidak ditemukan rekaman GPS pada rentang tanggal video ini.");
+      showProgress(10,"Menyiapkan sesi GPS…",`${sessions.length} sesi perjalanan ditemukan`);
       const customerRows=(typeof v131AllCompletedRecords==="function"?v131AllCompletedRecords():[])
         .filter(x=>String(x.dayKey||"")>=rangeStart&&String(x.dayKey||"")<=rangeEnd&&v13ValidActual(x));
       if(!customerRows.length)throw new Error("Tidak ada pelanggan selesai pada rentang tanggal ini.");
@@ -290,6 +311,7 @@
       const customerBounds=customers.map(c=>[parseCoordinate(c.item.actualLat),parseCoordinate(c.item.actualLon)]).filter(p=>p.every(Number.isFinite));
       const allBounds=[...trackBounds,...customerBounds];
       if(!allBounds.length)throw new Error("Koordinat perjalanan tidak tersedia.");
+      showProgress(16,"Menyiapkan foto, pelanggan, dan peta…",`${customers.length} pelanggan selesai`);
       pauseRouteHistory();
       const oldCenter=map.getCenter(),oldZoom=map.getZoom(),removed=[];
       [clusterGroup,v13RealizationLayer,v13PlaybackLayer,petugasMarker].forEach(layer=>{if(layer&&map.hasLayer(layer)){map.removeLayer(layer);removed.push(layer);}});
@@ -314,6 +336,7 @@
         await new Promise(r=>setTimeout(r,350));
         const captureScale=2;
         mapShot=await html2canvas(map.getContainer(),{backgroundColor:"#e9e5dd",useCORS:true,allowTaint:false,scale:captureScale,logging:false});
+        showProgress(24,"Peta dan rute siap. Menyiapkan animasi…");
         segments=sessions.map(s=>s.points.map(p=>{const q=map.latLngToContainerPoint([p.lat,p.lon]);return {...p,x:q.x*captureScale,y:q.y*captureScale};}));
         pins=customers.map(c=>{const lat=parseCoordinate(c.item.actualLat),lon=parseCoordinate(c.item.actualLon);if(!Number.isFinite(lat)||!Number.isFinite(lon))return null;
           const q=map.latLngToContainerPoint([lat,lon]);return {...c,x:q.x*captureScale,y:q.y*captureScale};}).filter(Boolean);
@@ -401,8 +424,10 @@
       const workElapsedAt=virtualTime=>[...dayTimeline.values()].reduce((sum,day)=>
         sum+clamp(virtualTime-day.base,0,day.span),0);
       const started=performance.now();
+      let lastProgressUi=0;
       const draw=(now)=>{
         const elapsed=now-started,progress=clamp(elapsed/durationMs,0,1),virtualTime=lerp(minTime,maxTime,smooth(progress));
+        if(progress-lastProgressUi>=.015){lastProgressUi=progress;showProgress(25+progress*63,"Merender frame perjalanan…",`${Math.round(progress*100)}% bagian perjalanan divisualisasikan`);}
         const worker=pointAtTime(virtualTime),phase=phaseAt(progress);
         pins.forEach(pin=>{const key=`${pin.index}|${pin.identity||""}`;if(pin.at<=virtualTime&&!revealed.has(key)){revealed.add(key);reached++;}});
         const arrival=nearestCustomer(virtualTime);
@@ -519,6 +544,7 @@
         const elapsed=now-started;
         if(elapsed<durationMs){draw(now);requestAnimationFrame(animate);return;}
         const closingProgress=clamp((elapsed-durationMs)/closingDurationMs,0,1);
+        showProgress(89+closingProgress*5,"Membuat rekap akhir…","Menghitung pelanggan selesai, sisa, durasi, dan jarak GPS");
         // Count-up metrics and staged reveal are synchronized with the closing hold.
         const reveal=smooth(clamp(closingProgress/.72,0,1));
         const stats={positive:Math.round(positiveCount*reveal),pending:Math.round(pendingCount*reveal),target:Math.round(totalTarget*reveal),percent:completionPercent*reveal};
@@ -527,15 +553,18 @@
         requestAnimationFrame(animate);
       };
       requestAnimationFrame(animate);
+      showProgress(96,"Menggabungkan dan menyimpan video…","Browser sedang menyelesaikan encoding. Mohon jangan tutup halaman.");
       const blob=await finished;stream.getTracks().forEach(t=>t.stop());stream=null;
       photoUrls.forEach(u=>URL.revokeObjectURL(u));photoUrls=[];
       if(!blob.size)throw new Error("Video kosong. Coba ulangi.");
       const url=URL.createObjectURL(blob),a=document.createElement("a"),ext=blob.type.includes("mp4")?"mp4":"webm";
       a.href=url;a.download=`OYONID_WIDE_JOURNEY_${rangeStart}_${rangeEnd}_${Math.round(durationSeconds)}detik.${ext}`;
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+      showProgress(100,"Video selesai dibuat!","Unduhan sudah dimulai.");
       showToast(`Wide Journey ${rangeStart===rangeEnd?rangeStart:rangeStart+" s.d. "+rangeEnd} berhasil dibuat • ${Math.round(durationSeconds)} detik • ${reached}/${pins.length} pelanggan ditampilkan.`);
-    }catch(err){console.error("[OYONID] Wide Journey V14.0.6 failed",err);showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
-    finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}}
+      setTimeout(()=>{if(progressEl)progressEl.hidden=true;},2200);
+     }catch(err){console.error("[OYONID] Wide Journey V14.0.20 failed",err);showProgress(0,"Pembuatan video gagal.",err?.message||"Silakan coba lagi.");if(progressEl)progressEl.dataset.keepError="1";showToast("Video gagal dibuat: "+(err?.message||"coba ulangi"));}
+    finally{if(stream)stream.getTracks().forEach(t=>t.stop());photoUrls.forEach(u=>URL.revokeObjectURL(u));if(button){button.disabled=false;button.textContent="⬇ Buat Ulang Video";}if(progressEl&&progressEl.dataset.keepError!=="1"&&progressEl.querySelector("[data-label]")?.textContent!=="Pembuatan video gagal.")setTimeout(()=>{if(progressEl)progressEl.hidden=true;},3500); }
   };
   console.info("[OYONID] Multi-Date Wide Journey Video Phase V14.0.6 loaded.");
 })();

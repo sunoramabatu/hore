@@ -1,4 +1,4 @@
-/* OYONID MAP V14.0.17 — Mas OYON chat UI */
+/* OYONID MAP V14.0.20 — Mas Dino chat UI */
 (() => {
   "use strict";
   const $ = id => document.getElementById(id);
@@ -17,7 +17,7 @@
     const bubble = document.createElement("div");
     bubble.className = `mas-oyon-bubble ${role === "user" ? "mas-oyon-user" : "mas-oyon-answer"}`;
     const label = document.createElement("b");
-    label.textContent = role === "user" ? "ANDA · TRANSKRIP / PESAN" : "MAS OYON";
+    label.textContent = role === "user" ? "ANDA · TRANSKRIP / PESAN" : "MAS DINO";
     const body = document.createElement("p");
     body.textContent = text;
     bubble.append(label, body);
@@ -47,7 +47,7 @@
     };
     const voice = chooseIndonesianVoice();
     if (voice) utterance.voice = voice;
-    utterance.onstart = () => setStatus("Mas OYON lagi ngomong. Dirungokna sek nggih…");
+    utterance.onstart = () => setStatus("Mas Dino lagi ngomong. Dirungokna sek nggih…");
     utterance.onend = () => setStatus("Wis rampung. Ana pitakon liyane? 😊");
     utterance.onerror = () => setStatus("Swara ora bisa diputer ing HP iki. Jawaban teks tetep isa diwaca.");
     lastUtterance = utterance;
@@ -76,15 +76,20 @@
     input.value = "";
     addBubble("user", message);
     busy = true; sendBtn.disabled = true; sendBtn.textContent = "Mengirim…";
-    setStatus("Mas OYON lagi mikir. Sekedap nggih…");
+    setStatus("Mas Dino lagi mikir. Sekedap nggih…");
     const thinking = addBubble("model", "Sedang menyusun jawaban…");
     thinking.classList.add("mas-oyon-thinking");
     const prior = history.slice(-8);
     try {
-      const response = await fetch("/api/mas-oyon", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history: prior })
-      });
+      const controller = new AbortController();
+      const requestTimer = setTimeout(() => controller.abort(), 56000);
+      let response;
+      try {
+        response = await fetch("/api/mas-oyon", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, history: prior }), signal: controller.signal
+        });
+      } finally { clearTimeout(requestTimer); }
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const detail = data.error || `Permintaan gagal (${response.status}).`;
@@ -92,7 +97,7 @@
         throw new Error(detail + code);
       }
       const answer = String(data.answer || "").trim();
-      if (!answer) throw new Error("Mas OYON belum memberi jawaban. Coba lagi.");
+      if (!answer) throw new Error("Mas Dino belum memberi jawaban. Coba lagi.");
       thinking.remove();
       history.push({ role: "user", text: message }, { role: "model", text: answer });
       if (history.length > 12) history.splice(0, history.length - 12);
@@ -102,7 +107,10 @@
     } catch (error) {
       const pending = messages.querySelector(".mas-oyon-thinking");
       pending?.remove();
-      addBubble("model", error.message || "Koneksine lagi rewel. Coba maneh sedhela nggih.");
+      const failureText = error?.name === "AbortError"
+        ? "Permintaan Mas Dino melewati batas waktu. Coba lagi; bila berulang, admin perlu memeriksa durasi Vercel Function dan respons Gemini."
+        : (error.message || "Koneksine lagi rewel. Coba maneh sedhela nggih.");
+      addBubble("model", failureText);
       setStatus("Koneksi AI gagal. Baca pesan error di atas; bila berulang, admin periksa Vercel Function Logs.");
     } finally {
       busy = false; sendBtn.disabled = false; sendBtn.textContent = "Kirim ➤"; input.focus();

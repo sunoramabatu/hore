@@ -1,0 +1,6 @@
+V14.0.20
+- Mas Dino default model changed to gemini-3.5-flash-lite; configurable with Vercel GEMINI_MODEL.
+- Added fixed video export progress and phase labels.
+- Added always-visible GPS recording status.
+- Added explicit GPS start/watch failure messages.
+- On reload, active saved GPS route is closed as interrupted and saved points are retained as a separate session.

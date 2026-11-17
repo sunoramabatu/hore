@@ -2464,10 +2464,12 @@ function openDetail(r){
 
 function closeDetail(){
   if(document.body.classList.contains("oyon-monitoring-active")&&v14MonitoringCompareActive){v14CloseMonitoringCompare();}
-  const panel=document.getElementById("detailPanel");panel?.classList.remove("open","monitoring-compare-card");
+  const panel=document.getElementById("detailPanel");panel?.classList.remove("open","monitoring-compare-card","is-minimized","is-maximized");
   const title=document.getElementById("detailCardTitle");if(title)title.textContent="📍 Detail Pelanggan";
   const toggle=document.querySelector("#detailPanel .detail-compare-toggle");if(toggle)toggle.style.display="";
   hasSelectedCustomer = false;
+  window.currentDetailRow = null;
+  const minBtn=document.getElementById("detailCardMinBtn");if(minBtn)minBtn.textContent="−";
   requestAnimationFrame(positionRouteRecordButton);
 }
 
@@ -2992,7 +2994,7 @@ function v131AllCompletedRecords() {
    FINISH DAN SIMPAN RBM UPDATE
 ====================== */
 
-downloadBtn.onclick = async () => {
+const oyonDownloadExcelUpdate = async () => {
   const completedForExport = v131AllCompletedRecords();
   if (workingRows.length === 0 && completedForExport.length === 0) {
     showToast("⚠️ Tidak ada pelanggan tersisa atau realisasi selesai untuk diunduh");
@@ -3154,9 +3156,48 @@ downloadBtn.onclick = async () => {
     console.error("[OYONID] Workbook sheet validation failed", wb.SheetNames);
     return;
   }
+  // Simpan IDPEL sebagai teks agar Excel tidak mengubahnya menjadi notasi ilmiah.
+  const applyIdpelTextFormat = (ws, headers, rowCount) => {
+    const col = headers.findIndex(h => normalizeHeader(h) === "IDPEL");
+    if (col < 0) return;
+    for (let r = 1; r <= rowCount; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: col })];
+      if (!cell || cell.v == null || cell.v === "") continue;
+      cell.t = "s"; cell.v = String(cell.v); cell.z = "@";
+    }
+  };
+  applyIdpelTextFormat(remainingSheet, exportHeaders, workingRowsWithPhotos.length);
+  applyIdpelTextFormat(completedSheet, completedHeaders, completedRows.length);
   XLSX.writeFile(wb, filename, { compression: true });
-  showToast(`✅ Excel V13.1.20: ${workingRows.length} tersisa • ${completedForExport.length} selesai • tepat 2 sheet.`);
+  showToast(`✅ Excel berhasil dibuat: ${workingRows.length} tersisa • ${completedForExport.length} selesai • 2 sheet.`);
 };
+
+let oyonExportBusy = false;
+if (downloadBtn) {
+  downloadBtn.addEventListener("click", async event => {
+    event.preventDefault();
+    if (oyonExportBusy) return;
+    oyonExportBusy = true;
+    const oldLabel = downloadBtn.textContent;
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = "⏳ Menyiapkan Excel…";
+    try {
+      if (!window.XLSX || !XLSX.utils || typeof XLSX.writeFile !== "function") {
+        throw new Error("Library Excel belum berhasil dimuat. Periksa koneksi internet lalu muat ulang aplikasi.");
+      }
+      await oyonDownloadExcelUpdate();
+    } catch (error) {
+      console.error("[OYONID] Download Excel Update gagal:", error);
+      showToast("❌ Download gagal: " + String(error?.message || error || "Kesalahan tidak diketahui").slice(0, 180));
+    } finally {
+      oyonExportBusy = false;
+      downloadBtn.disabled = false;
+      downloadBtn.textContent = oldLabel || "Download Excel Update";
+    }
+  });
+} else {
+  console.error("[OYONID] Tombol #downloadBtn tidak ditemukan saat inisialisasi.");
+}
 
 /* ======================
    GPS
@@ -3465,6 +3506,56 @@ function v132InitGpsRecoveryControls() {
     input.value="";
   });
 }
+
+// V14.0.20 — GPS status stays visible above the map controls, outside scrollable panels.
+function v142EnsureGpsStatus(){
+  let el=document.getElementById("v142GpsStatus");
+  if(el)return el;
+  el=document.createElement("div");
+  el.id="v142GpsStatus";
+  el.className="v142-gps-status";
+  el.setAttribute("role","status");
+  el.setAttribute("aria-live","polite");
+  const host=document.getElementById("map")||document.body;
+  host.appendChild(el);
+  return el;
+}
+function v142GpsStatus(kind,message,detail=""){
+  const el=v142EnsureGpsStatus();
+  const styles={
+    recording:["🔴 REKAMAN GPS AKTIF","#b42318"],
+    stopped:["GPS TIDAK DIREKAM","#475569"],
+    failed:["⚠️ GPS GAGAL","#b42318"],
+    interrupted:["⚠️ REKAMAN TERPUTUS","#b45309"],
+    starting:["⌛ MENYIAPKAN GPS","#1d4ed8"]
+  };
+  const s=styles[kind]||styles.stopped;
+  el.dataset.state=kind;
+  el.innerHTML=`<div class="v142-gps-title" style="color:${s[1]}">${s[0]}</div><div class="v142-gps-message"></div><div class="v142-gps-detail"></div>`;
+  el.querySelector(".v142-gps-message").textContent=message||"";
+  el.querySelector(".v142-gps-detail").textContent=detail||"";
+  el.hidden=false;
+}
+function v142ClearInterruptedFlag(){try{localStorage.removeItem("oyon_v142_interrupted_route");}catch(e){}}
+function v142RecoverInterruptedRoute(){
+  if(!v13ActiveRoute || v13ActiveRoute.endedAt)return;
+  const route=v13ActiveRoute;
+  route.endedAt=new Date().toISOString();
+  route.interrupted=true;
+  route.interruptionReason="Halaman dimuat ulang atau ditutup saat rekaman berlangsung.";
+  const count=route.points?.length||0;
+  if(count){
+    const duplicate=v13RouteSessions.some(s=>s.id===route.id);
+    if(!duplicate){v13RouteSessions.push(route);v13RouteSessions=v13RouteSessions.slice(-120);}
+  }
+  v13ActiveRoute=null;
+  v13SaveRoutes();
+  try{localStorage.setItem("oyon_v142_interrupted_route",JSON.stringify({id:route.id,at:route.endedAt,count}));}catch(e){}
+  v142GpsStatus("interrupted",
+    `Rekaman berhenti setelah halaman dimuat ulang. ${count} titik yang tersimpan dipertahankan.`,
+    `Berakhir ${new Date(route.endedAt).toLocaleString("id-ID")}. Tekan Mulai Rekam Rute untuk membuat sesi baru.`);
+}
+
 function v13SetRecordingUI(active){
   const float=document.getElementById("routeRecordFloatBtn");
   const st=document.getElementById("routeRecordStatus");
@@ -3474,6 +3565,9 @@ function v13SetRecordingUI(active){
     float.setAttribute("aria-pressed",active?"true":"false");
   }
   if(st)st.textContent=active?`🔴 Merekam rute • ${v13ActiveRoute?.points?.length||0} titik GPS`:"Rute tidak sedang direkam";
+  if(active)v142GpsStatus("recording",`Merekam rute • ${v13ActiveRoute?.points?.length||0} titik GPS`,
+    `Mulai ${v13ActiveRoute?.startedAt?new Date(v13ActiveRoute.startedAt).toLocaleTimeString("id-ID"):""}`);
+  else if(!document.getElementById("v142GpsStatus")?.dataset.state?.includes("interrupted"))v142GpsStatus("stopped","GPS tidak sedang merekam.","Tekan Mulai Rekam Rute sebelum memulai perjalanan.");
 }
 function v13MakePoint(pos){
   const lat=Number(pos?.coords?.latitude), lon=Number(pos?.coords?.longitude), accuracy=Number(pos?.coords?.accuracy);
@@ -3489,12 +3583,13 @@ function v13Distance(a,b){
 async function startRouteRecording(){
   if(v13ActiveRoute){showToast("Rekaman sebelumnya belum diakhiri. Tekan Akhiri Rekam Rute.");v13SetRecordingUI(true);return;}
   if(!navigator.geolocation?.getCurrentPosition||!navigator.geolocation?.watchPosition){showToast("Browser tidak mendukung GPS.");return;}
+  v142GpsStatus("starting","Meminta posisi GPS awal…","Pastikan izin lokasi aktif dan GPS perangkat menyala.");
   showToast("Meminta posisi GPS awal…");
   let pos;
   try{pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:0,timeout:25000}));}
-  catch(e){showToast("GPS belum siap: "+(e?.message||"izin/lokasi tidak tersedia")+". Rekaman belum dimulai.");return;}
+  catch(e){const reason=e?.message||"izin/lokasi tidak tersedia";v142GpsStatus("failed",`Rekaman belum dimulai: ${reason}`,"Periksa izin lokasi, aktifkan GPS, lalu tekan Mulai Rekam Rute lagi.");showToast("GPS belum siap: "+reason+". Rekaman belum dimulai.");return;}
   const first=v13MakePoint(pos);
-  if(!first){showToast("Akurasi GPS awal harus 60 meter atau lebih baik. Coba di area terbuka.");return;}
+  if(!first){v142GpsStatus("failed","Akurasi GPS awal belum cukup baik (maksimal 60 meter).","Pindah ke area terbuka lalu coba rekam lagi.");showToast("Akurasi GPS awal harus 60 meter atau lebih baik. Coba di area terbuka.");return;}
   v13ActiveRoute={id:`route_${Date.now()}`,dayKey:localDateTimeParts().dayKey,startedAt:new Date().toISOString(),endedAt:null,points:[first]};
   if(!v13SaveRoutes()){v13ActiveRoute=null;return;}
   v13SetRecordingUI(true);
@@ -3509,9 +3604,12 @@ async function startRouteRecording(){
       pts.push(point);
       if(!v13SaveRoutes()){pts.pop();return;}
       const st=document.getElementById("routeRecordStatus");if(st)st.textContent=`🔴 Merekam rute • ${pts.length} titik GPS`;
+      v142GpsStatus("recording",`Merekam rute • ${pts.length} titik GPS`,`Terakhir tersimpan ${new Date(point.at).toLocaleTimeString("id-ID")}`);
     }
-  },e=>{showToast("GPS rute terputus: "+(e?.message||"lokasi tidak tersedia"));const st=document.getElementById("routeRecordStatus");if(st)st.textContent="⚠️ GPS terputus — akhiri dan mulai ulang";},
+  },e=>{const reason=e?.message||"lokasi tidak tersedia";v142GpsStatus("failed",`GPS terputus: ${reason}`,"Data yang sudah tersimpan tetap aman. Periksa GPS lalu akhiri sesi ini atau mulai ulang.");showToast("GPS rute terputus: "+reason);const st=document.getElementById("routeRecordStatus");if(st)st.textContent="⚠️ GPS terputus — periksa dan mulai ulang";},
   {enableHighAccuracy:true,maximumAge:1000,timeout:20000});
+  v142ClearInterruptedFlag();
+  v142GpsStatus("recording",`Merekam rute • ${v13ActiveRoute.points.length} titik GPS`,"Jangan refresh/tutup halaman selama merekam.");
   showToast("🔴 Rekam rute dimulai. Biarkan halaman tetap terbuka dan GPS aktif.");
 }
 function stopRouteRecording(){
@@ -3520,7 +3618,8 @@ function stopRouteRecording(){
   v13ActiveRoute.endedAt=new Date().toISOString();
   const count=v13ActiveRoute.points?.length||0;
   if(count){v13RouteSessions.push(v13ActiveRoute);v13RouteSessions=v13RouteSessions.slice(-120);}
-  v13ActiveRoute=null;const saved=v13SaveRoutes();v13SetRecordingUI(false);
+  v13ActiveRoute=null;const saved=v13SaveRoutes();v13SetRecordingUI(false);v142ClearInterruptedFlag();
+  v142GpsStatus("stopped",`Rekaman selesai. ${count} titik GPS tersimpan.`,`Sesi berakhir ${new Date().toLocaleTimeString("id-ID")}.`);
   showToast(saved?`Rekaman rute disimpan: ${count} titik GPS.`:"Rekaman dihentikan; periksa penyimpanan lokal.");
 }
 function v14SetPage(page){
@@ -4525,8 +4624,15 @@ async function downloadRouteVideo() {
 }
 
 document.addEventListener("DOMContentLoaded",()=>{
-  v13SetRecordingUI(!!v13ActiveRoute);
-  if(v13ActiveRoute){const st=document.getElementById("routeRecordStatus");if(st)st.textContent=`⚠️ Rekaman sebelumnya terputus • ${v13ActiveRoute.points?.length||0} titik tersimpan. Tekan Akhiri Rekam Rute untuk menyimpan.`;}
+  if(v13ActiveRoute){
+    v142RecoverInterruptedRoute();
+  }else{
+    const interrupted=(()=>{try{return JSON.parse(localStorage.getItem("oyon_v142_interrupted_route")||"null");}catch(e){return null;}})();
+    if(interrupted)v142GpsStatus("interrupted",`Rekaman terputus saat halaman dimuat ulang. ${interrupted.count||0} titik tersimpan dipertahankan.`,
+      `Sesi terakhir ${interrupted.at?new Date(interrupted.at).toLocaleString("id-ID"):""}. Tekan Mulai Rekam Rute untuk sesi baru.`);
+    else v142GpsStatus("stopped","GPS tidak sedang merekam.","Tekan Mulai Rekam Rute sebelum memulai perjalanan.");
+  }
+  v13SetRecordingUI(false);
   document.getElementById("workbookSheetSelect")?.addEventListener("change", event => {
     oyonSelectWorkbookSheet(event.target.value);
     showToast(`Menggunakan ${event.target.options[event.target.selectedIndex]?.text || event.target.value}`);

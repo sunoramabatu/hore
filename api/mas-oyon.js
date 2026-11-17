@@ -1,9 +1,11 @@
-// OYONID MAP — Mas OYON Gemini assistant (V14.0.17)
+// OYONID MAP — Mas Dino Gemini assistant (V14.0.20)
 // Configure GEMINI_API_KEY in Vercel Project Settings > Environment Variables.
 // Never put the Gemini key in index.html, app.js, or any public file.
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.8-flash";
-const SYSTEM_INSTRUCTION = `Kamu adalah Mas OYON, asisten resmi aplikasi OYONID MAP untuk petugas lapangan dan admin.
+// Default to the previous stable Flash generation for a speed/stability trial.
+ // Override with GEMINI_MODEL in Vercel if operational testing favors another model.
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
+const SYSTEM_INSTRUCTION = `Kamu adalah Mas Dino, asisten resmi aplikasi OYONID MAP untuk petugas lapangan dan admin.
 
 IDENTITAS & GAYA BICARA
 - Gaya utama: guyon Jawa ngoko alus, akrab seperti kanca kerja lapangan. Campur bahasa Indonesia supaya semua petugas paham.
@@ -28,7 +30,7 @@ LINGKUP PENGETAHUAN OYONID MAP
 - GPS browser membutuhkan izin lokasi dan layanan lokasi perangkat aktif. Akurasi dipengaruhi perangkat, sinyal satelit, lingkungan gedung, dan pengaturan hemat baterai.
 - Foto dapat disimpan sebagai data gambar/Base64 atau Blob lokal tergantung versi dan alur aplikasi. Jangan menjanjikan foto lama yang sudah terkompresi bisa dipulihkan kualitas aslinya.
 - Fitur dan posisi tombol dapat berubah antarversi. Jika petugas menyebut tombol yang tidak ditemukan, tanyakan versi aplikasi atau minta screenshot.
-- Jangan menganggap AI mengetahui kondisi aplikasi yang sedang berjalan. Mas OYON tidak otomatis membaca marker yang dipilih, isi Excel, IndexedDB, foto, lokasi GPS, status rekaman, atau layar petugas.
+- Jangan menganggap AI mengetahui kondisi aplikasi yang sedang berjalan. Mas Dino tidak otomatis membaca marker yang dipilih, isi Excel, IndexedDB, foto, lokasi GPS, status rekaman, atau layar petugas.
 - Jika ditanya cara kerja fitur yang belum dijelaskan secara rinci dalam basis pengetahuan ini, jangan menebak. Minta screenshot tanpa data sensitif dan sebutkan versi aplikasi.
 
 PANDUAN JAWABAN BERDASARKAN JENIS MASALAH
@@ -59,7 +61,7 @@ FORMAT JAWABAN
 - Akhiri dengan satu pertanyaan klarifikasi yang spesifik bila memang dibutuhkan.
 - Jangan berpura-pura melakukan tindakan pada aplikasi. Kamu hanya memberi panduan, kecuali ada tool resmi yang memang menjalankan tindakan tersebut.`;
 
-const KNOWLEDGE_BASE = `KNOWLEDGE BASE MAS OYON — V1
+const KNOWLEDGE_BASE = `KNOWLEDGE BASE MAS DINO — V1
 
 TUJUAN
 Asisten panduan penggunaan OYONID MAP untuk petugas lapangan dan admin. Dokumen ini adalah fondasi awal; bukan pengganti SOP resmi perusahaan.
@@ -88,7 +90,7 @@ DIJ vs Realisasi: selisih titik bukan rute petugas. Koordinat kosong tidak boleh
 Video: periksa tanggal/rentang dan data GPS sesi. Jangan membuat garis penghubung antar sesi yang terpisah.
 
 BATAS PENGETAHUAN
-Mas OYON tidak otomatis melihat layar, Excel, database lokal, foto, marker yang dipilih, GPS, atau status rekaman. Semua itu hanya diketahui jika aplikasi secara eksplisit mengirim konteks yang sudah disaring dan aman. Jika tidak tahu, minta screenshot teredaksi dan versi aplikasi. Jangan mengarang SOP, tombol, status, data, atau koordinat.
+Mas Dino tidak otomatis melihat layar, Excel, database lokal, foto, marker yang dipilih, GPS, atau status rekaman. Semua itu hanya diketahui jika aplikasi secara eksplisit mengirim konteks yang sudah disaring dan aman. Jika tidak tahu, minta screenshot teredaksi dan versi aplikasi. Jangan mengarang SOP, tombol, status, data, atau koordinat.
 
 PRIVASI & KESELAMATAN
 Jangan meminta API key, password, OTP, NIK lengkap, nomor HP, alamat rinci, atau foto pelanggan. Jangan menyarankan manipulasi koordinat, data pelanggan, status pekerjaan, meter, atau prosedur keselamatan. Ikuti SOP resmi dan arahan atasan.
@@ -134,7 +136,7 @@ module.exports = async function handler(req, res) {
   if (buckets.size > 2000) for (const [key, value] of buckets) if (now - value.start > 120_000) buckets.delete(key);
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return sendJson(res, 503, { error: "Mas OYON belum diaktifkan admin. GEMINI_API_KEY belum dipasang di Vercel." });
+  if (!apiKey) return sendJson(res, 503, { error: "Mas Dino belum diaktifkan admin. GEMINI_API_KEY belum dipasang di Vercel." });
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch (_) { body = null; } }
@@ -153,21 +155,29 @@ module.exports = async function handler(req, res) {
   contents.push({ role: "user", parts: [{ text: message }] });
 
   try {
-    const upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: `${SYSTEM_INSTRUCTION}\n\nBASIS PENGETAHUAN RESMI OYONID MAP (V1):\n${KNOWLEDGE_BASE}` }] },
-        contents,
-        generationConfig: { temperature: 0.45, maxOutputTokens: 700 }
-      }),
-      signal: AbortSignal.timeout(45_000)
+    const requestBody = JSON.stringify({
+      systemInstruction: { parts: [{ text: `${SYSTEM_INSTRUCTION}\\n\\nBASIS PENGETAHUAN RESMI OYONID MAP (V1):\\n${KNOWLEDGE_BASE}` }] },
+      contents,
+      generationConfig: { temperature: 0.45, maxOutputTokens: 700 }
     });
-    const data = await upstream.json().catch(() => ({}));
+    let upstream, data = {};
+    // Retry sekali untuk gangguan Gemini sementara (mis. 503 UNAVAILABLE).
+    for (let attempt = 0; attempt < 2; attempt++) {
+      upstream = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: requestBody,
+        signal: AbortSignal.timeout(25_000)
+      });
+      data = await upstream.json().catch(() => ({}));
+      const transient = upstream.status >= 500 || String(data?.error?.status || "").toUpperCase() === "UNAVAILABLE";
+      if (!(transient && attempt === 0)) break;
+      await new Promise(resolve => setTimeout(resolve, 700));
+    }
     if (!upstream.ok) {
       const googleStatus = String(data?.error?.status || "");
       const googleMessage = String(data?.error?.message || "").slice(0, 240);
-      console.error("Mas OYON Gemini error", upstream.status, googleStatus, googleMessage);
+      console.error("Mas Dino Gemini error", upstream.status, googleStatus, googleMessage);
       let userMessage = "Gemini belum bisa memproses pesan. Coba lagi sebentar.";
       if (upstream.status === 400) userMessage = "Format permintaan Gemini ditolak. Admin perlu memeriksa konfigurasi model/API.";
       else if (upstream.status === 401 || upstream.status === 403) userMessage = "API key Gemini tidak valid atau akses API belum diizinkan. Admin perlu memeriksa API key dan akses Gemini API di Google AI Studio.";
@@ -180,7 +190,7 @@ module.exports = async function handler(req, res) {
     if (!answer) return sendJson(res, 502, { error: "Jawaban belum berhasil dibuat. Coba tanyakan dengan kalimat lebih sederhana." });
     return sendJson(res, 200, { answer, model: MODEL });
   } catch (error) {
-    console.error("Mas OYON request failed", error?.name || "Error");
-    return sendJson(res, 504, { error: "Koneksi ke Mas OYON timeout. Periksa internet lalu coba lagi." });
+    console.error("Mas Dino request failed", error?.name || "Error");
+    return sendJson(res, 504, { error: "Koneksi ke Mas Dino timeout. Periksa internet lalu coba lagi." });
   }
 };
