@@ -49,7 +49,13 @@
       voiceUnlocked = true;
     } catch (_) {}
   }
-  function splitSpeech(text, max = 180) {
+  function pickMasculineIndonesianVoice(voices) {
+    const idVoices = (voices || []).filter(v => /^id(-|_)/i.test(v.lang) || /indonesian|bahasa indonesia/i.test(v.name));
+    // Browser voice metadata rarely exposes gender. Prefer an explicitly male-labelled
+    // Indonesian voice when the device provides one; otherwise use its Indonesian voice.
+    return idVoices.find(v => /male|pria|laki/i.test(v.name)) || idVoices[0] || null;
+  }
+  function splitSpeech(text, max = 230) {
     const words = String(text || "").replace(/\s+/g, " ").trim().split(" ");
     const chunks = []; let part = "";
     for (const word of words) {
@@ -68,15 +74,15 @@
     synth.cancel();
     const chunks = splitSpeech(text);
     const voices = synth.getVoices();
-    const voice = voices.find(v => /^id(-|_)/i.test(v.lang)) || voices.find(v => /bahasa indonesia|indonesian/i.test(v.name)) || null;
+    const voice = pickMasculineIndonesianVoice(voices);
     if (!chunks.length) return;
     let index = 0;
     const next = () => {
       if (index >= chunks.length) { setStatus("Wis rampung. Ana pitakon liyane? 😊"); return; }
       const utterance = new SpeechSynthesisUtterance(chunks[index++]);
-      utterance.lang = "id-ID"; utterance.rate = 0.92; utterance.pitch = 1.0; utterance.volume = 1;
+      utterance.lang = "id-ID"; utterance.rate = 1.12; utterance.pitch = 0.88; utterance.volume = 1;
       if (voice) utterance.voice = voice;
-      utterance.onstart = () => setStatus("Mas Dino lagi ngomong. Dirungokna sek nggih…");
+      utterance.onstart = () => setStatus("Mas Dino lagi ngomong. Cepet, cekak, ora muter-muter 😄");
       utterance.onend = next;
       utterance.onerror = event => {
         setStatus(event?.error === "interrupted" ? "Swara dihentikan." : "Swara ora bisa diputer. Priksa setelan suara HP; jawaban teks tetep ana.");

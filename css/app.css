@@ -2116,3 +2116,22 @@ body.oyon-realization-active #playbackPhotoBox .playback-photo-data{font-size:10
 @media(max-width:600px){
   .mas-oyon-panel{bottom:calc(230px + env(safe-area-inset-bottom,0px)) !important;height:min(44dvh,400px) !important;max-height:calc(100dvh - 260px) !important}
 }
+
+
+/* V14.0.26 — Mas Dino compact right-side chat, map stays visible on phones. */
+@media(max-width:600px){
+  .mas-oyon-panel{
+    left:auto !important; right:8px !important; top:11dvh !important; bottom:auto !important;
+    width:min(76vw,350px) !important; height:74dvh !important;
+    min-height:300px !important; max-height:calc(100dvh - 22dvh) !important;
+    border-radius:18px !important;
+  }
+  .mas-oyon-messages{min-height:0 !important; flex:1 1 auto !important; overflow-y:auto !important; overscroll-behavior:contain; -webkit-overflow-scrolling:touch}
+  .mas-oyon-compose{flex:0 0 auto !important;padding:8px !important}
+  .mas-oyon-compose textarea{min-height:42px !important;max-height:68px !important}
+  .mas-oyon-compose-actions{gap:5px !important;flex-wrap:wrap}
+  .mas-oyon-compose-actions button{padding:8px 9px !important}
+  .mas-oyon-speak-toggle{font-size:11px !important}
+  .mas-oyon-head{padding:9px 10px !important}
+  .mas-oyon-head strong{font-size:15px !important}
+}

@@ -1,0 +1,12 @@
+OYONID MAP V14.0.26 — MAS DINO VOICE & CHAT PANEL
+
+- Mas Dino answers are instructed to be shorter, faster, naturally East Javanese/Malang ngoko alus, and lightly humorous.
+- Browser speech uses faster pacing and lower pitch; it prefers an explicitly male-labelled Indonesian voice if the device exposes one.
+- Welcome speech uses the same lower-pitch/faster profile.
+- Mobile chat panel is positioned on the right, narrower, taller, and keeps its message area vertically scrollable so more map remains visible.
+- Cache-busting updated to V14.0.26.
+
+LIMITATIONS / TESTING
+- Browser speech synthesis depends on Android/Chrome voices installed on the device. Most browsers do not expose reliable voice-gender metadata, and pitch adjustment cannot guarantee a truly native Javanese male voice.
+- No Android device voice playback test or live Gemini API test was performed. Test on the target phone.
+- No production deployment was performed.

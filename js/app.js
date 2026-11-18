@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V14.0.23-DATA-SAFETY-DEDUP";
+window.OYONID_BUILD = "V14.0.25-REFRESH-RESTORE-FIX";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -900,7 +900,7 @@ function welcomeFieldOfficer(rows, options = {}) {
     host.classList.remove("welcome-visible");
     requestAnimationFrame(() => host.classList.add("welcome-visible"));
   }
-  // Popup sambutan tampil singkat di tengah layar; suara tidak menahan popup.
+  // Popup sambutan tampil singkat; suara memakai karakter lebih rendah dan tempo lebih gesit.
   window.clearTimeout(window.oyonWelcomeTimer);
   window.oyonWelcomeTimer = window.setTimeout(() => {
     if (host) { host.classList.remove("welcome-visible"); window.setTimeout(() => { host.style.display = "none"; }, 180); }
@@ -911,8 +911,12 @@ function welcomeFieldOfficer(rows, options = {}) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(message);
       utterance.lang = "id-ID";
-      utterance.rate = 1.02;
-      utterance.pitch = 1.05;
+      const availableVoices = window.speechSynthesis.getVoices();
+      const indonesianVoices = availableVoices.filter(v => /^id(-|_)/i.test(v.lang) || /indonesian|bahasa indonesia/i.test(v.name));
+      const maleVoice = indonesianVoices.find(v => /male|pria|laki/i.test(v.name)) || indonesianVoices[0] || null;
+      if (maleVoice) utterance.voice = maleVoice;
+      utterance.rate = 1.10;
+      utterance.pitch = 0.88;
       let hidden = false;
       const hideOnce = () => { if (!hidden) { hidden = true; hideAfterVoice(); } };
       utterance.onend = hideOnce;
@@ -1631,46 +1635,57 @@ async function oyonStorageAudit() {
 
 window.addEventListener("load", async () => {
   requestPersistentOyonStorage();
+
+  // IndexedDB adalah sumber utama. Jangan biarkan localStorage yang kosong/usang
+  // menimpa data pelanggan yang berhasil dipulihkan dari IndexedDB.
+  let hasIndexedDBSnapshot = false;
+  try {
+    const [idbWorkingRows, idbSourceRows] = await Promise.all([
+      oyonLocalGet("workingRows"),
+      oyonLocalGet("sourceRows")
+    ]);
+    hasIndexedDBSnapshot = Array.isArray(idbWorkingRows) || Array.isArray(idbSourceRows);
+  } catch (err) {
+    console.warn("[OYONID] Pemeriksaan snapshot IndexedDB gagal:", err);
+  }
   await oyonRestoreLocalFirstState();
 
-  // Restore filename
-  const savedFilename = localStorage.getItem("RBM_FILENAME");
-  if (savedFilename) {
-    document.getElementById("fileNameLabel").innerText = "📄 " + savedFilename;
-  }
+  // Restore filename (metadata saja; tidak menentukan apakah marker dibuat).
+  try {
+    const savedFilename = localStorage.getItem("RBM_FILENAME");
+    if (savedFilename) {
+      const label = document.getElementById("fileNameLabel");
+      if (label) label.innerText = "📄 " + savedFilename;
+    }
+  } catch (e) {}
 
-  const saved = localStorage.getItem(STORAGE_KEY);
-
-  const savedHeaders = localStorage.getItem("OYONID_ORIGINAL_HEADERS");
-  if (savedHeaders) {
+  // localStorage hanya fallback untuk instalasi lama yang belum punya snapshot IndexedDB.
+  if (!hasIndexedDBSnapshot) {
     try {
-      originalHeaders = JSON.parse(savedHeaders);
-    } catch (e) {
-      originalHeaders = [];
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) workingRows = filterAlreadyCompletedRows(JSON.parse(saved));
+    } catch (err) {
+      console.warn("[OYONID] Fallback localStorage tidak dapat dibaca:", err);
     }
   }
 
-  if (saved) {
-    workingRows = filterAlreadyCompletedRows(JSON.parse(saved));
-    saveState();
-
-    map.whenReady(() => {
-      buildMarkers();
-      renderHistory();
-      renderColumnMappingOptions();
-      positionRouteRecordButton();
-      // Sambutan baru setiap kali aplikasi dibuka/refresh, berdasarkan isi kolom PETUGAS.
-      welcomeFieldOfficer(workingRows, { force: true });
-
-      // Tampilkan tombol zoom
-      if (workingRows.length > 0) {
-        zoomBtn.style.display = "block";
-      }
-
-      // Auto zoom ke marker
-      zoomToAllMarkers();
-    });
+  // Metadata header lama tetap boleh dipakai bila IndexedDB belum menyediakannya.
+  if (!originalHeaders.length) {
+    try {
+      const savedHeaders = localStorage.getItem("OYONID_ORIGINAL_HEADERS");
+      if (savedHeaders) originalHeaders = JSON.parse(savedHeaders) || [];
+    } catch (e) { originalHeaders = []; }
   }
+
+  map.whenReady(() => {
+    // Bangun ulang marker setiap aplikasi dibuka, termasuk setelah refresh/scroll.
+    buildMarkers();
+    renderHistory();
+    renderColumnMappingOptions();
+    positionRouteRecordButton();
+    if (workingRows.length > 0 && zoomBtn) zoomBtn.style.display = "block";
+    if (markers.length) zoomToAllMarkers();
+  });
 });
 
 function zoomToAllMarkers() {

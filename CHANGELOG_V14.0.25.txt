@@ -1,0 +1,9 @@
+V14.0.25 — FIX PEMULIHAN DATA SETELAH REFRESH
+
+- IndexedDB menjadi sumber utama saat aplikasi dimuat ulang.
+- localStorage hanya digunakan sebagai fallback untuk instalasi lama yang belum memiliki snapshot IndexedDB.
+- Data localStorage kosong/usang tidak lagi menimpa snapshot IndexedDB.
+- Pembuatan marker dijalankan setelah pemulihan data selesai, tidak bergantung pada keberadaan localStorage.
+- Sambutan Pak Sobat tidak lagi dipaksa muncul setiap refresh. Sambutan setelah upload tetap dipertahankan.
+
+Validasi: pemeriksaan sintaks JavaScript dan integritas ZIP. Belum diuji di perangkat Android atau browser pengguna.
