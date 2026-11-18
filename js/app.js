@@ -1,4 +1,4 @@
-window.OYONID_BUILD = "V13.1.23-WIDE-JOURNEY-CINEMATIC";
+window.OYONID_BUILD = "V14.0.23-DATA-SAFETY-DEDUP";
 console.info("[OYONID]", window.OYONID_BUILD);
 window.onerror = function (msg, src, line, col, err) {
   alert("JS ERROR:\n" + msg + "\nLine: " + line);
@@ -45,6 +45,27 @@ async function oyonLocalGet(key) {
     req.onerror = () => reject(req.error || new Error("Gagal membaca database lokal"));
   });
 }
+async function oyonCreatePreImportBackup() {
+  // Create a durable IndexedDB checkpoint before an Excel upload can replace in-memory state.
+  const snapshot = {
+    id: `preimport_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    workingRows: Array.isArray(workingRows) ? structuredClone(workingRows) : [],
+    sourceRows: Array.isArray(originalRows) ? structuredClone(originalRows) : [],
+    completedRecords: Array.isArray(completedRecords) ? structuredClone(completedRecords) : [],
+    history: Array.isArray(history) ? structuredClone(history) : [],
+    originalHeaders: Array.isArray(originalHeaders) ? [...originalHeaders] : [],
+    columnMapping: columnMapping && typeof columnMapping === "object" ? structuredClone(columnMapping) : {},
+    routeSessions: Array.isArray(v13RouteSessions) ? structuredClone(v13RouteSessions) : [],
+    activeRoute: v13ActiveRoute ? structuredClone(v13ActiveRoute) : null
+  };
+  const previous = await oyonLocalGet("preImportBackups").catch(() => []);
+  const backups = [snapshot, ...(Array.isArray(previous) ? previous : [])].slice(0, 3);
+  await oyonLocalPut("preImportBackups", backups);
+  console.info("[OYONID] Backup sebelum upload tersimpan:", snapshot.id);
+  return snapshot;
+}
+
 function oyonMirrorLocal(key, value) {
   // Fire-and-forget mirror; localStorage remains a quick fallback for older app versions.
   oyonLocalPut(key, value).catch(err => console.warn(`[OYONID] IndexedDB write ${key} gagal:`, err));
@@ -1356,10 +1377,19 @@ upload.onchange = e => {
   if (!file) return;
 
   // Simpan nama file hanya untuk referensi; identitas petugas diambil dari kolom PETUGAS.
-  localStorage.setItem("RBM_FILENAME", file.name);
+  try { localStorage.setItem("RBM_FILENAME", file.name); }
+  catch (storageError) { console.warn("[OYONID] Nama file tidak dapat disimpan ke localStorage:", storageError); }
 
   const reader = new FileReader();
   reader.onload = async evt => {
+    try {
+      await oyonCreatePreImportBackup();
+    } catch (backupError) {
+      console.error("[OYONID] Backup sebelum upload gagal:", backupError);
+      showToast("❌ Upload dibatalkan: backup data sebelumnya gagal dibuat. Data lama tetap dipertahankan.");
+      upload.value = "";
+      return;
+    }
     const wb = XLSX.read(new Uint8Array(evt.target.result), { type: "array" });
     oyonUploadedWorkbook = wb;
 
@@ -1368,6 +1398,23 @@ upload.onchange = e => {
     // selector pada placeholder "Upload Excel terlebih dahulu".
     oyonPopulateWorkbookSheetSelector(wb);
     const sheet = wb.Sheets[oyonSelectedSheetName || wb.SheetNames[0]];
+    const incomingRemaining = XLSX.utils.sheet_to_json(sheet, { defval: "" })
+      .filter(row => Object.values(row || {}).some(value => String(value ?? "").trim() !== ""));
+    const incomingCompletedName = wb.SheetNames.find(name => normalizeHeader(name) === normalizeHeader("Realisasi Selesai"));
+    const incomingCompleted = incomingCompletedName
+      ? XLSX.utils.sheet_to_json(wb.Sheets[incomingCompletedName], { defval: "" })
+          .filter(row => Object.values(row || {}).some(value => String(value ?? "").trim() !== ""))
+      : [];
+    if (incomingRemaining.length === 0 && incomingCompleted.length > 0) {
+      const proceed = window.confirm(
+        `PERINGATAN KEAMANAN DATA\n\nFile ini berisi 0 pelanggan tersisa dan ${incomingCompleted.length} baris realisasi selesai.\n\nJika file ini tidak benar-benar menandakan semua pelanggan selesai, upload dapat membuat daftar kerja kosong.\n\nLanjutkan upload file ini? Backup sebelum upload sudah dibuat.`
+      );
+      if (!proceed) {
+        showToast("Upload dibatalkan. Data sebelumnya tetap digunakan.");
+        upload.value = "";
+        return;
+      }
+    }
 
     // Foto adalah proses tambahan; kegagalannya tidak membatalkan pemuatan Excel.
     try {
@@ -1407,11 +1454,10 @@ originalHeaders.forEach((header, colIndex) => {
 try { localStorage.setItem("OYONID_GPS_NUMBER_FORMATS", JSON.stringify(gpsNumberFormats)); } catch (e) {}
 renderColumnMappingOptions();
 
-localStorage.setItem(
-  "OYONID_ORIGINAL_HEADERS",
-  JSON.stringify(originalHeaders)
-);
-localStorage.setItem("OYONID_COLUMN_HEADERS_V1", JSON.stringify(originalHeaders));
+try { localStorage.setItem("OYONID_ORIGINAL_HEADERS", JSON.stringify(originalHeaders)); }
+catch (storageError) { console.warn("[OYONID] Header Excel tidak muat di localStorage; tetap disimpan di IndexedDB.", storageError); }
+try { localStorage.setItem("OYONID_COLUMN_HEADERS_V1", JSON.stringify(originalHeaders)); }
+catch (storageError) { console.warn("[OYONID] Cache header kolom tidak muat di localStorage.", storageError); }
 oyonMirrorLocal("originalHeaders", originalHeaders);
 oyonMirrorLocal("gpsNumberFormats", gpsNumberFormats);
 
@@ -1506,6 +1552,83 @@ hariBacaList = [...new Set(
 /* ======================
    SAAT LOAD
 ====================== */
+
+/* V14.0.24 — full local data backup/restore (safe, explicit user action). */
+async function oyonFullBackupExport() {
+  const db = await oyonOpenLocalDb();
+  const rows = await new Promise((resolve,reject)=>{
+    const tx=db.transaction("kv","readonly"), req=tx.objectStore("kv").getAll();
+    req.onsuccess=()=>resolve(req.result||[]); req.onerror=()=>reject(req.error);
+  });
+  const payload={
+    format:"OYONID_FULL_BACKUP", schema:1, createdAt:new Date().toISOString(),
+    appVersion:"14.0.24", indexedDB:{database:OYON_LOCAL_DB_NAME,store:"kv",records:rows},
+    localState:{
+      workingRows:Array.isArray(workingRows)?workingRows:[],
+      sourceRows:Array.isArray(originalRows)?originalRows:[],
+      completedRecords:Array.isArray(completedRecords)?completedRecords:[],
+      history:Array.isArray(history)?history:[],
+      originalHeaders:Array.isArray(originalHeaders)?originalHeaders:[],
+      columnMapping:columnMapping||{},
+      routeSessions:Array.isArray(v13RouteSessions)?v13RouteSessions:[],
+      activeRoute:v13ActiveRoute||null
+    }
+  };
+  const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download=`OYONID_FULL_BACKUP_${new Date().toISOString().replace(/[:.]/g,"-")}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000);
+  showToast("Backup data aplikasi berhasil dibuat.");
+}
+async function oyonFullBackupRestore(file) {
+  if(!file) return;
+  const text=await file.text(), data=JSON.parse(text);
+  if(data?.format!=="OYONID_FULL_BACKUP" || data?.schema!==1 || !Array.isArray(data?.indexedDB?.records))
+    throw new Error("Format backup tidak dikenali atau tidak lengkap.");
+  const state=data.localState||{};
+  if(!confirm(`Pulihkan backup tanggal ${data.createdAt||"tidak diketahui"}? Data lokal saat ini akan diganti. Pastikan Anda sudah menyimpan backup kondisi sekarang.`)) return;
+  // First preserve the current database in a separate pre-restore snapshot.
+  const current=await new Promise((resolve,reject)=>{
+    const dbReq=indexedDB.open(OYON_LOCAL_DB_NAME);
+    dbReq.onsuccess=()=>{const db=dbReq.result; if(!db.objectStoreNames.contains("kv")){resolve([]);db.close();return;}
+      const tx=db.transaction("kv","readonly"),req=tx.objectStore("kv").getAll();
+      req.onsuccess=()=>{resolve(req.result||[]);db.close();};req.onerror=()=>{reject(req.error);db.close();};};
+    dbReq.onerror=()=>reject(dbReq.error);
+  });
+  await oyonLocalPut("preRestoreBackup",{createdAt:new Date().toISOString(),records:current});
+  const db=await oyonOpenLocalDb();
+  await new Promise((resolve,reject)=>{
+    const tx=db.transaction("kv","readwrite"),store=tx.objectStore("kv");
+    store.clear(); data.indexedDB.records.forEach(r=>{if(r&&typeof r.key==="string")store.put(r);});
+    tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+  });
+  workingRows=Array.isArray(state.workingRows)?state.workingRows:[];
+  originalRows=Array.isArray(state.sourceRows)?state.sourceRows:[];
+  completedRecords=Array.isArray(state.completedRecords)?state.completedRecords:[];
+  history=Array.isArray(state.history)?state.history:[];
+  originalHeaders=Array.isArray(state.originalHeaders)?state.originalHeaders:[];
+  columnMapping=state.columnMapping||{};
+  v13RouteSessions=Array.isArray(state.routeSessions)?state.routeSessions:[];
+  v13ActiveRoute=state.activeRoute||null;
+  await Promise.all([
+    oyonLocalPut("workingRows",workingRows),oyonLocalPut("sourceRows",originalRows),
+    oyonLocalPut("completedRecords",completedRecords),oyonLocalPut("history",history),
+    oyonLocalPut("originalHeaders",originalHeaders),oyonLocalPut("columnMapping",columnMapping),
+    oyonLocalPut("routeSessions",v13RouteSessions),oyonLocalPut("activeRoute",v13ActiveRoute)
+  ]);
+  alert("Backup berhasil dipulihkan. Halaman akan dimuat ulang.");
+  location.reload();
+}
+async function oyonStorageAudit() {
+  let estimate={usage:0,quota:0};
+  try{if(navigator.storage?.estimate)estimate=await navigator.storage.estimate();}
+  catch(e){}
+  const usage=Number(estimate.usage||0),quota=Number(estimate.quota||0);
+  const mb=n=>`${(n/1048576).toFixed(1)} MB`;
+  const msg=`Penyimpanan browser terpakai: ${mb(usage)}${quota?` dari ${mb(quota)} (${Math.round(usage/quota*100)}%)`:""}.\nIndexedDB utama: ${OYON_LOCAL_DB_NAME}.\nCatatan: angka browser mencakup seluruh data situs, bukan OYONID saja.`;
+  alert(msg);
+}
+
 window.addEventListener("load", async () => {
   requestPersistentOyonStorage();
   await oyonRestoreLocalFirstState();
@@ -3008,19 +3131,46 @@ function showToast(msg){
   window.clearTimeout(window.oyonToastTimer);
   window.oyonToastTimer = window.setTimeout(() => t.classList.remove("show"), 4000);
 }
+function v14CompletionEventKey(item) {
+  const row = item?.row || item || {};
+  const identity = String(item?.identity || completionIdentity(row) || "").trim();
+  const dayKey = String(item?.dayKey || (item?.completedAt ? localDateTimeParts(new Date(item.completedAt)).dayKey : "")).trim();
+  let time = String(item?.time || "").trim().replace(/\./g, ":");
+  if (!/^\d{1,2}:\d{2}:\d{2}$/.test(time) && item?.completedAt) {
+    const parsed = new Date(item.completedAt);
+    if (!Number.isNaN(parsed.getTime())) time = `${String(parsed.getHours()).padStart(2,"0")}:${String(parsed.getMinutes()).padStart(2,"0")}:${String(parsed.getSeconds()).padStart(2,"0")}`;
+  }
+  // ISO milliseconds are deliberately ignored: duplicate imports often differ only by .000/.969.
+  if (time) {
+    const parts = time.split(":");
+    time = `${String(Number(parts[0])).padStart(2,"0")}:${String(Number(parts[1])).padStart(2,"0")}:${String(Number(parts[2])).padStart(2,"0")}`;
+  }
+  return identity && identity !== "|" ? `${identity}|${dayKey}|${time || "NO_TIME"}` : "";
+}
 function v131AllCompletedRecords() {
-  const records = Array.isArray(completedRecords) ? completedRecords.slice() : [];
-  const seen = new Set(records.map(x => x.completionId ? "id:" + x.completionId : "key:" + (x.dayKey || "") + "|" + (x.identity || "")));
+  const records = [];
+  const seen = new Set();
+  const append = item => {
+    const row = item?.row || item || {};
+    const identity = String(item?.identity || completionIdentity(row) || "").trim();
+    const dayKey = String(item?.dayKey || (item?.completedAt ? localDateTimeParts(new Date(item.completedAt)).dayKey : localDateTimeParts().dayKey));
+    const normalized = { ...item, identity, dayKey, row: structuredClone(row) };
+    const eventKey = v14CompletionEventKey(normalized);
+    const idKey = normalized.completionId ? `id:${normalized.completionId}` : "";
+    const key = eventKey || idKey;
+    if (key && seen.has(key)) return;
+    if (idKey && seen.has(idKey)) return;
+    if (key) seen.add(key);
+    if (idKey) seen.add(idKey);
+    records.push(normalized);
+  };
+  (Array.isArray(completedRecords) ? completedRecords : []).forEach(append);
   (Array.isArray(history) ? history : []).forEach((h, index) => {
     const row = h.row || h;
     const identity = completionIdentity(row);
     const dayKey = h.dayKey || (h.completedAt ? localDateTimeParts(new Date(h.completedAt)).dayKey : localDateTimeParts().dayKey);
-    const completionId = h.completionId || "";
-    const key = completionId ? "id:" + completionId : "key:" + dayKey + "|" + identity;
-    if (seen.has(key)) return;
-    seen.add(key);
-    records.push({
-      completionId: completionId || "legacy_" + dayKey + "_" + index,
+    append({
+      completionId: h.completionId || `legacy_${dayKey}_${identity}_${index}`,
       identity, dayKey, row: structuredClone(row), completedAt: h.completedAt || "",
       date: h.date || "", time: h.time || "", actualLat: h.actualLat ?? "",
       actualLon: h.actualLon ?? "", gpsAccuracy: h.gpsAccuracy ?? "",
@@ -4813,3 +4963,14 @@ document.addEventListener("DOMContentLoaded",()=>{
 // Expose functions for compatibility with any older inline buttons.
 Object.assign(window,{openRealizationPanel,closeRealizationPanel,showRealizationOnMap,startRouteRecording,stopRouteRecording,playRouteHistory,pauseRouteHistory,resetRoutePlayback,openCustomerPhotoChooser,closeCustomerPhotoChooser,startCustomerPhotoCapture});
 window.addEventListener("beforeunload",()=>{if(v13ActiveRoute)v13SaveRoutes();});
+
+window.addEventListener("load",()=>{
+  const $=id=>document.getElementById(id);
+  $("fullBackupExportBtn")?.addEventListener("click",()=>oyonFullBackupExport().catch(e=>alert("Backup gagal: "+(e.message||e))));
+  $("fullBackupImportBtn")?.addEventListener("click",()=>$("fullBackupFileInput")?.click());
+  $("fullBackupFileInput")?.addEventListener("change",e=>{
+    const file=e.target.files?.[0]; if(file) oyonFullBackupRestore(file).catch(err=>alert("Pemulihan gagal: "+(err.message||err)));
+    e.target.value="";
+  });
+  $("storageAuditBtn")?.addEventListener("click",()=>oyonStorageAudit());
+});

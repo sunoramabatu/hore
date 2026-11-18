@@ -1,0 +1,6 @@
+V14.0.24
+- Added full app-state JSON backup and restore controls.
+- Restore validates schema, confirms replacement, and snapshots current IndexedDB kv first.
+- Added browser storage usage/quota audit.
+- Mas Dino launcher repositions on viewport and panel/layout changes.
+- Preserved existing app architecture and two-sheet Excel export.

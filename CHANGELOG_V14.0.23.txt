@@ -1,0 +1,10 @@
+V14.0.23 — DATA SAFETY & EXPORT DEDUPLICATION
+
+- Automatic IndexedDB checkpoint before Excel upload (3 most recent snapshots).
+- Cancel upload if checkpoint cannot be saved.
+- Confirmation guard when an incoming workbook has 0 remaining customers.
+- Catch localStorage quota errors for upload filename and Excel header cache.
+- Deduplicate completed export events by identity + day + second, ignoring ISO milliseconds.
+- Updated app.js cache-busting version.
+
+Base: V14.0.22. No production deployment.
